@@ -1,0 +1,258 @@
+import React, { useEffect } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useUser } from "../context/UserContext";
+import { iotService } from "../services/iotService";
+import Card from "../components/Card";
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Trash2,
+  Bell,
+  FileText,
+  Home,
+  CheckCircle,
+} from "lucide-react-native";
+
+export default function NotificationDetailScreen({ route, navigation }) {
+  const { notification } = route.params;
+  const { colors, showToast } = useUser();
+
+  const time = notification.triggeredDate
+    ? notification.triggeredDate.substring(11, 16)
+    : "00:00";
+  const date = notification.triggeredDate
+    ? notification.triggeredDate.substring(0, 10).split("-").reverse().join("/")
+    : "-";
+
+  // Mark notification as read when viewing the detail page
+  useEffect(() => {
+    if (notification.status !== "Read") {
+      iotService.markNotificationRead(notification.id).then((res) => {
+        if (res?.error) {
+          console.log("Gagal menandai telah dibaca di server:", res.message);
+        }
+      });
+    }
+  }, [notification]);
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Hapus Notifikasi",
+      "Apakah Anda yakin ingin menghapus notifikasi ini?",
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            const response = await iotService.deleteNotificationsBulk([notification.id]);
+            if (response.error) {
+              showToast("Gagal menghapus notifikasi.", "error");
+            } else {
+              showToast("Notifikasi berhasil dihapus.", "success");
+              navigation.goBack();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getNotificationTitle = (msg = "") => {
+    const lower = msg.toLowerCase();
+    if (lower.includes("added")) return "Perangkat Ditambahkan";
+    if (lower.includes("deleted home") || lower.includes("removed home")) return "Home Dihapus";
+    if (lower.includes("removed")) return "Perangkat Dicabut";
+    if (lower.includes("warning") || lower.includes("melampaui")) return "Peringatan Sensor";
+    return "Pemberitahuan";
+  };
+
+  const getIconConfig = (msg = "") => {
+    const lower = msg.toLowerCase();
+    if (lower.includes("deleted home") || lower.includes("removed home")) {
+      return { icon: Home, bg: "#ffedd5", fill: "#f97316" };
+    }
+    if (lower.includes("warning") || lower.includes("melampaui")) {
+      return { icon: Bell, bg: "#fee2e2", fill: "#ef4444" };
+    }
+    return { icon: FileText, bg: "#dcfce7", fill: "#22c55e" };
+  };
+
+  const title = getNotificationTitle(notification.message);
+  const iconConfig = getIconConfig(notification.message);
+  const IconComponent = iconConfig.icon;
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Navbar */}
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.navTitle, { color: colors.text }]}>Detail Notifikasi</Text>
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+          <Trash2 size={22} color="#ef4444" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Card style={[styles.detailCard, { backgroundColor: colors.cardBackground }]}>
+          {/* Badge Icon Header */}
+          <View style={styles.headerRow}>
+            <View style={[styles.iconContainer, { backgroundColor: iconConfig.bg }]}>
+              <IconComponent size={28} color={iconConfig.fill} />
+            </View>
+            <View style={styles.titleBox}>
+              <Text style={[styles.titleText, { color: colors.text }]}>{title}</Text>
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Calendar size={12} color={colors.textMuted} style={{ marginRight: 4 }} />
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>{date}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Clock size={12} color={colors.textMuted} style={{ marginRight: 4 }} />
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>{time} WIB</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+          {/* Description Content */}
+          <Text style={[styles.sectionHeading, { color: colors.textMuted }]}>Pesan</Text>
+          <Text style={[styles.messageContent, { color: colors.text }]}>
+            {notification.message}
+          </Text>
+
+          {/* Additional details */}
+          <View style={[styles.detailItemRow, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Kategori</Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>
+              {notification.alertType || "Info"}
+            </Text>
+          </View>
+          <View style={[styles.detailItemRow, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Status</Text>
+            <View style={styles.statusRowBadge}>
+              <CheckCircle size={14} color="#10b981" style={{ marginRight: 4 }} />
+              <Text style={[styles.detailValue, { color: "#10b981", fontWeight: "700" }]}>
+                Telah Dibaca
+              </Text>
+            </View>
+          </View>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  navbar: {
+    height: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  backBtn: {
+    padding: 8,
+  },
+  deleteBtn: {
+    padding: 8,
+  },
+  navTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  detailCard: {
+    padding: 20,
+    borderRadius: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  iconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  titleBox: {
+    flex: 1,
+  },
+  titleText: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metaText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  divider: {
+    height: 1,
+    marginVertical: 16,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  messageContent: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+    marginBottom: 20,
+  },
+  detailItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  detailValue: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  statusRowBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});
