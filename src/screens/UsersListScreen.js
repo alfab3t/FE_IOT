@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,9 +7,13 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  ActivityIndicator,
+  Alert,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
+import { iotService } from "../services/iotService";
 import {
   ArrowLeft,
   Search,
@@ -18,47 +22,79 @@ import {
 } from "lucide-react-native";
 
 export default function UsersListScreen({ navigation }) {
-  const { user, managedUsers } = useUser();
-  const [activeTab, setActiveTab] = useState("Semua"); // Semua, Admin, Owner/Controller, Viewer
+  const { user, colors, theme, showToast, t } = useUser();
+  const [activeRoleId, setActiveRoleId] = useState(""); // Default empty = "Semua"
+  const [dbRoles, setDbRoles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("Semua"); // Semua, Aktif, Nonaktif
+  const [statusFilter, setStatusFilter] = useState("Semua"); // Semua, Aktif, Tidak Aktif
 
-  // Tab Filtering
-  const getFilteredUsers = () => {
-    return managedUsers.filter((u) => {
-      const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase());
+  const [allUsers, setAllUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-      const roleLower = u.role.toLowerCase();
+  const isAdmin = user?.selectedRole?.roleId === "ROL001";
 
-      if (statusFilter !== "Semua" && u.status !== statusFilter) {
-        return false;
-      }
+  const loadUsers = useCallback(async () => {
+    setIsLoading(true);
+    // Fetch all users and role count statistics dynamically from the Stored Procedure response
+    const response = await iotService.getUsers("", "", "");
+    setIsLoading(false);
+    if (!response.error && response.users) {
+      setAllUsers(response.users);
+      setDbRoles(response.roles || []);
+    }
+  }, []);
 
-      if (activeTab === "Admin") {
-        return matchesSearch && roleLower === "admin";
-      }
-      if (activeTab === "Owner/Controller") {
-        return matchesSearch && (roleLower.includes("owner") || roleLower.includes("control"));
-      }
-      if (activeTab === "Viewer") {
-        return matchesSearch && roleLower === "viewer";
-      }
-      return matchesSearch;
+  useEffect(() => {
+    // Jalankan pertama kali saat mount
+    loadUsers();
+
+    // Jalankan setiap kali screen kembali aktif (focus)
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadUsers();
     });
+    return unsubscribe;
+  }, [navigation, loadUsers]);
+
+  // Locally filter users dynamically by active role ID, status filter, and keyword search
+  const filteredUsers = allUsers.filter((u) => {
+    const matchTab = !activeRoleId ? true : u.roleId === activeRoleId;
+
+    const matchStatus = statusFilter === "Semua" ? true : u.status === statusFilter;
+
+    const matchQuery = !searchQuery ? true : (
+      u.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.username?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return matchTab && matchStatus && matchQuery;
+  });
+
+  const handleToggleStatus = async (u) => {
+    const newStatus = u.status === "Aktif" ? "Tidak Aktif" : "Aktif";
+    Alert.alert(
+      "Ubah Status Pengguna",
+      `Ubah status ${u.fullName} menjadi "${newStatus}"?`,
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Ubah",
+          onPress: async () => {
+            const res = await iotService.setUserStatus(u.username, newStatus);
+            if (res.error) {
+              showToast(res.message || "Gagal mengubah status.", "error");
+            } else {
+              showToast(`Status ${u.fullName} berhasil diubah.`, "success");
+              loadUsers();
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const filteredUsers = getFilteredUsers();
-
-  // Tab counts
-  const countAll = managedUsers.length;
-  const countAdmin = managedUsers.filter((u) => u.role.toLowerCase() === "admin").length;
-  const countOwner = managedUsers.filter((u) => u.role.toLowerCase().includes("owner") || u.role.toLowerCase().includes("control")).length;
-  const countViewer = managedUsers.filter((u) => u.role.toLowerCase() === "viewer").length;
-
-  const renderRoleBadge = (roleName, isCurrentUser) => {
+  const renderRoleBadge = (roleId, roleName, isCurrentUser) => {
     if (isCurrentUser) {
       return (
         <View style={[styles.roleBadge, styles.badgeCurrent]}>
@@ -66,110 +102,128 @@ export default function UsersListScreen({ navigation }) {
         </View>
       );
     }
-    const nameLower = roleName.toLowerCase();
-    if (nameLower.includes("owner") || nameLower.includes("controller")) {
+    if (roleId === "ROL002") {
       return (
         <View style={[styles.roleBadge, styles.badgeOwner]}>
-          <Text style={[styles.roleBadgeText, styles.badgeTextOwner]}>owner/controller</Text>
+          <Text style={[styles.roleBadgeText, styles.badgeTextOwner]}>{roleName}</Text>
         </View>
       );
     }
     return (
       <View style={[styles.roleBadge, styles.badgeViewer]}>
-        <Text style={[styles.roleBadgeText, styles.badgeTextViewer]}>viewer</Text>
+        <Text style={[styles.roleBadgeText, styles.badgeTextViewer]}>{roleName}</Text>
       </View>
     );
   };
 
   const renderUserItem = ({ item }) => {
-    const isCurrentUser = item.email.toLowerCase() === user?.email?.toLowerCase() || item.name === user?.username || item.id === "usr001";
-
-    // Assign generic colorful user backgrounds for placeholder avatar
+    const isCurrentUser = item.username === user?.username;
     let avatarBg = "#dbeafe";
     let avatarColor = "#2563eb";
-    if (item.role.toLowerCase().includes("owner")) {
-      avatarBg = "#fef3c7";
-      avatarColor = "#d97706";
-    } else if (item.role.toLowerCase() === "viewer") {
-      avatarBg = "#fce7f3";
-      avatarColor = "#db2777";
-    }
+    if (item.roleId === "ROL002") { avatarBg = "#fef3c7"; avatarColor = "#d97706"; }
+    else if (item.roleId === "ROL003") { avatarBg = "#fce7f3"; avatarColor = "#db2777"; }
+
+    const isActive = item.status === "Aktif";
 
     return (
       <TouchableOpacity
         style={styles.userRow}
         activeOpacity={0.8}
-        onPress={() => navigation.navigate("UserDetail", { userId: item.id })}
+        onPress={() => navigation.navigate("UserDetail", { username: item.username })}
+        onLongPress={() => isAdmin && !isCurrentUser && handleToggleStatus(item)}
       >
         {/* Avatar circle */}
-        <View style={[styles.avatarCircle, { backgroundColor: avatarBg }]}>
-          <User size={22} color={avatarColor} />
+        <View style={[styles.avatarCircle, { backgroundColor: avatarBg, overflow: "hidden" }]}>
+          {item.photo ? (
+            <Image
+              source={{
+                uri: item.photo.startsWith("data:")
+                  ? item.photo
+                  : `data:image/jpeg;base64,${item.photo}`,
+              }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <User size={22} color={avatarColor} />
+          )}
         </View>
 
         {/* Info */}
         <View style={styles.userInfo}>
-          <Text style={styles.userNameText}>{item.name}</Text>
-          <Text style={styles.userEmailText}>{item.email}</Text>
+          <Text style={[styles.userNameText, { color: colors.text }]}>{item.fullName}</Text>
+          {item.email ? (
+            <Text style={[styles.userEmailText, { color: colors.textMuted }]}>{item.email}</Text>
+          ) : (
+            <Text style={[styles.userEmailText, { color: colors.textMuted }]}>@{item.username}</Text>
+          )}
         </View>
 
         {/* Badge & Status */}
         <View style={styles.rightSection}>
-          {renderRoleBadge(item.role, isCurrentUser)}
-          <Text style={styles.statusText}>{item.status}</Text>
+          {renderRoleBadge(item.roleId, item.roleName, isCurrentUser)}
+          <Text style={[styles.statusText, { color: isActive ? "#10b981" : "#ef4444" }]}>
+            {item.status}
+          </Text>
         </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate("Home")}>
-          <ArrowLeft size={24} color="#0f172a" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Pengguna</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("pengguna")}</Text>
         <View style={styles.navRightIcons}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setShowSearch(!showSearch)}>
-            <Search size={22} color="#0f172a" />
+            <Search size={22} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setFilterModalVisible(true)}>
-            <SlidersHorizontal size={20} color={statusFilter !== "Semua" ? "#0059AB" : "#0f172a"} />
+            <SlidersHorizontal size={20} color={statusFilter !== "Semua" ? "#0059AB" : colors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Floating Search Bar */}
       {showSearch && (
-        <View style={styles.searchBarContainer}>
-          <Search size={16} color="#94a3b8" style={styles.searchIcon} />
+        <View style={[styles.searchBarContainer, { backgroundColor: colors.border }]}>
+          <Search size={16} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
-            placeholder="Cari pengguna..."
+            placeholder={t("cari_pengguna")}
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            style={styles.searchInputField}
+            style={[styles.searchInputField, { color: colors.text }]}
             autoFocus
+            returnKeyType="search"
+            onSubmitEditing={loadUsers}
           />
         </View>
       )}
 
       {/* Segment Tabs */}
-      <View style={styles.segmentBar}>
+      <View style={[styles.segmentBar, { borderBottomColor: colors.border }]}>
         {[
-          { label: "Semua", count: countAll },
-          { label: "Admin", count: countAdmin },
-          { label: "Owner/Controller", count: countOwner },
-          { label: "Viewer", count: countViewer },
+          { label: "Semua", count: allUsers.length, roleId: "" },
+          ...dbRoles.map((role) => ({
+            label: role.roleName,
+            count: role.count,
+            roleId: role.roleId,
+          })),
         ].map((tab) => {
-          const active = activeTab === tab.label;
+          const active = activeRoleId === tab.roleId;
+          const displayLabel = tab.label === "Semua" ? t("semua") : tab.label;
           return (
             <TouchableOpacity
               key={tab.label}
               style={[styles.segmentTab, active && styles.segmentTabActive]}
-              onPress={() => setActiveTab(tab.label)}
+              onPress={() => setActiveRoleId(tab.roleId)}
             >
-              <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
-                {tab.label}({tab.count})
+              <Text style={[styles.segmentLabel, active ? styles.segmentLabelActive : { color: colors.textMuted }]}>
+                {displayLabel} ({tab.count})
               </Text>
             </TouchableOpacity>
           );
@@ -177,35 +231,46 @@ export default function UsersListScreen({ navigation }) {
       </View>
 
       {/* Users List */}
-      <FlatList
-        data={filteredUsers}
-        keyExtractor={(item) => item.id}
-        renderItem={renderUserItem}
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={UserItemSeparator}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Tidak ada pengguna ditemukan</Text>
-        }
-      />
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#0059AB" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredUsers}
+          keyExtractor={(item) => item.username}
+          renderItem={renderUserItem}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <UserItemSeparator color={colors.border} />}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              Tidak ada pengguna ditemukan
+            </Text>
+          }
+        />
+      )}
 
-      {/* Footer Buttons (Batal & Tambah User) */}
-      <View style={styles.footerButtonContainer}>
+      {/* Footer Buttons */}
+      <View style={[styles.footerButtonContainer, { backgroundColor: colors.cardBackground, borderTopColor: colors.border }]}>
         <TouchableOpacity
-          style={styles.cancelBtn}
+          style={[styles.cancelBtn, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
           onPress={() => navigation.navigate("Home")}
         >
-          <Text style={styles.cancelBtnText}>Batal</Text>
+          <Text style={[styles.cancelBtnText, { color: colors.text }]}>{t("batal")}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.addUserBtn}
-          onPress={() => navigation.navigate("AddUser")}
-        >
-          <Text style={styles.addUserBtnText}>+ Tambah User</Text>
-        </TouchableOpacity>
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.addUserBtn}
+            onPress={() => navigation.navigate("AddUser")}
+          >
+            <Text style={styles.addUserBtnText}>{t("tambah_user_btn")}</Text>
+          </TouchableOpacity>
+        )}
       </View>
-      {/* Custom Status Filter picker Modal */}
+
+      {/* Custom Status Filter Modal */}
       <Modal
         visible={filterModalVisible}
         transparent={true}
@@ -213,22 +278,15 @@ export default function UsersListScreen({ navigation }) {
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.dialogBox, { backgroundColor: "#fff" }]}>
-            {/* Header Icon */}
-            <View style={[styles.iconContainer, { backgroundColor: "#f8fafc" }]}>
+          <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.background }]}>
               <SlidersHorizontal size={32} color="#0059AB" />
             </View>
 
-            {/* Title */}
-            <Text style={[styles.dialogTitle, { color: "#0f172a", textAlign: "center", marginBottom: 8 }]}>Filter Status Pengguna</Text>
+            <Text style={[styles.dialogTitle, { color: colors.text, textAlign: "center", marginBottom: 8 }]}>{t("filter_status_pengguna")}</Text>
+            <Text style={[styles.dialogMessage, { color: colors.textMuted }]}>{t("pilih_status_pengguna")}</Text>
 
-            {/* Message */}
-            <Text style={[styles.dialogMessage, { color: "#64748b" }]}>
-              Pilih status pengguna yang ingin ditampilkan:
-            </Text>
-
-            {/* Options list */}
-            {["Semua", "Aktif", "Nonaktif"].map((statusOption) => {
+            {["Semua", "Aktif", "Tidak Aktif"].map((statusOption) => {
               const isSelected = statusFilter === statusOption;
               return (
                 <TouchableOpacity
@@ -236,8 +294,8 @@ export default function UsersListScreen({ navigation }) {
                   style={[
                     styles.optionRowBtn,
                     {
-                      borderColor: isSelected ? "#0059AB" : "#cbd5e1",
-                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+                      borderColor: isSelected ? "#0059AB" : colors.border,
+                      backgroundColor: isSelected ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : "transparent",
                       marginTop: 8
                     }
                   ]}
@@ -246,17 +304,16 @@ export default function UsersListScreen({ navigation }) {
                     setFilterModalVisible(false);
                   }}
                 >
-                  <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : "#0f172a" }]}>{statusOption}</Text>
+                  <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : colors.text }]}>{statusOption}</Text>
                 </TouchableOpacity>
               );
             })}
 
-            {/* Cancel Button */}
             <TouchableOpacity
               style={[styles.cancelBtnTextBox, { marginTop: 16 }]}
               onPress={() => setFilterModalVisible(false)}
             >
-              <Text style={[styles.modalCancelBtnText, { color: "#64748b" }]}>Batal</Text>
+              <Text style={[styles.modalCancelBtnText, { color: colors.textMuted }]}>{t("batal")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -265,12 +322,18 @@ export default function UsersListScreen({ navigation }) {
   );
 }
 
-const UserItemSeparator = () => <View style={styles.itemSeparator} />;
+const UserItemSeparator = ({ color }) => <View style={[styles.itemSeparator, { backgroundColor: color }]} />;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
   },
   navbar: {
     height: 60,
@@ -362,6 +425,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   userInfo: {
     flex: 1,

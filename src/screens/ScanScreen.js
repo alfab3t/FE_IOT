@@ -25,7 +25,16 @@ export default function ScanScreen({ route, navigation }) {
             Aplikasi membutuhkan akses kamera untuk memindai kode QR / MAC Address yang tertempel di perangkat fisik IoT Anda.
           </Text>
           <Button label="Berikan Izin Kamera" onPress={requestPermission} type="primary" />
-          <TouchableOpacity style={styles.cancelTextBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.cancelTextBtn}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate(returnScreen || "DevicesList");
+              }
+            }}
+          >
             <Text style={styles.cancelTextLink}>Kembali</Text>
           </TouchableOpacity>
         </View>
@@ -56,7 +65,13 @@ export default function ScanScreen({ route, navigation }) {
         
         <TouchableOpacity
           style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate(returnScreen || "DevicesList");
+            }
+          }}
         >
           <Text style={styles.cancelText}>Batal</Text>
         </TouchableOpacity>

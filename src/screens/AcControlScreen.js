@@ -16,7 +16,7 @@ import Card from "../components/Card";
 import { ArrowLeft, Wind, Snowflake, Compass } from "lucide-react-native";
 
 export default function AcControlScreen({ navigation }) {
-  const { user } = useUser();
+  const { user, colors } = useUser();
   const [activeBuilding, setActiveBuilding] = useState("");
   const [acDeviceId, setAcDeviceId] = useState("DEV_LAMP01");
   const [tempDeviceId, setTempDeviceId] = useState("DEV_TEMP01");
@@ -32,7 +32,6 @@ export default function AcControlScreen({ navigation }) {
 
   const loadAcStatus = async () => {
     setIsLoading(true);
-    // Fetch latest dashboard data to check AC status
     const response = await iotService.getDashboardLatest();
     
     if (response.error) {
@@ -41,44 +40,44 @@ export default function AcControlScreen({ navigation }) {
       return;
     }
 
-    // Find active building (we can use the first building found or fallback)
     let building = "Gedung Utama";
     if (response.length > 0) {
       building = response[0].gedung || "Gedung Utama";
     }
     setActiveBuilding(building);
 
-    // Mapped variables
-    let lampId = "DEV_LAMP01";
+    let lId = "DEV_AC01";
     let tId = "DEV_TEMP01";
     let pwrOn = false;
+    let tempVal = 22;
 
-    response.forEach((dev) => {
-      if (dev?.gedung?.toLowerCase() === building.toLowerCase()) {
-        if (dev.category === "Lampu" || dev.category === "AC") {
-          lampId = dev.id;
-          pwrOn = dev.status === "ON";
-        }
-        if (dev.category === "Temperatur & Kelembaban") {
-          tId = dev.id;
-        }
+    // Search for AC device in active building
+    const acDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "AC");
+    if (acDevInBuilding) {
+      lId = acDevInBuilding.id;
+      pwrOn = acDevInBuilding.status === "ON";
+    } else {
+      // Fallback to Lampu if no AC category device in building
+      const lampDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "Lampu");
+      if (lampDevInBuilding) {
+        lId = lampDevInBuilding.id;
+        pwrOn = lampDevInBuilding.status === "ON";
       }
-    });
+    }
 
-    setAcDeviceId(lampId);
+    // Search for Temperature sensor in active building
+    const tempDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "Temperatur & Kelembaban");
+    if (tempDevInBuilding) {
+      tId = tempDevInBuilding.id;
+      const parsed = parseFloat(tempDevInBuilding.status);
+      if (!isNaN(parsed)) tempVal = Math.round(parsed);
+    }
+
+    setAcDeviceId(lId);
     setTempDeviceId(tId);
     setIsPowerOn(pwrOn);
-
-    // Fetch device details for AC temperature limits
-    const detailResponse = await iotService.getDeviceById(tId);
+    setTemperature(tempVal);
     setIsLoading(false);
-
-    if (!detailResponse.error && detailResponse.limitMin !== null) {
-      let temp = Math.round(detailResponse.limitMin);
-      if (temp < 16) temp = 16;
-      if (temp > 30) temp = 30;
-      setTemperature(temp);
-    }
   };
 
   useEffect(() => {
@@ -96,13 +95,15 @@ export default function AcControlScreen({ navigation }) {
     }
 
     setIsPowerOn(value);
-    const topic = acDeviceId === "DEV_AC01" ? "setPowerS3" : "setPower00121";
-    const payload = value ? "1" : "0";
+    const cmd = value ? "1" : "0";
     
-    const response = await iotService.controlAc(topic, payload);
+    // Decouple AC control from Lamp control completely
+    const topic = tempDeviceId === "DEV_TEMP02" ? "setPowerS3" : "setPowerAC01";
+    const response = await iotService.controlAc(topic, cmd);
+    
     if (response.error) {
       setIsPowerOn(!value);
-      Alert.alert("Gagal", "Gagal mengubah daya AC.");
+      Alert.alert("Gagal", response.message || "Gagal mengontrol daya AC.");
     }
   };
 
@@ -120,8 +121,8 @@ export default function AcControlScreen({ navigation }) {
     
     const response = await iotService.controlAc(topic, String(nextTemp));
     if (response.error) {
-      setTemperature((prev) => prev);
-      Alert.alert("Gagal", "Gagal mengubah temperatur target.");
+      setTemperature(temperature);
+      Alert.alert("Gagal", response.message || "Gagal mengubah suhu AC.");
     }
   };
 
@@ -156,30 +157,30 @@ export default function AcControlScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#333" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Kontrol AC</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>Kontrol AC</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={styles.loaderText}>Menghubungkan kontrol AC...</Text>
+          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Menghubungkan kontrol AC...</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Active Info */}
-          <Text style={styles.activeBuildingText}>Lokasi: {activeBuilding}</Text>
+          <Text style={[styles.activeBuildingText, { color: colors.textMuted }]}>Lokasi: {activeBuilding}</Text>
 
           {/* Power Switch Card */}
-          <Card style={styles.powerCard}>
+          <Card style={[styles.powerCard, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.powerHeader}>
-              <Text style={styles.powerTitle}>Daya AC</Text>
+              <Text style={[styles.powerTitle, { color: colors.text }]}>Daya AC</Text>
               <Text style={styles.powerStatusText}>{isPowerOn ? "ON" : "OFF"}</Text>
             </View>
             <Switch
@@ -192,8 +193,8 @@ export default function AcControlScreen({ navigation }) {
           </Card>
 
           {/* Temperature Controls */}
-          <Card style={styles.tempCard}>
-            <Text style={styles.tempHeaderTitle}>Target Temperatur</Text>
+          <Card style={[styles.tempCard, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.tempHeaderTitle, { color: colors.text }]}>Target Temperatur</Text>
             <View style={styles.tempSelectorRow}>
               <TouchableOpacity
                 style={[styles.tempBtn, isViewer && styles.disabledBtn]}
@@ -203,7 +204,7 @@ export default function AcControlScreen({ navigation }) {
                 <Text style={styles.tempBtnText}>-</Text>
               </TouchableOpacity>
 
-              <Text style={styles.tempValueText}>{temperature}°C</Text>
+              <Text style={[styles.tempValueText, { color: colors.text }]}>{temperature}°C</Text>
 
               <TouchableOpacity
                 style={[styles.tempBtn, isViewer && styles.disabledBtn]}
@@ -216,8 +217,8 @@ export default function AcControlScreen({ navigation }) {
           </Card>
 
           {/* AC Modes */}
-          <Text style={styles.sectionTitle}>Mode Pengoperasian</Text>
-          <Card style={styles.modeCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Mode Pengoperasian</Text>
+          <Card style={[styles.modeCard, { backgroundColor: colors.cardBackground }]}>
             {[
               { label: "Auto", val: 1 },
               { label: "Cool", val: 2 },
@@ -227,12 +228,12 @@ export default function AcControlScreen({ navigation }) {
               return (
                 <TouchableOpacity
                   key={m.label}
-                  style={[styles.optionItem, active && styles.optionItemActive]}
+                  style={[styles.optionItem, { backgroundColor: colors.border }, active && styles.optionItemActive]}
                   onPress={() => changeMode(m.label, m.val)}
                   disabled={isViewer}
                 >
                   <Snowflake size={20} color={active ? "#fff" : "#0059AB"} />
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>
+                  <Text style={[styles.optionText, active ? styles.optionTextActive : { color: colors.text }]}>
                     {m.label}
                   </Text>
                 </TouchableOpacity>
@@ -241,8 +242,8 @@ export default function AcControlScreen({ navigation }) {
           </Card>
 
           {/* Fan Speeds */}
-          <Text style={styles.sectionTitle}>Kecepatan Kipas (Fan Speed)</Text>
-          <Card style={styles.modeCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Kecepatan Kipas (Fan Speed)</Text>
+          <Card style={[styles.modeCard, { backgroundColor: colors.cardBackground }]}>
             {[
               { label: "Auto", val: 1 },
               { label: "Quiet", val: 2 },
@@ -254,12 +255,12 @@ export default function AcControlScreen({ navigation }) {
               return (
                 <TouchableOpacity
                   key={f.label}
-                  style={[styles.optionItem, active && styles.optionItemActive]}
+                  style={[styles.optionItem, { backgroundColor: colors.border }, active && styles.optionItemActive]}
                   onPress={() => changeFanSpeed(f.label, f.val)}
                   disabled={isViewer}
                 >
                   <Wind size={20} color={active ? "#fff" : "#0059AB"} />
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>
+                  <Text style={[styles.optionText, active ? styles.optionTextActive : { color: colors.text }]}>
                     {f.label}
                   </Text>
                 </TouchableOpacity>
@@ -268,8 +269,8 @@ export default function AcControlScreen({ navigation }) {
           </Card>
 
           {/* Swing Modes */}
-          <Text style={styles.sectionTitle}>Arah Swing (Hembusan)</Text>
-          <Card style={styles.modeCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Arah Swing (Hembusan)</Text>
+          <Card style={[styles.modeCard, { backgroundColor: colors.cardBackground }]}>
             {[
               { label: "Auto", val: 1 },
               { label: "Highest", val: 2 },
@@ -281,12 +282,12 @@ export default function AcControlScreen({ navigation }) {
               return (
                 <TouchableOpacity
                   key={s.label}
-                  style={[styles.optionItem, active && styles.optionItemActive]}
+                  style={[styles.optionItem, { backgroundColor: colors.border }, active && styles.optionItemActive]}
                   onPress={() => changeSwingMode(s.label, s.val)}
                   disabled={isViewer}
                 >
                   <Compass size={20} color={active ? "#fff" : "#0059AB"} />
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>
+                  <Text style={[styles.optionText, active ? styles.optionTextActive : { color: colors.text }]}>
                     {s.label}
                   </Text>
                 </TouchableOpacity>
@@ -302,7 +303,7 @@ export default function AcControlScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "transparent",
   },
   navbar: {
     height: 60,

@@ -24,7 +24,7 @@ import {
 
 export default function NotificationDetailScreen({ route, navigation }) {
   const { notification } = route.params;
-  const { colors, showToast } = useUser();
+  const { colors, showToast, t, language, translateNotification } = useUser();
 
   const time = notification.triggeredDate
     ? notification.triggeredDate.substring(11, 16)
@@ -46,19 +46,25 @@ export default function NotificationDetailScreen({ route, navigation }) {
 
   const handleDelete = () => {
     Alert.alert(
-      "Hapus Notifikasi",
-      "Apakah Anda yakin ingin menghapus notifikasi ini?",
+      language === "Indonesia" ? "Hapus Notifikasi" : "Delete Notification",
+      language === "Indonesia" ? "Apakah Anda yakin ingin menghapus notifikasi ini?" : "Are you sure you want to delete this notification?",
       [
-        { text: "Batal", style: "cancel" },
+        { text: t("batal"), style: "cancel" },
         {
-          text: "Hapus",
+          text: language === "Indonesia" ? "Hapus" : "Delete",
           style: "destructive",
           onPress: async () => {
             const response = await iotService.deleteNotificationsBulk([notification.id]);
             if (response.error) {
-              showToast("Gagal menghapus notifikasi.", "error");
+              showToast(
+                language === "Indonesia" ? "Gagal menghapus notifikasi." : "Failed to delete notification.",
+                "error"
+              );
             } else {
-              showToast("Notifikasi berhasil dihapus.", "success");
+              showToast(
+                language === "Indonesia" ? "Notifikasi berhasil dihapus." : "Notification successfully deleted.",
+                "success"
+              );
               navigation.goBack();
             }
           },
@@ -69,11 +75,12 @@ export default function NotificationDetailScreen({ route, navigation }) {
 
   const getNotificationTitle = (msg = "") => {
     const lower = msg.toLowerCase();
-    if (lower.includes("added")) return "Perangkat Ditambahkan";
-    if (lower.includes("deleted home") || lower.includes("removed home")) return "Home Dihapus";
-    if (lower.includes("removed")) return "Perangkat Dicabut";
-    if (lower.includes("warning") || lower.includes("melampaui")) return "Peringatan Sensor";
-    return "Pemberitahuan";
+    const isId = language === "Indonesia";
+    if (lower.includes("added")) return isId ? "Perangkat Ditambahkan" : "Device Added";
+    if (lower.includes("deleted home") || lower.includes("removed home")) return isId ? "Home Dihapus" : "Home Deleted";
+    if (lower.includes("removed")) return isId ? "Perangkat Dicabut" : "Device Removed";
+    if (lower.includes("warning") || lower.includes("melampaui")) return isId ? "Peringatan Sensor" : "Sensor Warning";
+    return isId ? "Pemberitahuan" : "Notification";
   };
 
   const getIconConfig = (msg = "") => {
@@ -98,7 +105,9 @@ export default function NotificationDetailScreen({ route, navigation }) {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.navTitle, { color: colors.text }]}>Detail Notifikasi</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>
+          {language === "Indonesia" ? "Detail Notifikasi" : "Notification Detail"}
+        </Text>
         <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
           <Trash2 size={22} color="#ef4444" />
         </TouchableOpacity>
@@ -129,24 +138,28 @@ export default function NotificationDetailScreen({ route, navigation }) {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           {/* Description Content */}
-          <Text style={[styles.sectionHeading, { color: colors.textMuted }]}>Pesan</Text>
+          <Text style={[styles.sectionHeading, { color: colors.textMuted }]}>
+            {language === "Indonesia" ? "Pesan" : "Message"}
+          </Text>
           <Text style={[styles.messageContent, { color: colors.text }]}>
-            {notification.message}
+            {translateNotification(notification.message)}
           </Text>
 
           {/* Additional details */}
           <View style={[styles.detailItemRow, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Kategori</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>
+              {language === "Indonesia" ? "Kategori" : "Category"}
+            </Text>
             <Text style={[styles.detailValue, { color: colors.text }]}>
               {notification.alertType || "Info"}
             </Text>
           </View>
           <View style={[styles.detailItemRow, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Status</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{t("status")}</Text>
             <View style={styles.statusRowBadge}>
               <CheckCircle size={14} color="#10b981" style={{ marginRight: 4 }} />
               <Text style={[styles.detailValue, { color: "#10b981", fontWeight: "700" }]}>
-                Telah Dibaca
+                {language === "Indonesia" ? "Telah Dibaca" : "Read"}
               </Text>
             </View>
           </View>

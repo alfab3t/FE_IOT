@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
@@ -32,7 +33,7 @@ import {
 } from "lucide-react-native";
 
 export default function DevicesListScreen({ route, navigation, isTab = false }) {
-  const { user, colors, theme, showToast } = useUser();
+  const { user, colors, theme, showToast, t } = useUser();
   const [devices, setDevices] = useState([]);
   const [locations, setLocations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -148,20 +149,45 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   const handleDeleteDevice = async (id) => {
     Alert.alert(
       "Hapus Perangkat",
-      "Apakah Anda yakin ingin menghapus perangkat ini?",
+      "Apakah Anda yakin ingin menghapus perangkat ini? Semua data telemetri dan notifikasi terkait akan ikut terhapus.",
       [
         { text: "Batal", style: "cancel" },
         {
           text: "Hapus",
           style: "destructive",
           onPress: async () => {
-            // Simulated / Mock delete since API deletes dynamically
-            Alert.alert("Sukses", "Perangkat berhasil dihapus.");
-            setDevices(devices.filter((d) => d.id !== id));
+            const response = await iotService.deleteDevice(id);
+            if (response.error) {
+              Alert.alert("Gagal", response.message || "Gagal menghapus perangkat.");
+            } else {
+              showToast("Perangkat berhasil dihapus.", "success");
+              setDevices(devices.filter((d) => d.id !== id));
+            }
           },
         },
       ]
     );
+  };
+
+  const handleToggleActive = async (id, currentIsActive) => {
+    const newIsActive = !currentIsActive;
+    // Optimistic update
+    setDevices((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, isActive: newIsActive } : d))
+    );
+    const response = await iotService.toggleDeviceActive(id, newIsActive);
+    if (response.error) {
+      // Rollback jika gagal
+      setDevices((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, isActive: currentIsActive } : d))
+      );
+      showToast(response.message || "Gagal mengubah status perangkat.", "error");
+    } else {
+      showToast(
+        newIsActive ? "Perangkat berhasil diaktifkan." : "Perangkat dinonaktifkan.",
+        newIsActive ? "success" : "info"
+      );
+    }
   };
 
   // Filter devices based on Search input, Online/Offline tab, and selectedCategoryFilter
@@ -182,7 +208,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   const getFilteredDevices = () => {
     return devices.filter((dev) => {
       const nameMatch = dev.name?.toLowerCase().includes(search.toLowerCase());
-      const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");
+      const isOnline = dev.isActive !== false;
 
       if (statusTab === "Online" && !isOnline) return false;
       if (statusTab === "Offline" && isOnline) return false;
@@ -194,7 +220,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
   const filteredDevices = getFilteredDevices();
   const countAll = devices.length;
-  const countOnline = devices.filter((d) => d.status === "ON" || (d.status && d.status !== "OFF" && d.status !== "0")).length;
+  const countOnline = devices.filter((d) => d.isActive !== false).length;
   const countOffline = countAll - countOnline;
 
   const renderCategoryIcon = (category, name) => {
@@ -236,12 +262,20 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   };
 
   const renderDeviceRow = ({ item }) => {
-    const isOnline = item.status === "ON" || (item.status && item.status !== "OFF" && item.status !== "0");
+    const isActive = item.isActive !== false; // default true
+    const isOnline = isActive;
     return (
-      <Card style={[styles.deviceRowCard, { backgroundColor: colors.cardBackground }]}>
+      <Card
+        style={[
+          styles.deviceRowCard,
+          { backgroundColor: isActive ? colors.cardBackground : (theme === "Dark Mode" ? "#1e293b" : "#f1f5f9") },
+          !isActive && styles.deviceRowCardInactive,
+        ]}
+      >
         <TouchableOpacity
-          style={styles.deviceClickArea}
+          style={[styles.deviceClickArea, !isActive && { opacity: 0.45 }]}
           onPress={() => {
+            if (!isActive) return; // disabled jika offline
             if (item.category === "Lampu" || item.name?.toLowerCase().includes("lamp")) {
               navigation.navigate("LampControl");
             } else {
@@ -267,13 +301,29 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           </View>
         </TouchableOpacity>
 
-        {/* Value / State on right */}
+        {/* Value + Controls on right */}
         <View style={styles.rightStateColumn}>
-          <Text style={[styles.valueText, { color: colors.text }]}>{getValueDisplay(item)}</Text>
+          {/* Baris atas: nilai + tombol hapus */}
+          <View style={styles.topRightRow}>
+            {isActive && (
+              <Text style={[styles.valueText, { color: colors.text }]}>{getValueDisplay(item)}</Text>
+            )}
+            {isAdmin && isActive && (
+              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteDevice(item.id)}>
+                <Trash2 size={16} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Baris bawah: toggle switch */}
           {isAdmin && (
-            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteDevice(item.id)}>
-              <Trash2 size={16} color="#ef4444" />
-            </TouchableOpacity>
+            <Switch
+              value={isActive}
+              onValueChange={() => handleToggleActive(item.id, isActive)}
+              trackColor={{ false: "#ef4444", true: "#10b981" }}
+              thumbColor="#ffffff"
+              style={styles.toggleSwitch}
+            />
           )}
         </View>
       </Card>
@@ -289,7 +339,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
         )}
-        <Text style={[styles.navTitle, { color: colors.text }]}>Perangkat</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("perangkat")}</Text>
         <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={{ padding: 8 }}>
           <SlidersHorizontal size={20} color={selectedCategoryFilter !== "Semua" ? "#0059AB" : colors.textMuted} />
         </TouchableOpacity>
@@ -298,19 +348,19 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       {/* Tabs */}
       <View style={[styles.segmentTabBar, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
         {[
-          { label: "Semua", count: countAll },
-          { label: "Online", count: countOnline },
-          { label: "Offline", count: countOffline },
+          { label: "Semua", count: countAll, val: "Semua" },
+          { label: "Online", count: countOnline, val: "Online" },
+          { label: "Offline", count: countOffline, val: "Offline" },
         ].map((tab) => {
-          const active = statusTab === tab.label;
+          const active = statusTab === tab.val;
           return (
             <TouchableOpacity
-              key={tab.label}
+              key={tab.val}
               style={[styles.segmentTabItem, active && [styles.segmentTabItemActive, { borderBottomColor: "#0059AB" }]]}
-              onPress={() => setStatusTab(tab.label)}
+              onPress={() => setStatusTab(tab.val)}
             >
               <Text style={[styles.segmentTabLabel, active ? styles.segmentTabLabelActive : { color: colors.textMuted }]}>
-                {tab.label}({tab.count})
+                {tab.val === "Semua" ? t("semua") : tab.val}({tab.count})
               </Text>
             </TouchableOpacity>
           );
@@ -322,7 +372,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
         <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchBarInput, { color: colors.text }]}
-          placeholder="Cari perangkat..."
+          placeholder={t("cari_perangkat")}
           placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -345,13 +395,13 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               <View style={styles.emptyIconCircle}>
                 <Search size={40} color="#0059AB" />
               </View>
-              <Text style={styles.emptyTitle}>Tidak ada perangkat</Text>
-              <Text style={styles.emptySubtitle}>
-                Belum ada perangkat yang terdeteksi di status ini.
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("tidak_ada_perangkat")}</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+                {t("tidak_ada_perangkat_desc")}
               </Text>
               {isAdmin && (
                 <TouchableOpacity style={styles.emptyAddBtn} onPress={handleOpenAdd}>
-                  <Text style={styles.emptyAddBtnText}>+ Tambah Perangkat</Text>
+                  <Text style={styles.emptyAddBtnText}>{t("tambah_perangkat_btn")}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -363,7 +413,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       {isAdmin && filteredDevices.length > 0 && (
         <TouchableOpacity style={styles.floatingAddBtn} onPress={handleOpenAdd}>
           <Plus size={20} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.floatingAddBtnText}>Tambah Perangkat</Text>
+          <Text style={styles.floatingAddBtnText}>{t("tambah_perangkat")}</Text>
         </TouchableOpacity>
       )}
 
@@ -373,20 +423,20 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
         animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.navbar}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
             <TouchableOpacity style={styles.backBtn} onPress={() => setModalVisible(false)}>
-              <ArrowLeft size={24} color="#333" />
+              <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.navTitle}>Tambah Perangkat</Text>
+            <Text style={[styles.navTitle, { color: colors.text }]}>{t("tambah_perangkat")}</Text>
             <TouchableOpacity style={styles.scanBtn} onPress={handleScanQR}>
-              <Camera size={22} color="#0059AB" />
+              <Camera size={22} color={colors.primary || "#0059AB"} />
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.modalScrollContent}>
             <Input
-              label="Nama Device*"
+              label={t("nama_device")}
               placeholder="Contoh: ESP32-Ruang Lab"
               value={formName}
               onChangeText={setFormName}
@@ -394,7 +444,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             />
 
             <Input
-              label="Device ID (MAC/ID)*"
+              label={t("device_id")}
               placeholder="Contoh: ESP32-LAB-01"
               value={formId}
               onChangeText={setFormId}
@@ -402,7 +452,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             />
 
             <Input
-              label="MAC Address (Opsional)"
+              label={t("mac_address")}
               placeholder="Contoh: 00:1A:2B:3C:4D:5E"
               value={formMac}
               onChangeText={setFormMac}
@@ -410,19 +460,19 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             />
 
             {/* Type selector */}
-            <Text style={styles.formLabel}>Jenis Device*</Text>
+            <Text style={[styles.formLabel, { color: colors.text }]}>{t("jenis_device")}</Text>
             <View style={styles.pillSelector}>
               {["Sensor", "Aktuator", "Meter"].map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[
                     styles.pillItem,
-                    formCategory === type ? styles.pillItemActive : styles.pillItemInactive,
+                    formCategory === type ? styles.pillItemActive : [styles.pillItemInactive, { backgroundColor: colors.cardBackground, borderColor: colors.border }],
                   ]}
                   onPress={() => setFormCategory(type)}
                   disabled={isSubmitting}
                 >
-                  <Text style={[styles.pillText, formCategory === type && styles.pillTextActive]}>
+                  <Text style={[styles.pillText, { color: formCategory === type ? "#fff" : colors.text }]}>
                     {type}
                   </Text>
                 </TouchableOpacity>
@@ -430,19 +480,19 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             </View>
 
             {/* Comm Method selector */}
-            <Text style={styles.formLabel}>Metode Komunikasi*</Text>
+            <Text style={[styles.formLabel, { color: colors.text }]}>{t("metode_komunikasi")}</Text>
             <View style={styles.pillSelector}>
               {["WiFi", "Bluetooth", "LoRa"].map((comm) => (
                 <TouchableOpacity
                   key={comm}
                   style={[
                     styles.pillItem,
-                    formComm === comm ? styles.pillItemActive : styles.pillItemInactive,
+                    formComm === comm ? styles.pillItemActive : [styles.pillItemInactive, { backgroundColor: colors.cardBackground, borderColor: colors.border }],
                   ]}
                   onPress={() => setFormComm(comm)}
                   disabled={isSubmitting}
                 >
-                  <Text style={[styles.pillText, formComm === comm && styles.pillTextActive]}>
+                  <Text style={[styles.pillText, { color: formComm === comm ? "#fff" : colors.text }]}>
                     {comm}
                   </Text>
                 </TouchableOpacity>
@@ -450,7 +500,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             </View>
 
             <Input
-              label="MQTT Topic*"
+              label={t("mqtt_topic")}
               placeholder="Contoh: astratech/lab/temp01"
               value={formTopic}
               onChangeText={setFormTopic}
@@ -458,7 +508,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             />
 
             {/* Location selector */}
-            <Text style={styles.formLabel}>Lokasi Pemasangan*</Text>
+            <Text style={[styles.formLabel, { color: colors.text }]}>{t("lokasi_pemasangan")}</Text>
             <View style={styles.locationSelectorList}>
               {locations.map((loc) => {
                 const isSelected = formLocationId === String(loc.id);
@@ -467,13 +517,13 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                     key={loc.id}
                     style={[
                       styles.locItemBadge,
-                      isSelected ? styles.locItemBadgeActive : styles.locItemBadgeInactive,
+                      isSelected ? styles.locItemBadgeActive : [styles.locItemBadgeInactive, { backgroundColor: colors.cardBackground, borderColor: colors.border }],
                     ]}
                     onPress={() => setFormLocationId(String(loc.id))}
                     disabled={isSubmitting}
                   >
-                    <MapPin size={14} color={isSelected ? "#fff" : "#64748b"} />
-                    <Text style={[styles.locItemBadgeText, isSelected && styles.locItemBadgeTextActive]}>
+                    <MapPin size={14} color={isSelected ? "#fff" : colors.textMuted} />
+                    <Text style={[styles.locItemBadgeText, isSelected ? styles.locItemBadgeTextActive : { color: colors.text }]}>
                       {loc.ruangan} ({loc.gedung})
                     </Text>
                   </TouchableOpacity>
@@ -482,11 +532,14 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             </View>
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Batal</Text>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.text }]}>{t("batal")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSaveBtn} onPress={handleAddDevice} disabled={isSubmitting}>
-                <Text style={styles.modalSaveText}>Simpan</Text>
+                <Text style={styles.modalSaveText}>{t("simpan")}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -508,16 +561,17 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             </View>
 
             {/* Title */}
-            <Text style={[styles.dialogTitle, { color: colors.text, textAlign: "center", marginBottom: 8 }]}>Filter Kategori</Text>
+            <Text style={[styles.dialogTitle, { color: colors.text, textAlign: "center", marginBottom: 8 }]}>{t("filter_kategori")}</Text>
 
             {/* Message */}
             <Text style={[styles.dialogMessage, { color: colors.textMuted }]}>
-              Pilih kategori perangkat yang ingin ditampilkan:
+              {t("pilih_kategori")}
             </Text>
 
             {/* Options list */}
             {["Semua", "Lampu", "AC", "Listrik", "Debit Air", "Temperatur & Kelembaban"].map((catOption) => {
               const isSelected = selectedCategoryFilter === catOption;
+              const transCatLabel = catOption === "Semua" ? t("semua") : catOption;
               return (
                 <TouchableOpacity
                   key={catOption}
@@ -537,7 +591,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                     setFilterModalVisible(false);
                   }}
                 >
-                  <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : colors.text }]}>{catOption}</Text>
+                  <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : colors.text }]}>{transCatLabel}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -547,7 +601,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               style={[styles.cancelBtnTextBox, { marginTop: 16 }]}
               onPress={() => setFilterModalVisible(false)}
             >
-              <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>Batal</Text>
+              <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>{t("batal")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -684,7 +738,12 @@ const styles = StyleSheet.create({
   rightStateColumn: {
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 45,
+    minHeight: 52,
+  },
+  topRightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   valueText: {
     fontSize: 14,
@@ -693,6 +752,19 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     padding: 2,
+  },
+  switchRow: {
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+  },
+  toggleSwitch: {
+    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+  },
+  deviceRowCardInactive: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderStyle: "dashed",
   },
   floatingAddBtn: {
     position: "absolute",
@@ -756,7 +828,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "transparent",
   },
   scanBtn: {
     padding: 8,

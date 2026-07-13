@@ -9,154 +9,139 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
+import { iotService } from "../services/iotService";
 import Input from "../components/Input";
+import NotificationPopup from "../components/NotificationPopup";
 import {
   ArrowLeft,
   User,
   ChevronDown,
 } from "lucide-react-native";
 
-export default function AddUserScreen({ route, navigation }) {
-  const { managedUsers, addUser, updateUser } = useUser();
-  const editUserId = route.params?.editUserId;
-  const isEditMode = !!editUserId;
+export default function AddUserScreen({ navigation }) {
+  const { addUser, colors, theme, t, language } = useUser();
 
   // Form States
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
   const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
   const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
-  useEffect(() => {
-    if (isEditMode) {
-      const existingUser = managedUsers.find((u) => u.id === editUserId);
-      if (existingUser) {
-        setName(existingUser.name);
-        setEmail(existingUser.email);
-        setPhone(existingUser.phone || "");
-        setRole(existingUser.role);
-        setStatus(existingUser.status);
-      }
-    }
-  }, [editUserId, isEditMode]);
+  // Custom Popup States
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("info");
+  const [popupConfirmText, setPopupConfirmText] = useState("OK");
+  const [onConfirmAction, setOnConfirmAction] = useState(null);
 
-  const handleSave = () => {
-    if (!name.trim() || !email.trim() || !phone.trim() || !role) {
-      Alert.alert("Perhatian", "Semua kolom bertanda bintang (*) wajib diisi.");
+  // Validation Error States
+  const [usernameError, setUsernameError] = useState("");
+
+
+  const handleSave = async () => {
+    if (!usernameInput.trim()) {
+      setUsernameError(language === "Indonesia" ? "Username SIA wajib diisi." : "SSO Username is required.");
       return;
-    }
-
-    // Validation pattern for email (string methods to prevent regex backtracking warnings)
-    const isValidEmail = email.includes("@") && email.includes(".") && email.indexOf("@") > 0 && email.lastIndexOf(".") > email.indexOf("@") + 1 && email.lastIndexOf(".") < email.length - 1;
-    if (!isValidEmail) {
-      Alert.alert("Perhatian", "Format email tidak valid.");
-      return;
-    }
-
-    let roleId;
-    if (role === "Admin") {
-      roleId = "ROL001";
-    } else if (role.includes("Owner")) {
-      roleId = "ROL002";
-    } else {
-      roleId = "ROL003";
     }
 
     const userData = {
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      role: role,
-      roleId: roleId,
+      username: usernameInput.trim(),
+      roleId: role, // Kirim nama role langsung ("Admin", "Owner/Controller", "Viewer")
       status: status,
     };
 
-    if (isEditMode) {
-      updateUser(editUserId, userData);
-      Alert.alert("Sukses", "Informasi pengguna berhasil diperbarui.");
+    const response = await addUser(userData);
+    if (response?.error) {
+      setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
+      setPopupMessage(
+        language === "Indonesia" 
+          ? response.message || "Gagal menambahkan pengguna. Pastikan username terdaftar di master SIA." 
+          : "Failed to add new user. Ensure username exists in SSO master."
+      );
+      setPopupType("error");
+      setOnConfirmAction(null);
+      setPopupVisible(true);
     } else {
-      addUser(userData);
-      Alert.alert("Sukses", "Pengguna baru berhasil ditambahkan.");
+      setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
+      setPopupMessage(
+        language === "Indonesia" ? "Pengguna baru berhasil ditambahkan." : "New user successfully added."
+      );
+      setPopupType("success");
+      setOnConfirmAction(() => () => {
+        setPopupVisible(false);
+        navigation.navigate("UsersList");
+      });
+      setPopupVisible(true);
     }
-
-    navigation.navigate("UsersList");
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#0f172a" />
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate("UsersList");
+            }
+          }}
+        >
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>{isEditMode ? "Edit Pengguna" : "Tambah Pengguna"}</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("tambah_pengguna")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile photo circle */}
-        <Text style={styles.formLabel}>Foto Profil</Text>
+        <Text style={[styles.formLabel, { color: colors.text }]}>{t("foto_profil")}</Text>
         <View style={styles.avatarSection}>
-          <View style={styles.avatarCircle}>
-            <User size={36} color="#94a3b8" />
+          <View style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}>
+            <User size={36} color={colors.textMuted} />
           </View>
         </View>
 
         {/* Inputs */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabelText}>
-            Nama Lengkap<Text style={styles.redAsterisk}>*</Text>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            {language === "Indonesia" ? "Username SIA" : "SSO Username"}<Text style={styles.redAsterisk}>*</Text>
           </Text>
           <Input
-            placeholder="Contoh: Pak Budi"
-            value={name}
-            onChangeText={setName}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabelText}>
-            Email<Text style={styles.redAsterisk}>*</Text>
-          </Text>
-          <Input
-            placeholder="Contoh: pakbudi@astratech.co.id"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            placeholder={language === "Indonesia" ? "Masukkan Username SIA (Contoh: jeki)" : "Enter SSO Username"}
+            value={usernameInput}
+            onChangeText={(val) => {
+              setUsernameInput(val);
+              if (!val.trim()) {
+                setUsernameError(language === "Indonesia" ? "Username wajib diisi." : "Username is required.");
+              } else {
+                setUsernameError("");
+              }
+            }}
             autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabelText}>
-            No. HP<Text style={styles.redAsterisk}>*</Text>
-          </Text>
-          <Input
-            placeholder="Contoh: 0812 3456 7890"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
+            error={usernameError}
           />
         </View>
 
         {/* Custom Role Dropdown Picker */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabelText}>
-            Role<Text style={styles.redAsterisk}>*</Text>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            {t("role")}<Text style={styles.redAsterisk}>*</Text>
           </Text>
           <TouchableOpacity
-            style={styles.rolePickerBox}
+            style={[styles.rolePickerBox, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
             activeOpacity={0.8}
             onPress={() => setShowRoleDropdown(!showRoleDropdown)}
           >
-            <Text style={styles.rolePickerText}>{role}</Text>
-            <ChevronDown size={18} color="#64748b" />
+            <Text style={[styles.rolePickerText, { color: colors.text }]}>{role}</Text>
+            <ChevronDown size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
           {showRoleDropdown && (
-            <View style={styles.dropdownOptionsBox}>
+            <View style={[styles.dropdownOptionsBox, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               {["Admin", "Owner/Controller", "Viewer"].map((r) => (
                 <TouchableOpacity
                   key={r}
@@ -166,7 +151,7 @@ export default function AddUserScreen({ route, navigation }) {
                     setShowRoleDropdown(false);
                   }}
                 >
-                  <Text style={[styles.optionText, role === r && styles.optionTextActive]}>
+                  <Text style={[styles.optionText, role === r ? styles.optionTextActive : { color: colors.textMuted }]}>
                     {r}
                   </Text>
                 </TouchableOpacity>
@@ -176,50 +161,81 @@ export default function AddUserScreen({ route, navigation }) {
         </View>
 
         {/* Status Radio Buttons Selector */}
-        <Text style={[styles.inputLabelText, { marginTop: 10 }]}>
-          Status<Text style={styles.redAsterisk}>*</Text>
+        <Text style={[styles.inputLabelText, { marginTop: 10, color: colors.text }]}>
+          {t("status")}<Text style={styles.redAsterisk}>*</Text>
         </Text>
         
         {/* Option 1: Aktif */}
         <TouchableOpacity
-          style={[styles.radioItemRow, status === "Aktif" && styles.radioItemRowActive]}
+          style={[
+            styles.radioItemRow,
+            {
+              borderColor: status === "Aktif" ? "#0059AB" : colors.border,
+              backgroundColor: status === "Aktif" ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : colors.cardBackground
+            }
+          ]}
           onPress={() => setStatus("Aktif")}
           activeOpacity={0.9}
         >
-          <View style={[styles.radioOuterCircle, status === "Aktif" && styles.radioOuterCircleActive]}>
+          <View style={[styles.radioOuterCircle, { borderColor: status === "Aktif" ? "#0059AB" : colors.textMuted }]}>
             {status === "Aktif" && <View style={styles.radioInnerCircle} />}
           </View>
           <View style={styles.radioTextContainer}>
-            <Text style={styles.radioTitleText}>Aktif</Text>
-            <Text style={styles.radioDescText}>Pengguna dapat login & menggunakan sistem</Text>
+            <Text style={[styles.radioTitleText, { color: colors.text }]}>{t("aktif")}</Text>
+            <Text style={[styles.radioDescText, { color: colors.textMuted }]}>{t("pengguna_dapat_login")}</Text>
           </View>
         </TouchableOpacity>
 
         {/* Option 2: Nonaktif */}
         <TouchableOpacity
-          style={[styles.radioItemRow, status === "Nonaktif" && styles.radioItemRowActive]}
+          style={[
+            styles.radioItemRow,
+            {
+              borderColor: status === "Nonaktif" ? "#0059AB" : colors.border,
+              backgroundColor: status === "Nonaktif" ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : colors.cardBackground
+            }
+          ]}
           onPress={() => setStatus("Nonaktif")}
           activeOpacity={0.9}
         >
-          <View style={[styles.radioOuterCircle, status === "Nonaktif" && styles.radioOuterCircleActive]}>
+          <View style={[styles.radioOuterCircle, { borderColor: status === "Nonaktif" ? "#0059AB" : colors.textMuted }]}>
             {status === "Nonaktif" && <View style={styles.radioInnerCircle} />}
           </View>
           <View style={styles.radioTextContainer}>
-            <Text style={styles.radioTitleText}>Nonaktif</Text>
-            <Text style={styles.radioDescText}>Pengguna tidak dapat login</Text>
+            <Text style={[styles.radioTitleText, { color: colors.text }]}>{t("nonaktif")}</Text>
+            <Text style={[styles.radioDescText, { color: colors.textMuted }]}>{t("pengguna_tidak_dapat_login")}</Text>
           </View>
         </TouchableOpacity>
 
         {/* Action Buttons Row */}
         <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.cancelText}>Batal</Text>
+          <TouchableOpacity
+            style={[styles.cancelBtn, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("UsersList");
+              }
+            }}
+          >
+            <Text style={[styles.cancelText, { color: colors.text }]}>{t("batal")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveText}>Simpan</Text>
+            <Text style={styles.saveText}>{t("simpan")}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <NotificationPopup
+        visible={popupVisible}
+        title={popupTitle}
+        message={popupMessage}
+        type={popupType}
+        confirmText={popupConfirmText}
+        onConfirm={onConfirmAction}
+        onClose={() => setPopupVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -227,7 +243,7 @@ export default function AddUserScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
   },
   navbar: {
     height: 60,

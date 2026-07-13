@@ -16,7 +16,7 @@ import Card from "../components/Card";
 import { ArrowLeft, Lightbulb } from "lucide-react-native";
 
 export default function LampControlScreen({ navigation }) {
-  const { user } = useUser();
+  const { user, colors } = useUser();
   const [activeBuilding, setActiveBuilding] = useState("");
   const [lampDeviceId, setLampDeviceId] = useState("DEV_LAMP01");
   const [isLampOn, setIsLampOn] = useState(false);
@@ -34,79 +34,63 @@ export default function LampControlScreen({ navigation }) {
       return;
     }
 
-    let building = "Gedung Utama";
-    if (response.length > 0) {
-      building = response[0].gedung || "Gedung Utama";
+    const firstLamp = response.find((d) => d.category === "Lampu" || d.name?.toLowerCase().includes("lamp"));
+    if (firstLamp) {
+      setIsLampOn(firstLamp.status === "ON" || firstLamp.status === "1");
+      setLampDeviceId(firstLamp.id);
+      setActiveBuilding(`${firstLamp.ruangan} (${firstLamp.gedung})`);
+    } else {
+      setActiveBuilding("Lab IoT (Gedung Utama)");
     }
-    setActiveBuilding(building);
-
-    let lId = "DEV_LAMP01";
-    let pwrOn = false;
-
-    response.forEach((dev) => {
-      if (dev?.gedung?.toLowerCase() === building.toLowerCase()) {
-        if (dev.category === "Lampu") {
-          lId = dev.id;
-          pwrOn = dev.status === "ON";
-        }
-      }
-    });
-
-    setLampDeviceId(lId);
-    setIsLampOn(pwrOn);
   };
 
   useEffect(() => {
     loadLampStatus();
   }, []);
 
-  const handleViewerBlock = () => {
-    Alert.alert("Akses Ditolak", "Anda tidak memiliki akses untuk mengendalikan perangkat (Viewer).");
-  };
-
   const handleToggle = async (value) => {
     if (isViewer) {
-      handleViewerBlock();
+      Alert.alert("Akses Ditolak", "Viewer tidak diperbolehkan mengontrol perangkat.");
       return;
     }
 
     setIsLampOn(value);
-    const statusStr = value ? "ON" : "OFF";
-    const response = await iotService.setDeviceStatus(lampDeviceId, statusStr);
+    const cmd = value ? "ON" : "OFF";
+    const response = await iotService.controlDevice(lampDeviceId, cmd);
     
     if (response.error) {
       setIsLampOn(!value);
-      Alert.alert("Gagal", "Gagal mengubah status lampu.");
+      Alert.alert("Gagal", response.message || "Gagal mengontrol lampu.");
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#333" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Kontrol Lampu</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>Kontrol Lampu</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={styles.loaderText}>Menghubungkan lampu...</Text>
+          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Menghubungkan lampu...</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Active Info */}
-          <Text style={styles.activeBuildingText}>Lokasi: {activeBuilding}</Text>
+          <Text style={[styles.activeBuildingText, { color: colors.textMuted }]}>Lokasi: {activeBuilding}</Text>
 
           {/* Lamp Visual Representation */}
           <View style={styles.lampVisualContainer}>
             <View
               style={[
                 styles.glowCircle,
-                isLampOn ? styles.glowCircleOn : styles.glowCircleOff,
+                isLampOn ? styles.glowCircleOn : [styles.glowCircleOff, { backgroundColor: colors.border }],
               ]}
             >
               <Lightbulb
@@ -115,16 +99,16 @@ export default function LampControlScreen({ navigation }) {
                 style={styles.lampIcon}
               />
             </View>
-            <Text style={styles.lampStatusLabel}>
+            <Text style={[styles.lampStatusLabel, { color: colors.text }]}>
               Status Lampu: {isLampOn ? "MENYALA 💡" : "PADAM 😴"}
             </Text>
           </View>
 
           {/* Control Switch Card */}
-          <Card style={styles.controlCard}>
+          <Card style={[styles.controlCard, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.controlHeader}>
-              <Text style={styles.controlTitle}>Sakelar Lampu</Text>
-              <Text style={styles.controlSubtitle}>
+              <Text style={[styles.controlTitle, { color: colors.text }]}>Sakelar Lampu</Text>
+              <Text style={[styles.controlSubtitle, { color: colors.textMuted }]}>
                 Hidupkan atau matikan aliran listrik lampu utama.
               </Text>
             </View>
@@ -145,7 +129,7 @@ export default function LampControlScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "transparent",
   },
   navbar: {
     height: 60,

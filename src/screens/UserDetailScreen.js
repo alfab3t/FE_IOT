@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,10 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
+import { iotService } from "../services/iotService";
 import Card from "../components/Card";
+import NotificationPopup from "../components/NotificationPopup";
 import {
   ArrowLeft,
   User,
@@ -18,71 +22,165 @@ import {
 } from "lucide-react-native";
 
 export default function UserDetailScreen({ route, navigation }) {
-  const { userId } = route.params;
-  const { managedUsers, deleteUser } = useUser();
+  const { username } = route.params;
+  const { user, deleteUser, colors, t, language } = useUser();
+  const [selectedUserObj, setSelectedUserObj] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const selectedUserObj = managedUsers.find((u) => u.id === userId);
+  // Custom Popup States
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("info");
+  const [popupConfirmText, setPopupConfirmText] = useState("OK");
+  const [popupCancelText, setPopupCancelText] = useState("Batal");
+  const [onConfirmAction, setOnConfirmAction] = useState(null);
+
+
+  const isAdmin = selectedUserObj?.canManage === true;
+
+  useEffect(() => {
+    const fetchDetail = async () => {
+      setIsLoading(true);
+      const response = await iotService.getUserDetail(username);
+      setIsLoading(false);
+      if (!response.error && response.username) {
+        setSelectedUserObj({
+          id: response.username,
+          name: response.fullName || response.username,
+          email: response.email || "-",
+          role: response.roleName,
+          roleId: response.roleId,
+          phone: response.phone || "-",
+          status: response.status || "Aktif",
+          registeredSince: "-",
+          lastLogin: "-",
+          photo: response.photo,
+          canManage: response.canManage,
+        });
+      }
+    };
+    fetchDetail();
+  }, [username]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color="#0059AB" />
+      </SafeAreaView>
+    );
+  }
 
   if (!selectedUserObj) {
     return (
-      <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>Pengguna tidak ditemukan.</Text>
+      <SafeAreaView style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.text }]}>
+          {language === "Indonesia" ? "Pengguna tidak ditemukan." : "User not found."}
+        </Text>
         <TouchableOpacity style={styles.errorBackBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.errorBackBtnText}>Kembali</Text>
+          <Text style={styles.errorBackBtnText}>
+            {language === "Indonesia" ? "Kembali" : "Go Back"}
+          </Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
   const handleDelete = () => {
-    Alert.alert(
-      "Hapus Pengguna",
-      `Apakah Anda yakin ingin menghapus akun ${selectedUserObj.name}?`,
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: () => {
-            deleteUser(userId);
-            Alert.alert("Sukses", "Pengguna berhasil dihapus dari sistem.");
-            navigation.navigate("UsersList");
-          },
-        },
-      ]
+    setPopupTitle(language === "Indonesia" ? "Hapus Pengguna" : "Delete User");
+    setPopupMessage(
+      language === "Indonesia"
+        ? `Apakah Anda yakin ingin menghapus akun ${selectedUserObj.name}?`
+        : `Are you sure you want to delete account ${selectedUserObj.name}?`
     );
+    setPopupType("question");
+    setPopupConfirmText(language === "Indonesia" ? "HAPUS" : "DELETE");
+    setPopupCancelText(language === "Indonesia" ? "BATAL" : "CANCEL");
+    setOnConfirmAction(() => async () => {
+      setPopupVisible(false);
+      const res = await deleteUser(selectedUserObj.id);
+      if (res.error) {
+        // Show error popup
+        setTimeout(() => {
+          setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
+          setPopupMessage(res.message || "Gagal mencabut hak akses pengguna.");
+          setPopupType("error");
+          setPopupConfirmText("OK");
+          setOnConfirmAction(null);
+          setPopupVisible(true);
+        }, 300);
+      } else {
+        // Show success popup
+        setTimeout(() => {
+          setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
+          setPopupMessage(
+            language === "Indonesia"
+              ? "Pengguna berhasil dihapus dari sistem."
+              : "User successfully deleted from system."
+          );
+          setPopupType("success");
+          setPopupConfirmText("OK");
+          setOnConfirmAction(() => () => {
+            setPopupVisible(false);
+            navigation.navigate("UsersList");
+          });
+          setPopupVisible(true);
+        }, 300);
+      }
+    });
+    setPopupVisible(true);
   };
 
   // Determine avatar background color
   let avatarBg = "#dbeafe";
   let avatarColor = "#2563eb";
-  if (selectedUserObj.role.toLowerCase().includes("owner")) {
+  if (selectedUserObj.role && selectedUserObj.role.toLowerCase().includes("owner")) {
     avatarBg = "#fef3c7";
     avatarColor = "#d97706";
-  } else if (selectedUserObj.role.toLowerCase() === "viewer") {
+  } else if (selectedUserObj.role && selectedUserObj.role.toLowerCase() === "viewer") {
     avatarBg = "#fce7f3";
     avatarColor = "#db2777";
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#0f172a" />
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate("UsersList");
+            }
+          }}
+        >
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Detail Pengguna</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("detail_pengguna")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Card Header */}
-        <View style={styles.profileHeaderBox}>
-          <View style={[styles.avatarCircleLarge, { backgroundColor: avatarBg }]}>
-            <User size={36} color={avatarColor} />
+        <View style={[styles.profileHeaderBox, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
+          <View style={[styles.avatarCircleLarge, { backgroundColor: avatarBg, overflow: "hidden" }]}>
+            {selectedUserObj.photo ? (
+              <Image
+                source={{
+                  uri: selectedUserObj.photo.startsWith("data:")
+                    ? selectedUserObj.photo
+                    : `data:image/jpeg;base64,${selectedUserObj.photo}`,
+                }}
+                style={styles.avatarImageLarge}
+              />
+            ) : (
+              <User size={36} color={avatarColor} />
+            )}
           </View>
-          <Text style={styles.profileNameText}>{selectedUserObj.name}</Text>
-          <Text style={styles.profileEmailText}>{selectedUserObj.email}</Text>
+          <Text style={[styles.profileNameText, { color: colors.text }]}>{selectedUserObj.name}</Text>
+          <Text style={[styles.profileEmailText, { color: colors.textMuted }]}>{selectedUserObj.email}</Text>
           <View style={styles.onlineBadgeRow}>
             <View style={styles.onlineDot} />
             <Text style={styles.onlineBadgeText}>Online</Text>
@@ -90,81 +188,98 @@ export default function UserDetailScreen({ route, navigation }) {
         </View>
 
         {/* User Info Metadata Grid */}
-        <Text style={styles.sectionHeaderTitle}>Informasi Pengguna</Text>
-        <Card style={styles.metadataCard}>
+        <Text style={[styles.sectionHeaderTitle, { color: colors.textMuted }]}>{t("informasi_pengguna")}</Text>
+        <Card style={[styles.metadataCard, { backgroundColor: colors.cardBackground }]}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Nama Lengkap</Text>
-            <Text style={styles.metaValue}>{selectedUserObj.name}</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("nama_lengkap")}</Text>
+            <Text style={[styles.metaValue, { color: colors.text }]}>{selectedUserObj.name}</Text>
           </View>
-          <View style={styles.metaDivider} />
+          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Role</Text>
-            <Text style={styles.metaValue}>{selectedUserObj.role}</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("role")}</Text>
+            <Text style={[styles.metaValue, { color: colors.text }]}>{selectedUserObj.role}</Text>
           </View>
-          <View style={styles.metaDivider} />
+          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Email</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("email")}</Text>
             <Text style={styles.metaValueBlue}>{selectedUserObj.email}</Text>
           </View>
-          <View style={styles.metaDivider} />
+          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>No.HP</Text>
-            <Text style={styles.metaValue}>{selectedUserObj.phone || "-"}</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("nohp")}</Text>
+            <Text style={[styles.metaValue, { color: colors.text }]}>{selectedUserObj.phone || "-"}</Text>
           </View>
-          <View style={styles.metaDivider} />
+          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Status</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("status")}</Text>
             <View style={styles.aktifStatusBadge}>
               <View style={styles.aktifDot} />
-              <Text style={styles.aktifText}>{selectedUserObj.status}</Text>
+              <Text style={styles.aktifText}>
+                {selectedUserObj.status === "Aktif" ? t("aktif") : t("nonaktif")}
+              </Text>
             </View>
           </View>
-          <View style={styles.metaDivider} />
+          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Terdaftar Sejak</Text>
-            <Text style={styles.metaValue}>{selectedUserObj.registeredSince}</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("terdaftar_sejak")}</Text>
+            <Text style={[styles.metaValue, { color: colors.text }]}>{selectedUserObj.registeredSince}</Text>
           </View>
-          <View style={styles.metaDivider} />
+          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Login Terakhir</Text>
-            <Text style={styles.metaValue}>{selectedUserObj.lastLogin}</Text>
+            <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("login_terakhir")}</Text>
+            <Text style={[styles.metaValue, { color: colors.text }]}>{selectedUserObj.lastLogin}</Text>
           </View>
         </Card>
 
         {/* Action Buttons Section */}
-        <Text style={styles.sectionHeaderTitle}>Aksi</Text>
-        <Card style={styles.actionsCard}>
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => navigation.navigate("AddUser", { editUserId: userId })}
-          >
-            <View style={styles.actionIconCircleBlue}>
-              <PenTool size={18} color="#0059AB" />
-            </View>
-            <View style={styles.actionTextContent}>
-              <Text style={styles.actionMainText}>Edit Pengguna</Text>
-              <Text style={styles.actionSubText}>Ubah Informasi Pengguna</Text>
-            </View>
-          </TouchableOpacity>
-          <View style={styles.actionDivider} />
+        {isAdmin && (
+          <>
+            <Text style={[styles.sectionHeaderTitle, { color: colors.textMuted }]}>{t("aksi")}</Text>
+            <Card style={[styles.actionsCard, { backgroundColor: colors.cardBackground }]}>
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => navigation.navigate("EditUser", { editUsername: selectedUserObj.id })}
+              >
+                <View style={styles.actionIconCircleBlue}>
+                  <PenTool size={18} color="#0059AB" />
+                </View>
+                <View style={styles.actionTextContent}>
+                  <Text style={[styles.actionMainText, { color: colors.text }]}>{t("edit_pengguna")}</Text>
+                  <Text style={[styles.actionSubText, { color: colors.textMuted }]}>{t("ubah_info_pengguna")}</Text>
+                </View>
+              </TouchableOpacity>
+              <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
 
-          <TouchableOpacity style={styles.actionRow} onPress={handleDelete}>
-            <View style={styles.actionIconCircleRed}>
-              <Trash2 size={18} color="#ef4444" />
-            </View>
-            <View style={styles.actionTextContent}>
-              <Text style={styles.actionMainTextRed}>Hapus Pengguna</Text>
-              <Text style={styles.actionSubText}>Hapus akun pengguna dari sistem</Text>
-            </View>
-          </TouchableOpacity>
-        </Card>
+              <TouchableOpacity style={styles.actionRow} onPress={handleDelete}>
+                <View style={styles.actionIconCircleRed}>
+                  <Trash2 size={18} color="#ef4444" />
+                </View>
+                <View style={styles.actionTextContent}>
+                  <Text style={styles.actionMainTextRed}>{t("hapus_pengguna")}</Text>
+                  <Text style={[styles.actionSubText, { color: colors.textMuted }]}>{t("hapus_pengguna_desc")}</Text>
+                </View>
+              </TouchableOpacity>
+            </Card>
+          </>
+        )}
       </ScrollView>
+
+      <NotificationPopup
+        visible={popupVisible}
+        title={popupTitle}
+        message={popupMessage}
+        type={popupType}
+        confirmText={popupConfirmText}
+        cancelText={popupCancelText}
+        onConfirm={onConfirmAction}
+        onClose={() => setPopupVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -172,7 +287,7 @@ export default function UserDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
   },
   navbar: {
     height: 60,
@@ -208,6 +323,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
+  },
+  avatarImageLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   profileNameText: {
     fontSize: 18,

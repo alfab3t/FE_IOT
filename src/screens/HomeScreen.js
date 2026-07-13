@@ -15,7 +15,7 @@ import ProfileScreen from "./ProfileScreen";
 import { LayoutDashboard, Smartphone, Activity, Bell, User } from "lucide-react-native";
 
 export default function HomeScreen({ navigation }) {
-  const { colors } = useUser();
+  const { colors, t } = useUser();
   const [activeTab, setActiveTab] = useState(0); // 0: Beranda, 1: Perangkat, 2: Monitoring, 3: Notifikasi, 4: Profil
   const [hasUnread, setHasUnread] = useState(false);
 
@@ -65,7 +65,7 @@ export default function HomeScreen({ navigation }) {
         >
           <LayoutDashboard size={22} color={activeTab === 0 ? "#0059AB" : colors.textMuted} />
           <Text style={[styles.tabLabel, { color: activeTab === 0 ? "#0059AB" : colors.textMuted }]}>
-            Beranda
+            {t("beranda")}
           </Text>
         </TouchableOpacity>
 
@@ -77,7 +77,7 @@ export default function HomeScreen({ navigation }) {
         >
           <Smartphone size={22} color={activeTab === 1 ? "#0059AB" : colors.textMuted} />
           <Text style={[styles.tabLabel, { color: activeTab === 1 ? "#0059AB" : colors.textMuted }]}>
-            Perangkat
+            {t("perangkat")}
           </Text>
         </TouchableOpacity>
 
@@ -89,7 +89,7 @@ export default function HomeScreen({ navigation }) {
         >
           <Activity size={22} color={activeTab === 2 ? "#0059AB" : colors.textMuted} />
           <Text style={[styles.tabLabel, { color: activeTab === 2 ? "#0059AB" : colors.textMuted }]}>
-            Monitoring
+            {t("monitoring")}
           </Text>
         </TouchableOpacity>
 
@@ -107,7 +107,7 @@ export default function HomeScreen({ navigation }) {
             {hasUnread && <View style={styles.badgeDot} />}
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 3 ? "#0059AB" : colors.textMuted }]}>
-            Notifikasi
+            {t("notifikasi")}
           </Text>
         </TouchableOpacity>
 
@@ -119,7 +119,7 @@ export default function HomeScreen({ navigation }) {
         >
           <User size={22} color={activeTab === 4 ? "#0059AB" : colors.textMuted} />
           <Text style={[styles.tabLabel, { color: activeTab === 4 ? "#0059AB" : colors.textMuted }]}>
-            Profil
+            {t("profil")}
           </Text>
         </TouchableOpacity>
       </View>

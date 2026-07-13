@@ -1,0 +1,430 @@
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Image,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useUser } from "../context/UserContext";
+import { iotService } from "../services/iotService";
+import { ArrowLeft, User, ChevronDown } from "lucide-react-native";
+import NotificationPopup from "../components/NotificationPopup";
+
+export default function EditUserScreen({ route, navigation }) {
+  const { updateUser, colors, theme, t, language } = useUser();
+  const { editUsername } = route.params;
+
+  // Form States
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
+  const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Custom Popup States
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("info");
+  const [popupConfirmText, setPopupConfirmText] = useState("OK");
+  const [onConfirmAction, setOnConfirmAction] = useState(null);
+
+
+  useEffect(() => {
+    const fetchUserDetail = async () => {
+      setIsLoading(true);
+      const response = await iotService.getUserDetail(editUsername);
+      setIsLoading(false);
+      if (!response.error && response.username) {
+        setFullName(response.fullName || response.username);
+        setRole(response.roleName || "Viewer");
+        setStatus(response.status || "Aktif");
+        setPhoto(response.photo);
+      }
+    };
+    fetchUserDetail();
+  }, [editUsername]);
+
+  const handleSave = async () => {
+    const userData = {
+      username: editUsername,
+      roleId: role, // Kirim nama role langsung ("Admin", "Owner/Controller", "Viewer")
+      status: status,
+    };
+
+    setIsSubmitting(true);
+    const response = await updateUser(editUsername, userData);
+    setIsSubmitting(false);
+    if (response?.error) {
+      setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
+      setPopupMessage(
+        language === "Indonesia" ? response.message || "Gagal memperbarui pengguna." : "Failed to update user details."
+      );
+      setPopupType("error");
+      setOnConfirmAction(null);
+      setPopupVisible(true);
+    } else {
+      setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
+      setPopupMessage(
+        language === "Indonesia" ? "Informasi pengguna berhasil diperbarui." : "User information successfully updated."
+      );
+      setPopupType("success");
+      setOnConfirmAction(() => () => {
+        setPopupVisible(false);
+        navigation.navigate("UsersList");
+      });
+      setPopupVisible(true);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#0059AB" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Navbar */}
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate("UsersList");
+            }
+          }}
+        >
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("edit_pengguna")}</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Profile photo circle */}
+        <Text style={[styles.formLabel, { color: colors.text }]}>{t("foto_profil")}</Text>
+        <View style={styles.avatarSection}>
+          <View style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder, overflow: "hidden" }]}>
+            {photo ? (
+              <Image
+                source={{
+                  uri: photo.startsWith("data:")
+                    ? photo
+                    : `data:image/jpeg;base64,${photo}`,
+                }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <User size={36} color={colors.textMuted} />
+            )}
+          </View>
+        </View>
+
+        {/* Inputs */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            {language === "Indonesia" ? "Username SIA" : "SSO Username"}
+          </Text>
+          <View style={[styles.rolePickerBox, { backgroundColor: colors.border, borderColor: colors.border }]}>
+            <Text style={[styles.rolePickerText, { color: colors.textMuted }]}>{editUsername}</Text>
+          </View>
+        </View>
+
+        {/* Custom Role Dropdown Picker */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            {t("role")}<Text style={styles.redAsterisk}>*</Text>
+          </Text>
+          <TouchableOpacity
+            style={[styles.rolePickerBox, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
+            activeOpacity={0.8}
+            onPress={() => setShowRoleDropdown(!showRoleDropdown)}
+          >
+            <Text style={[styles.rolePickerText, { color: colors.text }]}>{role}</Text>
+            <ChevronDown size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {showRoleDropdown && (
+            <View style={[styles.dropdownOptionsBox, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+              {["Admin", "Owner/Controller", "Viewer"].map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  style={styles.dropdownOptionRow}
+                  onPress={() => {
+                    setRole(r);
+                    setShowRoleDropdown(false);
+                  }}
+                >
+                  <Text style={[styles.optionText, role === r ? styles.optionTextActive : { color: colors.textMuted }]}>
+                    {r}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Status Selection */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            {t("status")}<Text style={styles.redAsterisk}>*</Text>
+          </Text>
+
+          {/* Aktif option */}
+          <TouchableOpacity
+            style={[
+              styles.statusSelectorRow,
+              status === "Aktif" && { borderColor: "#0059AB", backgroundColor: theme === "Dark Mode" ? "#1e293b" : "#f0f9ff" },
+              { borderColor: colors.border },
+            ]}
+            onPress={() => setStatus("Aktif")}
+          >
+            <View style={[styles.radioCircle, status === "Aktif" ? styles.radioCircleActive : { borderColor: colors.textMuted }]}>
+              {status === "Aktif" && <View style={styles.radioInnerCircle} />}
+            </View>
+            <View style={styles.statusLabelColumn}>
+              <Text style={[styles.statusMainLabelText, { color: colors.text }]}>{t("aktif")}</Text>
+              <Text style={[styles.statusSubLabelText, { color: colors.textMuted }]}>{t("pengguna_dapat_login")}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Nonaktif option */}
+          <TouchableOpacity
+            style={[
+              styles.statusSelectorRow,
+              status === "Tidak Aktif" && { borderColor: "#0059AB", backgroundColor: theme === "Dark Mode" ? "#1e293b" : "#f0f9ff" },
+              { borderColor: colors.border },
+            ]}
+            onPress={() => setStatus("Tidak Aktif")}
+          >
+            <View style={[styles.radioCircle, status === "Tidak Aktif" ? styles.radioCircleActive : { borderColor: colors.textMuted }]}>
+              {status === "Tidak Aktif" && <View style={styles.radioInnerCircle} />}
+            </View>
+            <View style={styles.statusLabelColumn}>
+              <Text style={[styles.statusMainLabelText, { color: colors.text }]}>{t("nonaktif")}</Text>
+              <Text style={[styles.statusSubLabelText, { color: colors.textMuted }]}>{t("pengguna_tidak_dapat_login")}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Buttons Row */}
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={[styles.cancelFormBtn, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate("UsersList");
+              }
+            }}
+          >
+            <Text style={[styles.cancelFormText, { color: colors.text }]}>{t("batal")}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.saveFormBtn}
+            onPress={handleSave}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.saveFormText}>{t("simpan")}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <NotificationPopup
+        visible={popupVisible}
+        title={popupTitle}
+        message={popupMessage}
+        type={popupType}
+        confirmText={popupConfirmText}
+        onConfirm={onConfirmAction}
+        onClose={() => setPopupVisible(false)}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  navbar: {
+    height: 60,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+  },
+  backBtn: {
+    padding: 8,
+  },
+  navTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  formLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748b",
+    marginBottom: 8,
+    marginTop: 10,
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginVertical: 14,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  inputContainer: {
+    marginBottom: 16,
+    width: "100%",
+  },
+  inputLabelText: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  redAsterisk: {
+    color: "#ef4444",
+  },
+  rolePickerBox: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+  },
+  rolePickerText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  dropdownOptionsBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 6,
+    overflow: "hidden",
+  },
+  dropdownOptionRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "transparent",
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  optionTextActive: {
+    color: "#0059AB",
+    fontWeight: "800",
+  },
+  statusSelectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  radioCircleActive: {
+    borderColor: "#0059AB",
+  },
+  radioInnerCircle: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#0059AB",
+  },
+  statusLabelColumn: {
+    flex: 1,
+  },
+  statusMainLabelText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  statusSubLabelText: {
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  btnRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  cancelFormBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  cancelFormText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  saveFormBtn: {
+    flex: 1,
+    height: 48,
+    backgroundColor: "#0059AB",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveFormText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+});

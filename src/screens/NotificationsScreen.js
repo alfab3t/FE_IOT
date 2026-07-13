@@ -24,7 +24,7 @@ import {
 } from "lucide-react-native";
 
 export default function NotificationsScreen({ navigation }) {
-  const { colors, theme } = useUser();
+  const { colors, theme, t, language, translateNotification } = useUser();
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -170,11 +170,12 @@ export default function NotificationsScreen({ navigation }) {
 
   const getNotificationTitle = (msg = "") => {
     const lower = msg.toLowerCase();
-    if (lower.includes("added")) return "Perangkat Ditambahkan";
-    if (lower.includes("deleted home") || lower.includes("removed home")) return "Home Dihapus";
-    if (lower.includes("removed")) return "Perangkat Dicabut";
-    if (lower.includes("warning") || lower.includes("melampaui")) return "Peringatan Sensor";
-    return "Pemberitahuan";
+    const isId = language === "Indonesia";
+    if (lower.includes("added")) return isId ? "Perangkat Ditambahkan" : "Device Added";
+    if (lower.includes("deleted home") || lower.includes("removed home")) return isId ? "Home Dihapus" : "Home Deleted";
+    if (lower.includes("removed")) return isId ? "Perangkat Dicabut" : "Device Removed";
+    if (lower.includes("warning") || lower.includes("melampaui")) return isId ? "Peringatan Sensor" : "Sensor Warning";
+    return isId ? "Pemberitahuan" : "Notification";
   };
 
   const getIconConfig = (msg = "") => {
@@ -248,7 +249,7 @@ export default function NotificationsScreen({ navigation }) {
               <Text style={[styles.notifTime, { color: colors.textMuted }]}>{time}</Text>
             </View>
             <Text style={[styles.notifMessage, { color: colors.textMuted }]} numberOfLines={2}>
-              {item.message}
+              {translateNotification(item.message)}
             </Text>
           </View>
         </Card>

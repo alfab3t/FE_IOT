@@ -10,8 +10,14 @@ export const getAuthToken = () => {
   return jwtToken;
 };
 
-const apiClient = async (endpoint, options = {}) => {
-  const url = `${BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
+const apiClient = async (endpoint, options = {}, params = null) => {
+  let url = `${BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
+
+  // Append query params for GET requests
+  if (params && Object.keys(params).length > 0) {
+    const query = new URLSearchParams(params).toString();
+    url = `${url}?${query}`;
+  }
 
   const headers = {
     "Content-Type": "application/json",

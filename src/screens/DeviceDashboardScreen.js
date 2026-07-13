@@ -40,9 +40,10 @@ import {
 const chartWidth = Dimensions.get("window").width - 32;
 
 export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
-  const { user, logout, setUser, refreshInterval, t, colors, showToast } = useUser();
+  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast } = useUser();
   const [devices, setDevices] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -59,29 +60,59 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const isAdmin = selectedRoleName.toLowerCase().includes("admin");
 
   // Chart Interactive State
-  const [activeChartTab, setActiveChartTab] = useState("Suhu"); // Suhu, Kelembaban, Listrik, Air
-  const [chartDataState, setChartDataState] = useState([22, 23, 22, 24, 25, 26, 25, 24, 23, 24, 25, 26]);
+  const [activeChartTab, setActiveChartTab] = useState("Suhu"); // Suhu, Kelembaban, Listrik
+  const [chartDataState, setChartDataState] = useState([]);
+  const [chartLabelsState, setChartLabelsState] = useState([]);
+
+  const loadChartData = async (tab, devicesList = devices) => {
+    // Call the average graph endpoint directly with the selected category tab
+    const response = await iotService.getGraphAverage(tab, "Minutely");
+    if (!response.error && Array.isArray(response) && response.length > 0) {
+      const labels = response.map((pt) => pt.labelText || "");
+      const values = response.map((pt) => parseFloat(pt.averageValue || 0));
+      setChartLabelsState(labels);
+
+      if (tab === "Suhu") {
+        setChartDataState(values);
+      } else if (tab === "Kelembaban") {
+        // Use true average humidity values directly from DB
+        setChartDataState(values);
+      } else if (tab === "Listrik") {
+        // Convert Watts to kW for cleaner Y-axis labels
+        const powerKW = values.map((v) => v / 1000.0);
+        setChartDataState(powerKW);
+      }
+    } else {
+      // API returned empty — show empty chart
+      setChartLabelsState([]);
+      setChartDataState([]);
+    }
+  };
 
   const loadDashboardData = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
     const devResponse = await iotService.getDashboardLatest();
     const actResponse = await iotService.getNotifications();
+    const statsResponse = await iotService.getDashboardStats();
     if (showLoader) setIsLoading(false);
     setIsRefreshing(false);
 
     if (!devResponse.error && Array.isArray(devResponse)) {
       setDevices(devResponse);
+      loadChartData(activeChartTab, devResponse);
+    }
+    if (!statsResponse.error && statsResponse) {
+      setStats(statsResponse);
     }
     if (!actResponse.error && Array.isArray(actResponse)) {
       setActivities(actResponse);
 
-      // Auto-trigger dynamic Toast for new unread warning/urgent alert notifications
       actResponse.forEach((notif) => {
         const isUrgent = notif.alertType === "Urgent" || notif.message?.toLowerCase().includes("melampaui") || notif.message?.toLowerCase().includes("warning");
         if (notif.status !== "Read" && isUrgent) {
           if (!seenNotifsRef.current.has(notif.id)) {
             seenNotifsRef.current.add(notif.id);
-            showToast(`⚠️ Alarm: ${notif.message}`, "warning", () => {
+            showToast(`⚠️ Alarm: ${translateNotification(notif.message)}`, "warning", () => {
               navigation.navigate("NotificationDetail", { notification: notif });
             });
           }
@@ -93,7 +124,6 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   useEffect(() => {
     loadDashboardData();
 
-    // Fetch user profile photo on dashboard mount to keep it persisted across sessions
     if (user && !user.foto) {
       authService.getProfilePhoto().then((res) => {
         if (res && !res.error && res.photo) {
@@ -102,81 +132,104 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
       });
     }
 
-    // Dynamic background sensor telemetry polling based on global refresh interval
-    let intervalMs = 30000; // default 30s
+    let intervalMs = 30000;
     if (refreshInterval === "5 detik") intervalMs = 5000;
     else if (refreshInterval === "10 detik") intervalMs = 10000;
     else if (refreshInterval === "60 detik") intervalMs = 60000;
 
     const timer = setInterval(() => {
       loadDashboardData(false);
+      loadChartData(activeChartTab);
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshInterval]);
+  }, [refreshInterval, activeChartTab]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
     loadDashboardData(false);
   };
 
-  // Generate date string in Indonesian
+  // Generate date string in Indonesian/English based on translation context
   const getIndonesianDate = () => {
     const date = new Date();
     const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
-    const dateStr = date.toLocaleDateString("id-ID", options);
+    const isId = t("bahasa") === "Indonesia";
+    const dateStr = date.toLocaleDateString(isId ? "id-ID" : "en-US", options);
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${dateStr} • ${hours}:${minutes} WIB`;
+    return `${dateStr} • ${hours}:${minutes} ${isId ? "WIB" : "WIB"}`;
   };
 
   // Extract Summary Statistics
-  const totalDevices = devices.length;
-  const onlineDevices = devices.filter(
-    (d) => d.status === "ON" || (d.status && d.status !== "OFF" && d.status !== "0")
-  ).length;
-  const offlineDevices = totalDevices - onlineDevices;
+  const totalDevices = stats.totalDevices;
+  const onlineDevices = stats.onlineDevices;
+  const offlineDevices = stats.offlineDevices;
 
   // Active Metric values
   const getMetricValue = (category) => {
-    const matched = devices.find((d) => d.category?.toLowerCase().includes(category.toLowerCase()));
-    if (matched?.limitMin == null) {
-      if (category === "Suhu") return "26.3°C";
-      if (category === "Kelembaban") return "64.2%";
-      if (category === "Listrik") return "542.7 kWh";
-      if (category === "Air") return "13.8 m³";
-      return "N/A";
+    if (category === "Suhu") {
+      return stats.avgSuhu > 0 ? `${stats.avgSuhu.toFixed(1)}°C` : "26.3°C";
     }
-    const val = matched.limitMin;
-    if (category === "Suhu") return `${val}°C`;
-    if (category === "Kelembaban") return `${val}%`;
-    if (category === "Listrik") return `${(val / 1000.0).toFixed(1)} kWh`;
-    if (category === "Air") return `${val} m³`;
-    return `${val}`;
+    if (category === "Kelembaban") {
+      return stats.avgHumi > 0 ? `${stats.avgHumi.toFixed(1)}%` : "64.2%";
+    }
+    if (category === "Listrik") {
+      // stats.avgPower is in Watts, convert to kW
+      return stats.avgPower > 0 ? `${(stats.avgPower / 1000.0).toFixed(1)} kW` : "542.7 kWh";
+    }
+    if (category === "Air") {
+      return "13.8 m³";
+    }
+    return "N/A";
   };
 
-  // Dynamically configure graph when chart tab changes
   useEffect(() => {
-    if (activeChartTab === "Suhu") {
-      setChartDataState([20, 21, 23, 22, 24, 26, 25, 24, 23, 22, 23, 25]);
-    } else if (activeChartTab === "Kelembaban") {
-      setChartDataState([60, 62, 65, 63, 66, 68, 65, 62, 60, 61, 63, 64]);
-    } else if (activeChartTab === "Listrik") {
-      setChartDataState([300, 320, 350, 410, 480, 520, 542, 510, 480, 450, 420, 410]);
-    } else if (activeChartTab === "Air") {
-      setChartDataState([10, 11, 13, 12, 14, 13.8, 13, 12, 11, 10, 12, 13]);
-    }
+    loadChartData(activeChartTab);
   }, [activeChartTab]);
+
+  const getChartStats = () => {
+    if (!chartDataState || chartDataState.length === 0) {
+      return { avg: "-", min: "-", max: "-", energy: "-" };
+    }
+    const sum = chartDataState.reduce((a, b) => a + b, 0);
+    const avg = sum / chartDataState.length;
+    const min = Math.min(...chartDataState);
+    const max = Math.max(...chartDataState);
+
+    let unit = "";
+    if (activeChartTab === "Suhu") unit = "°C";
+    else if (activeChartTab === "Kelembaban") unit = "%";
+    else if (activeChartTab === "Listrik") unit = " kW";
+
+    // Estimasi total energi untuk Listrik (rata-rata kW * 2 jam)
+    const energyVal = activeChartTab === "Listrik" ? `${(avg * 2.0).toFixed(2)} kWh` : "-";
+
+    return {
+      avg: `${avg.toFixed(1)}${unit}`,
+      min: `${min.toFixed(1)}${unit}`,
+      max: `${max.toFixed(1)}${unit}`,
+      energy: energyVal
+    };
+  };
 
   const chartConfig = {
     backgroundColor: colors.cardBackground,
     backgroundGradientFrom: colors.cardBackground,
     backgroundGradientTo: colors.cardBackground,
-    decimalPlaces: activeChartTab === "Listrik" ? 0 : 1,
+    decimalPlaces: activeChartTab === "Listrik" ? 2 : 1,
     color: (opacity = 1) => `rgba(0, 89, 171, ${opacity})`,
     labelColor: (opacity = 1) => colors.text,
     style: { borderRadius: 16 },
-    propsForDots: { r: "4", strokeWidth: "2", stroke: "#0059AB" },
+    propsForDots: { r: "3", strokeWidth: "2", stroke: "#0059AB" },
+    propsForLabels: { fontSize: 9 },
+  };
+
+  // Thin out labels: only show every Nth label to prevent X-axis overlap
+  const thinLabels = (labels) => {
+    if (!labels || labels.length === 0) return [];
+    const n = labels.length <= 6 ? 1 : labels.length <= 12 ? 2 : 3;
+    return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
   };
 
   // Render Admin Dashboard
@@ -184,40 +237,41 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     return (
       <View>
         {/* Ringkasan Sistem (4 cards in a row) */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Ringkasan Sistem</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("status_sistem")}</Text>
         <View style={styles.summaryRow}>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#0059AB" />
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Device</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Devices</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{totalDevices || 54}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#10b981" />
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Device Online</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("device_online")}</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{onlineDevices || 42}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#ef4444" />
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Device Offline</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("device_offline")}</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{offlineDevices || 12}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <User size={24} color="#8b5cf6" />
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total User</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>27</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("total_user")}</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{stats.totalUsers || 6}</Text>
           </Card>
         </View>
 
         {/* Grafik Monitoring Card */}
         <Card style={[styles.chartCard, { backgroundColor: colors.cardBackground }]}>
           <View style={styles.chartHeader}>
-            <Text style={[styles.chartTitle, { color: colors.text }]}>Grafik Monitoring Sistem</Text>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>{t("monitoring_sistem")}</Text>
           </View>
 
           {/* Interactive Chart Tabs */}
           <View style={[styles.chartTabs, { backgroundColor: colors.border }]}>
-            {["Suhu", "Kelembaban", "Listrik", "Air"].map((tab) => {
+            {["Suhu", "Kelembaban", "Listrik"].map((tab) => {
               const active = activeChartTab === tab;
+              const transKey = tab === "Kelembaban" ? "kelembapan" : tab.toLowerCase();
               return (
                 <TouchableOpacity
                   key={tab}
@@ -225,48 +279,68 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                   onPress={() => setActiveChartTab(tab)}
                 >
                   <Text style={[styles.chartTabLabel, active ? styles.chartTabLabelActive : { color: colors.textMuted }]}>
-                    {tab}
+                    {t(transKey)}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
+          {/* Stats Summary Info Panel */}
+          {chartDataState.length > 0 && (
+            <View style={styles.chartStatsRow}>
+              <View style={styles.chartStatBox}>
+                <Text style={styles.chartStatLabel}>Rata-rata</Text>
+                <Text style={styles.chartStatValue}>{getChartStats().avg}</Text>
+              </View>
+              <View style={styles.chartStatBox}>
+                <Text style={styles.chartStatLabel}>Tertinggi</Text>
+                <Text style={styles.chartStatValue}>{getChartStats().max}</Text>
+              </View>
+              <View style={styles.chartStatBox}>
+                <Text style={styles.chartStatLabel}>Terendah</Text>
+                <Text style={styles.chartStatValue}>{getChartStats().min}</Text>
+              </View>
+              {activeChartTab === "Listrik" && (
+                <View style={styles.chartStatBox}>
+                  <Text style={styles.chartStatLabel}>Est. Konsumsi</Text>
+                  <Text style={[styles.chartStatValue, { color: "#10b981" }]}>{getChartStats().energy}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Graph visual */}
-          {activeChartTab === "Listrik" || activeChartTab === "Air" ? (
-            <BarChart
-              data={{
-                labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-                datasets: [{ data: chartDataState.slice(0, 7) }],
-              }}
-              width={chartWidth}
-              height={180}
-              chartConfig={chartConfig}
-              style={styles.chartVisual}
-              showValuesOnTopOfBars={false}
-            />
+          {chartDataState.length === 0 ? (
+            <View style={[styles.chartVisual, { justifyContent: "center", alignItems: "center", height: 180, backgroundColor: colors.background, borderRadius: 12 }]}>
+              <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                {"Belum ada data telemetri"}
+              </Text>
+            </View>
           ) : (
             <LineChart
               data={{
-                labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-                datasets: [{ data: chartDataState.slice(0, 7) }],
+                labels: thinLabels(chartLabelsState),
+                datasets: [{ data: chartDataState }],
               }}
               width={chartWidth}
               height={180}
               chartConfig={chartConfig}
               bezier
               style={styles.chartVisual}
+              withHorizontalLabels={true}
+              fromZero={false}
             />
           )}
 
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(2)}>
-            <Text style={styles.chartLinkText}>Lihat Detail Monitoring</Text>
+            <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
             <ChevronRight size={16} color="#0059AB" />
           </TouchableOpacity>
         </Card>
 
         {/* Stack Lists for Mobile: Recent Devices and System Timeline */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Status Device Terbaru</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Latest Device Status</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {devices.slice(0, 5).map((dev, idx) => {
             const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");
@@ -286,17 +360,19 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             );
           })}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(1)}>
-            <Text style={styles.chartLinkText}>Lihat Semua Device</Text>
+            <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
             <ChevronRight size={16} color="#0059AB" />
           </TouchableOpacity>
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Aktivitas Sistem Terbaru</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("aktivitas_terakhir")}</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {activities.length === 0 ? (
             <View style={styles.emptyActivityBox}>
               <CheckCircle size={32} color="#10b981" />
-              <Text style={[styles.emptyActivityText, { color: colors.textMuted }]}>Sistem berjalan normal. Tidak ada alarm.</Text>
+              <Text style={[styles.emptyActivityText, { color: colors.textMuted }]}>
+                {t("bahasa") === "Indonesia" ? "Sistem berjalan normal. Tidak ada alarm." : "System running normally. No alarms."}
+              </Text>
             </View>
           ) : (
             activities.slice(0, 4).map((act, idx) => {
@@ -306,16 +382,16 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                   <View style={[styles.timelineDot, { backgroundColor: isUrgent ? "#ef4444" : "#eab308" }]} />
                   <View style={styles.timelineContent}>
                     <Text style={[styles.timelineBadgeText, { color: colors.textMuted }]}>
-                      {isUrgent ? "Peringatan" : "Sistem"}
+                      {isUrgent ? t("alarm") : t("kontrol")}
                     </Text>
-                    <Text style={[styles.timelineMessage, { color: colors.text }]}>{act.message}</Text>
+                    <Text style={[styles.timelineMessage, { color: colors.text }]}>{translateNotification(act.message)}</Text>
                   </View>
                 </View>
               );
             })
           )}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(3)}>
-            <Text style={styles.chartLinkText}>Lihat Semua Notifikasi</Text>
+            <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
             <ChevronRight size={16} color="#0059AB" />
           </TouchableOpacity>
         </Card>
@@ -327,8 +403,8 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const renderOwnerDashboard = () => {
     return (
       <View>
-        {/* Ringkasan Monitoring Hari Ini (2x2 Grid) */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Ringkasan Monitoring Hari Ini</Text>
+        {/* Ringkasan Monitoring Hari Ini (Grid) */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("monitoring_sistem")}</Text>
         <View style={styles.gridContainer}>
           <View style={styles.gridRow}>
             <TouchableOpacity
@@ -337,42 +413,31 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             >
               <View style={styles.metricCardHeader}>
                 <Thermometer size={22} color={activeChartTab === "Suhu" ? "#0059AB" : "#64748b"} />
-                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>Suhu Rata-rata</Text>
+                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>{t("suhu")}</Text>
               </View>
               <Text style={[styles.metricCardValue, { color: colors.text }]}>{getMetricValue("Suhu")}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }, activeChartTab === "Air" && styles.metricCardActive]}
-              onPress={() => setActiveChartTab("Air")}
-            >
-              <View style={styles.metricCardHeader}>
-                <Droplet size={22} color={activeChartTab === "Air" ? "#0059AB" : "#64748b"} />
-                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>Air (Penggunaan)</Text>
-              </View>
-              <Text style={[styles.metricCardValue, { color: colors.text }]}>{getMetricValue("Air")}</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.gridRow}>
             <TouchableOpacity
               style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }, activeChartTab === "Kelembaban" && styles.metricCardActive]}
               onPress={() => setActiveChartTab("Kelembaban")}
             >
               <View style={styles.metricCardHeader}>
                 <Droplet size={22} color={activeChartTab === "Kelembaban" ? "#0059AB" : "#64748b"} />
-                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>Kelembaban</Text>
+                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>{t("kelembapan")}</Text>
               </View>
               <Text style={[styles.metricCardValue, { color: colors.text }]}>{getMetricValue("Kelembaban")}</Text>
             </TouchableOpacity>
+          </View>
 
+          <View style={styles.gridRow}>
             <TouchableOpacity
               style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }, activeChartTab === "Listrik" && styles.metricCardActive]}
               onPress={() => setActiveChartTab("Listrik")}
             >
               <View style={styles.metricCardHeader}>
                 <Zap size={22} color={activeChartTab === "Listrik" ? "#0059AB" : "#64748b"} />
-                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>Listrik</Text>
+                <Text style={[styles.metricCardLabel, { color: colors.textMuted }]}>{t("listrik")}</Text>
               </View>
               <Text style={[styles.metricCardValue, { color: colors.text }]}>{getMetricValue("Listrik")}</Text>
             </TouchableOpacity>
@@ -381,40 +446,63 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
         {/* Embedded Interactive Chart */}
         <Card style={[styles.chartCard, { backgroundColor: colors.cardBackground }]}>
-          <Text style={[styles.chartTitle, { color: colors.text }]}>Grafik {activeChartTab} Rata-rata</Text>
-          {activeChartTab === "Air" || activeChartTab === "Listrik" ? (
-            <BarChart
-              data={{
-                labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-                datasets: [{ data: chartDataState.slice(0, 7) }],
-              }}
-              width={chartWidth}
-              height={180}
-              chartConfig={chartConfig}
-              style={styles.chartVisual}
-              showValuesOnTopOfBars={false}
-            />
+          <Text style={[styles.chartTitle, { color: colors.text }]}>
+            {t("grafik")} {t(activeChartTab === "Kelembaban" ? "kelembapan" : activeChartTab.toLowerCase())}
+          </Text>
+
+          {/* Stats Summary Info Panel */}
+          {chartDataState.length > 0 && (
+            <View style={styles.chartStatsRow}>
+              <View style={styles.chartStatBox}>
+                <Text style={styles.chartStatLabel}>Rata-rata</Text>
+                <Text style={styles.chartStatValue}>{getChartStats().avg}</Text>
+              </View>
+              <View style={styles.chartStatBox}>
+                <Text style={styles.chartStatLabel}>Tertinggi</Text>
+                <Text style={styles.chartStatValue}>{getChartStats().max}</Text>
+              </View>
+              <View style={styles.chartStatBox}>
+                <Text style={styles.chartStatLabel}>Terendah</Text>
+                <Text style={styles.chartStatValue}>{getChartStats().min}</Text>
+              </View>
+              {activeChartTab === "Listrik" && (
+                <View style={styles.chartStatBox}>
+                  <Text style={styles.chartStatLabel}>Est. Konsumsi</Text>
+                  <Text style={[styles.chartStatValue, { color: "#10b981" }]}>{getChartStats().energy}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {chartDataState.length === 0 ? (
+            <View style={[styles.chartVisual, { justifyContent: "center", alignItems: "center", height: 180, backgroundColor: colors.background, borderRadius: 12 }]}>
+              <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
+                {"Belum ada data telemetri"}
+              </Text>
+            </View>
           ) : (
             <LineChart
               data={{
-                labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-                datasets: [{ data: chartDataState.slice(0, 7) }],
+                labels: thinLabels(chartLabelsState),
+                datasets: [{ data: chartDataState }],
               }}
               width={chartWidth}
               height={180}
               chartConfig={chartConfig}
               bezier
               style={styles.chartVisual}
+              withHorizontalLabels={true}
+              fromZero={false}
             />
           )}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(2)}>
-            <Text style={styles.chartLinkText}>Lihat Detail</Text>
+            <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
             <ChevronRight size={16} color="#0059AB" />
           </TouchableOpacity>
         </Card>
 
         {/* Perangkat Aktif */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Perangkat Aktif</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Active Devices</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {devices.filter((d) => d.category === "AC" || d.category === "Lampu").slice(0, 3).map((dev) => {
             const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");
@@ -438,13 +526,13 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             );
           })}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(1)}>
-            <Text style={styles.chartLinkText}>Lihat Semua</Text>
+            <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
             <ChevronRight size={16} color="#0059AB" />
           </TouchableOpacity>
         </Card>
 
         {/* Aktivitas Terakhir */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Aktivitas Terakhir</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("aktivitas_terakhir")}</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {activities.slice(0, 3).map((act, idx) => {
             const isUrgent = act.alertType === "Urgent" || act.title?.toLowerCase().includes("offline");
@@ -453,15 +541,15 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 <View style={[styles.timelineDot, { backgroundColor: isUrgent ? "#ef4444" : "#eab308" }]} />
                 <View style={styles.timelineContent}>
                   <Text style={[styles.timelineBadgeText, { color: colors.textMuted }]}>
-                    {isUrgent ? "Alarm" : "Kontrol"}
+                    {isUrgent ? t("alarm") : t("kontrol")}
                   </Text>
-                  <Text style={[styles.timelineMessage, { color: colors.text }]}>{act.message}</Text>
+                  <Text style={[styles.timelineMessage, { color: colors.text }]}>{translateNotification(act.message)}</Text>
                 </View>
               </View>
             );
           })}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(3)}>
-            <Text style={styles.chartLinkText}>Lihat Semua</Text>
+            <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
             <ChevronRight size={16} color="#0059AB" />
           </TouchableOpacity>
         </Card>
@@ -497,8 +585,8 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         {/* Welcome Card illustration */}
         <View style={[styles.welcomeCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
           <View style={styles.welcomeTextSection}>
-            <Text style={[styles.welcomeGreeting, { color: colors.text }]}>Selamat datang,</Text>
-            <Text style={[styles.welcomeUser, { color: colors.text }]}>{user?.nickname || user?.username || "Pengguna"}</Text>
+            <Text style={[styles.welcomeGreeting, { color: colors.text }]}>{t("selamat_datang")}</Text>
+            <Text style={[styles.welcomeUser, { color: colors.text }]}>{user?.nickname || user?.username || (t("bahasa") === "Indonesia" ? "Pengguna" : "User")}</Text>
             <View style={styles.roleBadgeBox}>
               <Text style={styles.roleBadgeText}>{selectedRoleName}</Text>
             </View>
@@ -659,73 +747,73 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         animationType="slide"
         onRequestClose={() => setAboutModalVisible(false)}
       >
-        <SafeAreaView style={styles.aboutModalContainer}>
-          <View style={styles.aboutNavbar}>
+        <SafeAreaView style={[styles.aboutModalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.aboutNavbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
             <TouchableOpacity style={styles.backBtn} onPress={() => setAboutModalVisible(false)}>
-              <ChevronLeft size={24} color="#333" />
+              <ChevronLeft size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.navTitle}>Tentang</Text>
+            <Text style={[styles.navTitle, { color: colors.text }]}>Tentang</Text>
             <View style={{ width: 40 }} />
           </View>
 
           <ScrollView contentContainerStyle={styles.aboutContent}>
-            <Card style={styles.aboutBrandCard}>
-              <Text style={styles.aboutLogoText}>ASTRATech IoT</Text>
-              <Text style={styles.aboutDescText}>
+            <Card style={[styles.aboutBrandCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.aboutLogoText, { color: colors.text }]}>ASTRATech IoT</Text>
+              <Text style={[styles.aboutDescText, { color: colors.textMuted }]}>
                 Aplikasi monitoring perangkat IoT untuk memantau sensor dan mengendalikan perangkat secara real-time.
               </Text>
             </Card>
 
-            <Text style={styles.aboutSectionTitle}>Informasi Aplikasi</Text>
-            <Card style={styles.aboutInfoCard}>
+            <Text style={[styles.aboutSectionTitle, { color: colors.text }]}>Informasi Aplikasi</Text>
+            <Card style={[styles.aboutInfoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.aboutInfoRow}>
                 <View style={styles.aboutRowLabelBox}>
                   <Info size={16} color="#0059AB" />
-                  <Text style={styles.aboutRowLabel}>Versi Aplikasi</Text>
+                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Versi Aplikasi</Text>
                 </View>
-                <Text style={styles.aboutRowValue}>1.0.0</Text>
+                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>1.0.0</Text>
               </View>
-              <View style={styles.aboutDivider} />
+              <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
 
               <View style={styles.aboutInfoRow}>
                 <View style={styles.aboutRowLabelBox}>
                   <User size={16} color="#0059AB" />
-                  <Text style={styles.aboutRowLabel}>Developer</Text>
+                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Developer</Text>
                 </View>
-                <Text style={styles.aboutRowValue}>Kelompok 6 & 7</Text>
+                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>Kelompok 6 & 7</Text>
               </View>
-              <View style={styles.aboutDivider} />
+              <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
 
               <View style={styles.aboutInfoRow}>
                 <View style={styles.aboutRowLabelBox}>
                   <Smartphone size={16} color="#0059AB" />
-                  <Text style={styles.aboutRowLabel}>Platform</Text>
+                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Platform</Text>
                 </View>
-                <Text style={styles.aboutRowValue}>Android</Text>
+                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>Android</Text>
               </View>
-              <View style={styles.aboutDivider} />
+              <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
 
               <View style={styles.aboutInfoRow}>
                 <View style={styles.aboutRowLabelBox}>
                   <Zap size={16} color="#0059AB" />
-                  <Text style={styles.aboutRowLabel}>Database</Text>
+                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Database</Text>
                 </View>
-                <Text style={styles.aboutRowValue}>SQL Server</Text>
+                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>SQL Server</Text>
               </View>
-              <View style={styles.aboutDivider} />
+              <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
 
               <View style={styles.aboutInfoRow}>
                 <View style={styles.aboutRowLabelBox}>
                   <Activity size={16} color="#0059AB" />
-                  <Text style={styles.aboutRowLabel}>Communication</Text>
+                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Communication</Text>
                 </View>
-                <Text style={styles.aboutRowValue}>MQTT</Text>
+                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>MQTT</Text>
               </View>
             </Card>
 
             <View style={styles.aboutFooterBox}>
-              <Text style={styles.aboutFooterText}>© 2026 AstraTech IoT</Text>
-              <Text style={styles.aboutFooterSubText}>Semua hak dilindungi.</Text>
+              <Text style={[styles.aboutFooterText, { color: colors.textMuted }]}>© 2026 AstraTech IoT</Text>
+              <Text style={[styles.aboutFooterSubText, { color: colors.textMuted }]}>Semua hak dilindungi.</Text>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -974,6 +1062,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#0059AB",
+  },
+  chartStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#f8fafc",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 8,
+  },
+  chartStatBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chartStatLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748b",
+    marginBottom: 2,
+  },
+  chartStatValue: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0f172a",
   },
   listCard: {
     padding: 12,

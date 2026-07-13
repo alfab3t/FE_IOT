@@ -90,9 +90,17 @@ export default function SystemSettingsScreen({ navigation }) {
   const handleThemeSelect = (option) => {
     setTheme(option);
     if (option === "Dark Mode") {
-      triggerPopup("Tema Gelap", "Tema Gelap berhasil diaktifkan!", "success");
+      triggerPopup(
+        language === "English" ? "Dark Theme" : "Tema Gelap",
+        language === "English" ? "Dark Theme successfully enabled!" : "Tema Gelap berhasil diaktifkan!",
+        "success"
+      );
     } else {
-      triggerPopup("Tema Terang", "Tema Terang berhasil diaktifkan!", "success");
+      triggerPopup(
+        language === "English" ? "Light Theme" : "Tema Terang",
+        language === "English" ? "Light Theme successfully enabled!" : "Tema Terang berhasil diaktifkan!",
+        "success"
+      );
     }
   };
 
@@ -113,8 +121,10 @@ export default function SystemSettingsScreen({ navigation }) {
     setTimeout(() => {
       setIsBackingUp(false);
       triggerPopup(
-        "Backup Sukses",
-        "Backup database sistem berhasil dibuat dan disimpan secara lokal (Backup_ASTRATech_IoT.bak).",
+        language === "English" ? "Backup Successful" : "Backup Sukses",
+        language === "English"
+          ? "System database backup successfully created and saved locally (Backup_ASTRATech_IoT.bak)."
+          : "Backup database sistem berhasil dibuat dan disimpan secara lokal (Backup_ASTRATech_IoT.bak).",
         "success"
       );
     }, 2000);
@@ -314,7 +324,7 @@ export default function SystemSettingsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
   },
   navbar: {
     height: 60,

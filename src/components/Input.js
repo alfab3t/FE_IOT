@@ -1,6 +1,8 @@
 import React from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
+import { useUser } from "../context/UserContext";
+
 export default function Input({
   label,
   placeholder,
@@ -10,14 +12,26 @@ export default function Input({
   keyboardType = "default",
   autoCapitalize = "none",
   editable = true,
+  error,
 }) {
+  const userCtx = useUser();
+  const colors = userCtx?.colors || { background: "#fff", text: "#333", border: "#dee2e6", inputBackground: "#fff", textMuted: "#aaa" };
+
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
       <TextInput
-        style={[styles.input, !editable && styles.disabledInput]}
+        style={[
+          styles.input,
+          {
+            color: colors.text,
+            backgroundColor: colors.inputBackground,
+            borderColor: error ? "#ef4444" : colors.border
+          },
+          !editable && [styles.disabledInput, { backgroundColor: colors.border }]
+        ]}
         placeholder={placeholder}
-        placeholderTextColor="#aaa"
+        placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
@@ -25,6 +39,7 @@ export default function Input({
         autoCapitalize={autoCapitalize}
         editable={editable}
       />
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
@@ -53,5 +68,11 @@ const styles = StyleSheet.create({
   disabledInput: {
     backgroundColor: "#e9ecef",
     color: "#777",
+  },
+  errorText: {
+    color: "#ef4444",
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "600",
   },
 });

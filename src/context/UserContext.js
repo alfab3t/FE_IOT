@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useRef } from "react";
 import { StyleSheet, View, Text, Dimensions } from "react-native";
 import { authService } from "../services/authService";
+import { iotService } from "../services/iotService";
 import { setAuthToken } from "../services/apiClient";
 import SwipeableToast from "../components/SwipeableToast";
 
@@ -140,6 +141,83 @@ export function UserProvider({ children }) {
       backup_desc: "Lakukan backup data sistem secara manual",
       backup_btn: "Backup Sekarang",
       pilih: "Pilih",
+      // New bilingual additions
+      beranda: "Beranda",
+      perangkat: "Perangkat",
+      monitoring: "Monitoring",
+      profil: "Profil",
+      selamat_datang: "Selamat Datang,",
+      status_sistem: "Status Sistem",
+      device_online: "Device Online",
+      device_offline: "Device Offline",
+      total_user: "Total User",
+      monitoring_sistem: "Monitoring Sistem",
+      aktivitas_terakhir: "Aktivitas Terakhir",
+      lihat_semua: "Lihat Semua",
+      alarm: "Alarm",
+      kontrol: "Kontrol",
+      semua: "Semua",
+      cari_perangkat: "Cari perangkat...",
+      tidak_ada_perangkat: "Tidak ada perangkat",
+      tidak_ada_perangkat_desc: "Belum ada perangkat yang terdeteksi di status ini.",
+      tambah_perangkat: "Tambah Perangkat",
+      tambah_perangkat_btn: "+ Tambah Perangkat",
+      nama_device: "Nama Device*",
+      device_id: "Device ID (MAC/ID)*",
+      mac_address: "MAC Address (Opsional)",
+      jenis_device: "Jenis Device*",
+      metode_komunikasi: "Metode Komunikasi*",
+      mqtt_topic: "MQTT Topic*",
+      lokasi_pemasangan: "Lokasi Pemasangan*",
+      filter_kategori: "Filter Kategori",
+      pilih_kategori: "Pilih kategori perangkat yang ingin ditampilkan:",
+      suhu: "Suhu",
+      kelembapan: "Kelembapan",
+      listrik: "Listrik",
+      air: "Air",
+      grafik: "Grafik",
+      data: "Data",
+      hari_ini: "Hari Ini",
+      minggu_ini: "Minggu Ini",
+      bulan_ini: "Bulan Ini",
+      data_tab: "Data",
+      satuan: "Satuan",
+      waktu: "Waktu",
+      nilai: "Nilai",
+      status: "Status",
+      tampil_data_terbaru: "i Menampilkan 10 data terbaru",
+      pilih_perangkat: "Pilih Perangkat",
+      pilih_perangkat_desc: "Pilih perangkat untuk melihat statistik detail:",
+      pengguna: "Pengguna",
+      cari_pengguna: "Cari pengguna...",
+      tambah_user_btn: "+ Tambah User",
+      filter_status_pengguna: "Filter Status Pengguna",
+      pilih_status_pengguna: "Pilih status pengguna yang ingin ditampilkan:",
+      informasi_pengguna: "Informasi Pengguna",
+      nama_lengkap: "Nama Lengkap",
+      role: "Role",
+      email: "Email",
+      nohp: "No.HP",
+      terdaftar_sejak: "Terdaftar Sejak",
+      login_terakhir: "Login Terakhir",
+      aksi: "Aksi",
+      edit_pengguna: "Edit Pengguna",
+      ubah_info_pengguna: "Ubah Informasi Pengguna",
+      hapus_pengguna: "Hapus Pengguna",
+      hapus_pengguna_desc: "Hapus akun pengguna dari sistem",
+      foto_profil: "Foto Profil",
+      pengguna_dapat_login: "Pengguna dapat login & menggunakan sistem",
+      pengguna_tidak_dapat_login: "Pengguna tidak dapat login",
+      kontrol_ac: "Kontrol AC",
+      kontrol_lampu: "Kontrol Lampu",
+      lokasi: "Lokasi",
+      daya_ac: "Daya AC",
+      target_temperatur: "Target Temperatur",
+      mode_pengoperasian: "Mode Pengoperasian",
+      kecepatan_kipas: "Kecepatan Kipas (Fan Speed)",
+      arah_swing: "Arah Swing (Hembusan)",
+      sakelar_lampu: "Sakelar Lampu",
+      hidupkan_matikan_lampu: "Hidupkan atau matikan aliran listrik lampu utama.",
     },
     English: {
       menu_admin: "ADMIN MENU",
@@ -172,12 +250,106 @@ export function UserProvider({ children }) {
       backup_desc: "Perform database backup manually",
       backup_btn: "Backup Now",
       pilih: "Select",
+      // New bilingual additions
+      beranda: "Home",
+      perangkat: "Devices",
+      monitoring: "Monitoring",
+      profil: "Profile",
+      selamat_datang: "Welcome,",
+      status_sistem: "System Status",
+      device_online: "Device Online",
+      device_offline: "Device Offline",
+      total_user: "Total Users",
+      monitoring_sistem: "System Monitoring",
+      aktivitas_terakhir: "Recent Activities",
+      lihat_semua: "View All",
+      alarm: "Alarm",
+      kontrol: "Control",
+      semua: "All",
+      cari_perangkat: "Search devices...",
+      tidak_ada_perangkat: "No devices found",
+      tidak_ada_perangkat_desc: "No devices detected in this status.",
+      tambah_perangkat: "Add Device",
+      tambah_perangkat_btn: "+ Add Device",
+      nama_device: "Device Name*",
+      device_id: "Device ID (MAC/ID)*",
+      mac_address: "MAC Address (Optional)",
+      jenis_device: "Device Type*",
+      metode_komunikasi: "Communication Method*",
+      mqtt_topic: "MQTT Topic*",
+      lokasi_pemasangan: "Installation Location*",
+      filter_kategori: "Filter Category",
+      pilih_kategori: "Select device category to display:",
+      suhu: "Temperature",
+      kelembapan: "Humidity",
+      listrik: "Electricity",
+      air: "Water",
+      grafik: "Chart",
+      data: "Data",
+      hari_ini: "Today",
+      minggu_ini: "This Week",
+      bulan_ini: "This Month",
+      data_tab: "Data",
+      satuan: "Unit",
+      waktu: "Time",
+      nilai: "Value",
+      status: "Status",
+      tampil_data_terbaru: "i Displaying latest 10 data points",
+      pilih_perangkat: "Select Device",
+      pilih_perangkat_desc: "Select device to view detailed statistics:",
+      pengguna: "Users",
+      cari_pengguna: "Search users...",
+      tambah_user_btn: "+ Add User",
+      filter_status_pengguna: "Filter User Status",
+      pilih_status_pengguna: "Select user status to display:",
+      informasi_pengguna: "User Information",
+      nama_lengkap: "Full Name",
+      role: "Role",
+      email: "Email",
+      nohp: "Phone Number",
+      terdaftar_sejak: "Registered Since",
+      login_terakhir: "Last Login",
+      aksi: "Actions",
+      edit_pengguna: "Edit User",
+      ubah_info_pengguna: "Modify user details",
+      hapus_pengguna: "Delete User",
+      hapus_pengguna_desc: "Delete user account from the system",
+      foto_profil: "Profile Picture",
+      pengguna_dapat_login: "User can login & use the system",
+      pengguna_tidak_dapat_login: "User cannot login",
+      kontrol_ac: "AC Control",
+      kontrol_lampu: "Lamp Control",
+      lokasi: "Location",
+      daya_ac: "AC Power",
+      target_temperatur: "Target Temperature",
+      mode_pengoperasian: "Operation Mode",
+      kecepatan_kipas: "Fan Speed",
+      arah_swing: "Swing Direction",
+      sakelar_lampu: "Lamp Switch",
+      hidupkan_matikan_lampu: "Turn on or turn off main light power.",
     }
   };
 
   const t = (key) => {
     const lang = language === "Indonesia" ? "Indonesia" : "English";
     return translations[lang][key] || key;
+  };
+
+  const translateNotification = (msg) => {
+    if (!msg) return msg;
+    if (language === "Indonesia") return msg;
+
+    let translated = msg;
+    translated = translated.replace(/Peringatan: Perangkat/g, "Warning: Device");
+    translated = translated.replace(/melampaui batas normal maksimum/g, "exceeded maximum normal limit");
+    translated = translated.replace(/melampaui batas normal minimum/g, "exceeded minimum normal limit");
+    translated = translated.replace(/Kembali ke status normal/g, "Returned to normal status");
+    translated = translated.replace(/berhasil ditambahkan ke dalam sistem/g, "successfully added to the system");
+    translated = translated.replace(/berhasil dihapus dari sistem/g, "successfully deleted from the system");
+    translated = translated.replace(/status mati \(OFF\)/g, "OFF status");
+    translated = translated.replace(/status hidup \(ON\)/g, "ON status");
+
+    return translated;
   };
 
   const login = async (username, password) => {
@@ -235,27 +407,16 @@ export function UserProvider({ children }) {
   };
 
   // User Management Actions
-  const addUser = (userData) => {
-    const newUser = {
-      id: `usr${Math.floor(100 + Math.random() * 900)}`,
-      registeredSince: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
-      lastLogin: "-",
-      ...userData,
-    };
-    setManagedUsers((prev) => [...prev, newUser]);
-    return { success: true, user: newUser };
+  const addUser = async (userData) => {
+    return await iotService.createUser(userData.username, userData.roleId, userData.status);
   };
 
-  const updateUser = (userId, userData) => {
-    setManagedUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, ...userData } : u))
-    );
-    return { success: true };
+  const updateUser = async (userId, userData) => {
+    return await iotService.updateUser(userId, userData.roleId, userData.status);
   };
 
-  const deleteUser = (userId) => {
-    setManagedUsers((prev) => prev.filter((u) => u.id !== userId));
-    return { success: true };
+  const deleteUser = async (username) => {
+    return await iotService.deleteUser(username);
   };
 
   const contextValue = useMemo(() => ({
@@ -279,6 +440,7 @@ export function UserProvider({ children }) {
     theme,
     setTheme,
     t,
+    translateNotification,
     colors,
     showToast,
   }), [

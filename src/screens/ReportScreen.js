@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import {
@@ -18,73 +19,64 @@ import {
   Thermometer,
   Droplet,
   Zap,
+  User,
 } from "lucide-react-native";
 
+
 export default function ReportScreen({ navigation }) {
-  const [selectedPeriod, setSelectedPeriod] = useState("Hari Ini"); // Hari Ini, Minggu ini, Bulan ini
-  const [devices, setDevices] = useState([]);
+  const { colors, theme, t } = useUser();
+  const [selectedPeriod, setSelectedPeriod] = useState("Hari Ini");
+  const [summary, setSummary]   = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadReportData = async () => {
+  const periodMap = {
+    "Hari Ini"   : "today",
+    "Minggu ini" : "week",
+    "Bulan ini"  : "month",
+  };
+
+  const loadReportData = async (period) => {
     setIsLoading(true);
-    const response = await iotService.getDashboardLatest();
+    const response = await iotService.getReportSummary(periodMap[period] ?? "today");
     setIsLoading(false);
-    if (!response.error && Array.isArray(response)) {
-      setDevices(response);
+    if (!response.error) {
+      setSummary(response);
     }
   };
 
   useEffect(() => {
-    loadReportData();
-  }, []);
-
-  // Calculate dynamic stats
-  const countAll = devices.length || 54;
-  const countOnline = devices.length 
-    ? devices.filter((d) => d.status === "ON" || (d.status && d.status !== "OFF" && d.status !== "0")).length 
-    : 42;
-  const countOffline = countAll - countOnline;
-
-  // Period multiplier helper to simulate change in values
-  const getMultiplier = () => {
-    if (selectedPeriod === "Minggu ini") return 7.2;
-    if (selectedPeriod === "Bulan ini") return 30.5;
-    return 1.0;
-  };
-
-  const mult = getMultiplier();
-
-  // Retrieve values from devices or default to Figma mockup
-  const getTempReport = () => (26.1).toFixed(1);
-  const getHumReport = () => (64.2).toFixed(1);
-  const getPowerReport = () => (542.7 * mult).toFixed(1);
-  const getWaterReport = () => (13.8 * (mult > 1 ? mult * 0.8 : 1)).toFixed(1);
+    loadReportData(selectedPeriod);
+  }, [selectedPeriod]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
-      <View style={styles.navbar}>
+      <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#0f172a" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Laporan</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("laporan")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Period Picker */}
-        <Text style={styles.sectionTitle}>Pilih Periode</Text>
+        {/* Horizontal Period Selector */}
         <View style={styles.periodRow}>
           {["Hari Ini", "Minggu ini", "Bulan ini"].map((p) => {
             const active = selectedPeriod === p;
+            const transP = p === "Hari Ini" ? t("hari_ini") : p === "Minggu ini" ? t("minggu_ini") : t("bulan_ini");
             return (
               <TouchableOpacity
                 key={p}
-                style={[styles.periodBtn, active && styles.periodBtnActive]}
+                style={[
+                  styles.periodBtn,
+                  { backgroundColor: colors.border, borderColor: colors.border },
+                  active && styles.periodBtnActive
+                ]}
                 onPress={() => setSelectedPeriod(p)}
               >
-                <Text style={[styles.periodText, active && styles.periodTextActive]}>
-                  {p}
+                <Text style={[styles.periodText, active ? styles.periodTextActive : { color: colors.textMuted }]}>
+                  {transP}
                 </Text>
               </TouchableOpacity>
             );
@@ -98,20 +90,24 @@ export default function ReportScreen({ navigation }) {
           </View>
         ) : (
           /* Ringkasan Monitoring Card */
-          <Card style={styles.reportCard}>
-            <Text style={styles.cardHeaderTitle}>Ringkasan Monitoring</Text>
+          <Card style={[styles.reportCard, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }]}>
+              {t("bahasa") === "Indonesia" ? "Ringkasan Monitoring" : "Monitoring Summary"}
+            </Text>
             
             {/* 1. Total Perangkat */}
             <View style={styles.statRow}>
               <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#f1f5f9" }]}>
+                <View style={[styles.iconContainer, { backgroundColor: theme === "Dark Mode" ? "#334155" : "#f1f5f9" }]}>
                   <Tv size={16} color="#64748b" />
                 </View>
-                <Text style={styles.statLabelText}>Total Perangkat</Text>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>Total Devices</Text>
               </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>{countAll} unit</Text>
+              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+                {summary?.totalDevice ?? "-"} {t("bahasa") === "Indonesia" ? "unit" : "units"}
+              </Text>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             {/* 2. Perangkat Online */}
             <View style={styles.statRow}>
@@ -119,11 +115,13 @@ export default function ReportScreen({ navigation }) {
                 <View style={[styles.iconContainer, { backgroundColor: "#dcfce7" }]}>
                   <Wifi size={16} color="#10b981" />
                 </View>
-                <Text style={styles.statLabelText}>Perangkat Online</Text>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>{t("perangkat_online") || "Devices Online"}</Text>
               </View>
-              <Text style={[styles.statValueText, { color: "#10b981" }]}>{countOnline} unit</Text>
+              <Text style={[styles.statValueText, { color: "#10b981" }]}>
+                {summary?.deviceOnline ?? "-"} {t("bahasa") === "Indonesia" ? "unit" : "units"}
+              </Text>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             {/* 3. Perangkat Offline */}
             <View style={styles.statRow}>
@@ -131,11 +129,27 @@ export default function ReportScreen({ navigation }) {
                 <View style={[styles.iconContainer, { backgroundColor: "#fefeec" }]}>
                   <WifiOff size={16} color="#ef4444" style={{ marginTop: 2 }} />
                 </View>
-                <Text style={styles.statLabelText}>Perangkat Offline</Text>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>{t("perangkat_offline") || "Devices Offline"}</Text>
               </View>
-              <Text style={[styles.statValueText, { color: "#ef4444" }]}>{countOffline} unit</Text>
+              <Text style={[styles.statValueText, { color: "#ef4444" }]}>
+                {summary?.deviceOffline ?? "-"} {t("bahasa") === "Indonesia" ? "unit" : "units"}
+              </Text>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            {/* Total Users */}
+            <View style={styles.statRow}>
+              <View style={styles.rowLabelBox}>
+                <View style={[styles.iconContainer, { backgroundColor: "#f3e8ff" }]}>
+                  <User size={16} color="#a855f7" />
+                </View>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>{t("total_user") || "Total Users"}</Text>
+              </View>
+              <Text style={[styles.statValueText, { color: "#a855f7" }]}>
+                {summary?.totalUsers ?? "-"} {t("bahasa") === "Indonesia" ? "orang" : "users"}
+              </Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             {/* 4. Rata-rata Suhu */}
             <View style={styles.statRow}>
@@ -143,11 +157,15 @@ export default function ReportScreen({ navigation }) {
                 <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
                   <Thermometer size={16} color="#2563eb" />
                 </View>
-                <Text style={styles.statLabelText}>Rata-rata Suhu</Text>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>
+                  {t("bahasa") === "Indonesia" ? "Rata-rata Suhu" : "Average Temperature"}
+                </Text>
               </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>{getTempReport()} °C</Text>
+              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+                {summary ? parseFloat(summary.avgTemperature).toFixed(1) : "-"} °C
+              </Text>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             {/* 5. Rata-rata Kelembapan */}
             <View style={styles.statRow}>
@@ -155,11 +173,15 @@ export default function ReportScreen({ navigation }) {
                 <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
                   <Droplet size={16} color="#2563eb" />
                 </View>
-                <Text style={styles.statLabelText}>Rata-rata Kelembapan</Text>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>
+                  {t("bahasa") === "Indonesia" ? "Rata-rata Kelembapan" : "Average Humidity"}
+                </Text>
               </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>{getHumReport()} %</Text>
+              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+                {summary ? parseFloat(summary.avgHumidity).toFixed(1) : "-"} %
+              </Text>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             {/* 6. Total Listrik */}
             <View style={styles.statRow}>
@@ -167,26 +189,18 @@ export default function ReportScreen({ navigation }) {
                 <View style={[styles.iconContainer, { backgroundColor: "#fefeec" }]}>
                   <Zap size={16} color="#eab308" />
                 </View>
-                <Text style={styles.statLabelText}>Total Listrik</Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>{getPowerReport()} kWh</Text>
-            </View>
-            <View style={styles.divider} />
-
-            {/* 7. Total Air */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
-                  <Droplet size={16} color="#0059AB" />
-                </View>
-                <Text style={styles.statLabelText}>Total Air</Text>
+                <Text style={[styles.statLabelText, { color: colors.text }]}>
+                  {t("bahasa") === "Indonesia" ? "Total Listrik" : "Total Electricity"}
+                </Text>
               </View>
               <Text style={[styles.statValueText, { color: "#2563eb" }]}>
-                {selectedPeriod === "Hari Ini" ? `${getWaterReport()} L/menit` : `${getWaterReport()} m³`}
+                {summary ? parseFloat(summary.totalPowerKwh).toFixed(2) : "-"} kWh
               </Text>
             </View>
+
           </Card>
         )}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -195,7 +209,7 @@ export default function ReportScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
   },
   navbar: {
     height: 60,

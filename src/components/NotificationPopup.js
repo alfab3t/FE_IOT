@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, View, Text, Modal, TouchableOpacity } from "react-native";
 import { useUser } from "../context/UserContext";
-import { CheckCircle, AlertTriangle, XCircle, Info } from "lucide-react-native";
+import { CheckCircle, AlertTriangle, XCircle, Info, HelpCircle } from "lucide-react-native";
 
 export default function NotificationPopup({
   visible,
@@ -11,7 +11,7 @@ export default function NotificationPopup({
   onConfirm,
   confirmText = "OK",
   cancelText = "Batal",
-  type = "info", // info, success, warning, error
+  type = "info", // info, success, warning, error, question
 }) {
   const { colors } = useUser();
 
@@ -23,6 +23,8 @@ export default function NotificationPopup({
         return <AlertTriangle size={32} color="#f59e0b" />;
       case "error":
         return <XCircle size={32} color="#ef4444" />;
+      case "question":
+        return <HelpCircle size={32} color="#0059AB" />;
       case "info":
       default:
         return <Info size={32} color="#0059AB" />;

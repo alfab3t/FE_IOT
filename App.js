@@ -17,22 +17,41 @@ import ScanScreen from "./src/screens/ScanScreen";
 import UsersListScreen from "./src/screens/UsersListScreen";
 import UserDetailScreen from "./src/screens/UserDetailScreen";
 import AddUserScreen from "./src/screens/AddUserScreen";
+import EditUserScreen from "./src/screens/EditUserScreen";
 import ReportScreen from "./src/screens/ReportScreen";
 import SystemSettingsScreen from "./src/screens/SystemSettingsScreen";
 import NotificationDetailScreen from "./src/screens/NotificationDetailScreen";
 
+import { View } from "react-native";
+import { useUser } from "./src/context/UserContext";
+
 const Stack = createNativeStackNavigator();
 
-export default function App() {
+function AppNavigator() {
+  const userCtx = useUser();
+  const colors = userCtx?.colors || { background: "#ffffff", text: "#0f172a", border: "#f1f5f9" };
+
+  const navTheme = {
+    dark: userCtx?.theme === "Dark Mode",
+    colors: {
+      primary: "#0059AB",
+      background: colors.background,
+      card: colors.cardBackground || colors.background,
+      text: colors.text,
+      border: colors.border,
+      notification: "#ef4444",
+    },
+  };
+
   return (
-    <UserProvider>
-      <SafeAreaProvider>
-        <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Stack.Navigator
           initialRouteName="Login"
           screenOptions={{
             headerShown: false,
             animation: "slide_from_right",
+            contentStyle: { backgroundColor: colors.background },
           }}
         >
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -47,11 +66,21 @@ export default function App() {
           <Stack.Screen name="UsersList" component={UsersListScreen} />
           <Stack.Screen name="UserDetail" component={UserDetailScreen} />
           <Stack.Screen name="AddUser" component={AddUserScreen} />
+          <Stack.Screen name="EditUser" component={EditUserScreen} />
           <Stack.Screen name="Report" component={ReportScreen} />
           <Stack.Screen name="SystemSettings" component={SystemSettingsScreen} />
           <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
         </Stack.Navigator>
-      </NavigationContainer>
+      </View>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <UserProvider>
+      <SafeAreaProvider>
+        <AppNavigator />
       </SafeAreaProvider>
     </UserProvider>
   );
