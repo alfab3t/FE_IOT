@@ -5,7 +5,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   Image,
 } from "react-native";
@@ -20,7 +19,6 @@ export default function EditUserScreen({ route, navigation }) {
   const { editUsername } = route.params;
 
   // Form States
-  const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
   const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -33,7 +31,7 @@ export default function EditUserScreen({ route, navigation }) {
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
   const [popupType, setPopupType] = useState("info");
-  const [popupConfirmText, setPopupConfirmText] = useState("OK");
+  const [popupConfirmText] = useState("OK");
   const [onConfirmAction, setOnConfirmAction] = useState(null);
 
 
@@ -43,7 +41,6 @@ export default function EditUserScreen({ route, navigation }) {
       const response = await iotService.getUserDetail(editUsername);
       setIsLoading(false);
       if (!response.error && response.username) {
-        setFullName(response.fullName || response.username);
         setRole(response.roleName || "Viewer");
         setStatus(response.status || "Aktif");
         setPhoto(response.photo);

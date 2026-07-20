@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useRef } from "react";
-import { StyleSheet, View, Text, Dimensions } from "react-native";
+import { StyleSheet } from "react-native";
 import { authService } from "../services/authService";
 import { iotService } from "../services/iotService";
 import { setAuthToken } from "../services/apiClient";
@@ -13,7 +13,7 @@ export function UserProvider({ children }) {
   const [rolePermissions, setRolePermissions] = useState([]);
 
   // Mock User Database matching Figma screen
-  const [managedUsers, setManagedUsers] = useState([
+  const [managedUsers] = useState([
     {
       id: "usr001",
       name: "Admin ASTRATech",
@@ -340,14 +340,14 @@ export function UserProvider({ children }) {
     if (language === "Indonesia") return msg;
 
     let translated = msg;
-    translated = translated.replace(/Peringatan: Perangkat/g, "Warning: Device");
-    translated = translated.replace(/melampaui batas normal maksimum/g, "exceeded maximum normal limit");
-    translated = translated.replace(/melampaui batas normal minimum/g, "exceeded minimum normal limit");
-    translated = translated.replace(/Kembali ke status normal/g, "Returned to normal status");
-    translated = translated.replace(/berhasil ditambahkan ke dalam sistem/g, "successfully added to the system");
-    translated = translated.replace(/berhasil dihapus dari sistem/g, "successfully deleted from the system");
-    translated = translated.replace(/status mati \(OFF\)/g, "OFF status");
-    translated = translated.replace(/status hidup \(ON\)/g, "ON status");
+    translated = translated.replaceAll("Peringatan: Perangkat", "Warning: Device");
+    translated = translated.replaceAll("melampaui batas normal maksimum", "exceeded maximum normal limit");
+    translated = translated.replaceAll("melampaui batas normal minimum", "exceeded minimum normal limit");
+    translated = translated.replaceAll("Kembali ke status normal", "Returned to normal status");
+    translated = translated.replaceAll("berhasil ditambahkan ke dalam sistem", "successfully added to the system");
+    translated = translated.replaceAll("berhasil dihapus dari sistem", "successfully deleted from the system");
+    translated = translated.replaceAll("status mati (OFF)", "OFF status");
+    translated = translated.replaceAll("status hidup (ON)", "ON status");
 
     return translated;
   };

@@ -5,7 +5,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   Image,
 } from "react-native";
@@ -23,7 +22,7 @@ import {
 
 export default function UserDetailScreen({ route, navigation }) {
   const { username } = route.params;
-  const { user, deleteUser, colors, t, language } = useUser();
+  const { deleteUser, colors, t, language } = useUser();
   const [selectedUserObj, setSelectedUserObj] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -86,6 +85,49 @@ export default function UserDetailScreen({ route, navigation }) {
     );
   }
 
+  const handleDismissPopup = () => {
+    setPopupVisible(false);
+  };
+
+  const handleRedirectToUsersList = () => {
+    setPopupVisible(false);
+    navigation.navigate("UsersList");
+  };
+
+  const showErrorPopup = (msg) => {
+    setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
+    setPopupMessage(msg || "Gagal mencabut hak akses pengguna.");
+    setPopupType("error");
+    setPopupConfirmText("OK");
+    setOnConfirmAction(() => handleDismissPopup);
+    setPopupVisible(true);
+  };
+
+  const showSuccessPopup = () => {
+    setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
+    setPopupMessage(
+      language === "Indonesia"
+        ? "Pengguna berhasil dihapus dari sistem."
+        : "User successfully deleted from system."
+    );
+    setPopupType("success");
+    setPopupConfirmText("OK");
+    setOnConfirmAction(() => handleRedirectToUsersList);
+    setPopupVisible(true);
+  };
+
+  const performDelete = async () => {
+    setPopupVisible(false);
+    const res = await deleteUser(selectedUserObj.id);
+    setTimeout(() => {
+      if (res.error) {
+        showErrorPopup(res.message);
+      } else {
+        showSuccessPopup();
+      }
+    }, 300);
+  };
+
   const handleDelete = () => {
     setPopupTitle(language === "Indonesia" ? "Hapus Pengguna" : "Delete User");
     setPopupMessage(
@@ -96,48 +138,17 @@ export default function UserDetailScreen({ route, navigation }) {
     setPopupType("question");
     setPopupConfirmText(language === "Indonesia" ? "HAPUS" : "DELETE");
     setPopupCancelText(language === "Indonesia" ? "BATAL" : "CANCEL");
-    setOnConfirmAction(() => async () => {
-      setPopupVisible(false);
-      const res = await deleteUser(selectedUserObj.id);
-      if (res.error) {
-        // Show error popup
-        setTimeout(() => {
-          setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
-          setPopupMessage(res.message || "Gagal mencabut hak akses pengguna.");
-          setPopupType("error");
-          setPopupConfirmText("OK");
-          setOnConfirmAction(null);
-          setPopupVisible(true);
-        }, 300);
-      } else {
-        // Show success popup
-        setTimeout(() => {
-          setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
-          setPopupMessage(
-            language === "Indonesia"
-              ? "Pengguna berhasil dihapus dari sistem."
-              : "User successfully deleted from system."
-          );
-          setPopupType("success");
-          setPopupConfirmText("OK");
-          setOnConfirmAction(() => () => {
-            setPopupVisible(false);
-            navigation.navigate("UsersList");
-          });
-          setPopupVisible(true);
-        }, 300);
-      }
-    });
+    setOnConfirmAction(() => performDelete);
     setPopupVisible(true);
   };
 
   // Determine avatar background color
   let avatarBg = "#dbeafe";
   let avatarColor = "#2563eb";
-  if (selectedUserObj.role && selectedUserObj.role.toLowerCase().includes("owner")) {
+  if (selectedUserObj.role?.toLowerCase().includes("owner")) {
     avatarBg = "#fef3c7";
     avatarColor = "#d97706";
-  } else if (selectedUserObj.role && selectedUserObj.role.toLowerCase() === "viewer") {
+  } else if (selectedUserObj.role?.toLowerCase() === "viewer") {
     avatarBg = "#fce7f3";
     avatarColor = "#db2777";
   }

@@ -169,6 +169,10 @@ export default function UsersListScreen({ navigation }) {
     );
   };
 
+  const renderSeparator = useCallback(() => (
+    <UserItemSeparator color={colors.border} />
+  ), [colors.border]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Navbar */}
@@ -242,7 +246,7 @@ export default function UsersListScreen({ navigation }) {
           renderItem={renderUserItem}
           style={{ flex: 1 }}
           contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <UserItemSeparator color={colors.border} />}
+          ItemSeparatorComponent={renderSeparator}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
               Tidak ada pengguna ditemukan
@@ -288,6 +292,10 @@ export default function UsersListScreen({ navigation }) {
 
             {["Semua", "Aktif", "Tidak Aktif"].map((statusOption) => {
               const isSelected = statusFilter === statusOption;
+              let optionBg = "transparent";
+              if (isSelected) {
+                optionBg = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
+              }
               return (
                 <TouchableOpacity
                   key={statusOption}
@@ -295,7 +303,7 @@ export default function UsersListScreen({ navigation }) {
                     styles.optionRowBtn,
                     {
                       borderColor: isSelected ? "#0059AB" : colors.border,
-                      backgroundColor: isSelected ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : "transparent",
+                      backgroundColor: optionBg,
                       marginTop: 8
                     }
                   ]}

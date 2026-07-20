@@ -95,6 +95,15 @@ export default function SwipeableToast({ message, type, colors, onDismiss, onPre
     }
   };
 
+  let titleText = "Pemberitahuan";
+  if (type === "warning") {
+    titleText = "Peringatan Sensor";
+  } else if (type === "success") {
+    titleText = "Sukses";
+  } else if (type === "error") {
+    titleText = "Gagal";
+  }
+
   return (
     <Animated.View
       style={[
@@ -112,13 +121,7 @@ export default function SwipeableToast({ message, type, colors, onDismiss, onPre
       <View style={styles.iconBox}>{renderIcon()}</View>
       <View style={styles.textBox}>
         <Text style={[styles.titleText, { color: colors.text }]}>
-          {type === "warning"
-            ? "Peringatan Sensor"
-            : type === "success"
-              ? "Sukses"
-              : type === "error"
-                ? "Gagal"
-                : "Pemberitahuan"}
+          {titleText}
         </Text>
         <Text style={[styles.messageText, { color: colors.textMuted }]}>{message}</Text>
       </View>

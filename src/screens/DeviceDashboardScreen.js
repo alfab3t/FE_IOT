@@ -12,7 +12,7 @@ import {
   Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LineChart, BarChart } from "react-native-chart-kit";
+import { LineChart } from "react-native-chart-kit";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import { authService } from "../services/authService";
@@ -40,7 +40,7 @@ import {
 const chartWidth = Dimensions.get("window").width - 32;
 
 export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
-  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast } = useUser();
+  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme } = useUser();
   const [devices, setDevices] = useState([]);
   const [activities, setActivities] = useState([]);
   const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
@@ -69,7 +69,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     const response = await iotService.getGraphAverage(tab, "Minutely");
     if (!response.error && Array.isArray(response) && response.length > 0) {
       const labels = response.map((pt) => pt.labelText || "");
-      const values = response.map((pt) => parseFloat(pt.averageValue || 0));
+      const values = response.map((pt) => Number.parseFloat(pt.averageValue || 0));
       setChartLabelsState(labels);
 
       if (tab === "Suhu") {
@@ -158,7 +158,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     const dateStr = date.toLocaleDateString(isId ? "id-ID" : "en-US", options);
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${dateStr} • ${hours}:${minutes} ${isId ? "WIB" : "WIB"}`;
+    return `${dateStr} • ${hours}:${minutes} WIB`;
   };
 
   // Extract Summary Statistics
@@ -228,7 +228,12 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   // Thin out labels: only show every Nth label to prevent X-axis overlap
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
-    const n = labels.length <= 6 ? 1 : labels.length <= 12 ? 2 : 3;
+    let n = 3;
+    if (labels.length <= 6) {
+      n = 1;
+    } else if (labels.length <= 12) {
+      n = 2;
+    }
     return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
   };
 
@@ -288,22 +293,22 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
           {/* Stats Summary Info Panel */}
           {chartDataState.length > 0 && (
-            <View style={styles.chartStatsRow}>
+            <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
               <View style={styles.chartStatBox}>
-                <Text style={styles.chartStatLabel}>Rata-rata</Text>
-                <Text style={styles.chartStatValue}>{getChartStats().avg}</Text>
+                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Rata-rata</Text>
+                <Text style={[styles.chartStatValue, { color: colors.text }]}>{getChartStats().avg}</Text>
               </View>
               <View style={styles.chartStatBox}>
-                <Text style={styles.chartStatLabel}>Tertinggi</Text>
-                <Text style={styles.chartStatValue}>{getChartStats().max}</Text>
+                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Tertinggi</Text>
+                <Text style={[styles.chartStatValue, { color: colors.text }]}>{getChartStats().max}</Text>
               </View>
               <View style={styles.chartStatBox}>
-                <Text style={styles.chartStatLabel}>Terendah</Text>
-                <Text style={styles.chartStatValue}>{getChartStats().min}</Text>
+                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Terendah</Text>
+                <Text style={[styles.chartStatValue, { color: colors.text }]}>{getChartStats().min}</Text>
               </View>
               {activeChartTab === "Listrik" && (
                 <View style={styles.chartStatBox}>
-                  <Text style={styles.chartStatLabel}>Est. Konsumsi</Text>
+                  <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Est. Konsumsi</Text>
                   <Text style={[styles.chartStatValue, { color: "#10b981" }]}>{getChartStats().energy}</Text>
                 </View>
               )}

@@ -173,7 +173,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
           <TouchableOpacity onPress={handlePhotoSelect} style={{ marginTop: 8 }}>
             <Text style={[styles.editTextBtn, { color: "#0059AB" }]}>
-              {language === "Indonesia" ? "Edit" : "Edit"}
+              Edit
             </Text>
           </TouchableOpacity>
         </View>
@@ -244,92 +244,27 @@ export default function ProfileScreen({ navigation }) {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Edit Nickname Modal */}
-      <Modal
+      <NicknameModal
         visible={nicknameModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setNicknameModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.dialogTitle, { color: colors.text }]}>
-              {language === "Indonesia" ? "Ubah Nickname" : "Change Nickname"}
-            </Text>
-            <Input
-              placeholder={language === "Indonesia" ? "Masukkan nickname baru" : "Enter new nickname"}
-              value={editNicknameValue}
-              onChangeText={setEditNicknameValue}
-            />
-            <View style={styles.dialogButtonRow}>
-              <TouchableOpacity
-                style={[styles.dialogBtn, styles.dialogBtnCancel, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
-                onPress={() => setNicknameModalVisible(false)}
-              >
-                <Text style={[styles.dialogBtnCancelText, { color: colors.text }]}>{t("batal")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dialogBtn, styles.dialogBtnSave]}
-                onPress={handleSaveNickname}
-              >
-                <Text style={styles.dialogBtnSaveText}>{t("simpan")}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setNicknameModalVisible(false)}
+        editNicknameValue={editNicknameValue}
+        setEditNicknameValue={setEditNicknameValue}
+        handleSaveNickname={handleSaveNickname}
+        colors={colors}
+        t={t}
+        language={language}
+      />
 
-      {/* Timezone picker Modal */}
-      <Modal
+      <TimezoneModal
         visible={timezoneModalVisible}
-        animationType="slide"
-        onRequestClose={() => setTimezoneModalVisible(false)}
-      >
-        <SafeAreaView style={[styles.tzModalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => setTimezoneModalVisible(false)}>
-              <ArrowLeft size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.navTitle, { color: colors.text }]}>
-              {language === "Indonesia" ? "Pilih Zona Waktu" : "Select Time Zone"}
-            </Text>
-            <View style={{ width: 40 }} />
-          </View>
-
-          <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
-            <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
-            <TextInput
-              style={[styles.searchBarInput, { color: colors.text }]}
-              placeholder={language === "Indonesia" ? "Cari kota..." : "Search city..."}
-              placeholderTextColor={colors.textMuted}
-              value={searchTz}
-              onChangeText={setSearchTz}
-            />
-          </View>
-
-          <FlatList
-            data={timezones.filter((tz) => tz.city.toLowerCase().includes(searchTz.toLowerCase()))}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.tzItem, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}
-                onPress={() => {
-                  setTimezone(item.city);
-                  setTimezoneModalVisible(false);
-                }}
-              >
-                <Text style={[styles.tzItemText, { color: colors.text }]}>{item.city}</Text>
-                <Text style={styles.tzItemSubText}>{item.id}</Text>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                {language === "Indonesia" ? "Zona waktu tidak ditemukan" : "Time zone not found"}
-              </Text>
-            }
-          />
-        </SafeAreaView>
-      </Modal>
+        onClose={() => setTimezoneModalVisible(false)}
+        colors={colors}
+        language={language}
+        searchTz={searchTz}
+        setSearchTz={setSearchTz}
+        timezones={timezones}
+        setTimezone={setTimezone}
+      />
 
       <NotificationPopup
         visible={logoutPopupVisible}
@@ -346,128 +281,272 @@ export default function ProfileScreen({ navigation }) {
         }}
       />
 
-      {/* Custom Bottom Sheet Action Sheet for Photo Selection */}
-      <Modal
+      <PhotoSourceModal
         visible={photoModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setPhotoModalVisible(false)}
-      >
-        <TouchableOpacity 
-          style={styles.bottomSheetOverlay} 
-          activeOpacity={1} 
-          onPress={() => setPhotoModalVisible(false)}
-        >
-          <View style={[styles.bottomSheetContainer, { backgroundColor: colors.cardBackground }]}>
-            <View style={styles.bottomSheetHandle} />
-            <Text style={[styles.bottomSheetTitle, { color: colors.text }]}>
-              {language === "Indonesia" ? "Ubah Foto Profil" : "Change Profile Photo"}
-            </Text>
-            <Text style={[styles.bottomSheetSub, { color: colors.textMuted }]}>
-              {language === "Indonesia" ? "Pilih sumber foto profil Anda:" : "Select your profile photo source:"}
-            </Text>
+        onClose={() => setPhotoModalVisible(false)}
+        colors={colors}
+        language={language}
+        processImageResult={processImageResult}
+      />
 
-            {/* Options */}
-            <TouchableOpacity 
-              style={[styles.bottomSheetOption, { borderBottomColor: colors.border }]}
-              onPress={async () => {
-                setPhotoModalVisible(false);
-                const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                if (status !== "granted") {
-                  Alert.alert(
-                    language === "Indonesia" ? "Izin Kamera Diperlukan" : "Camera Permission Required",
-                    language === "Indonesia" ? "Izin akses kamera dibutuhkan untuk mengambil foto." : "Camera access permission is required to take photos."
-                  );
-                  return;
-                }
-                const result = await ImagePicker.launchCameraAsync({
-                  allowsEditing: true,
-                  aspect: [1, 1],
-                  quality: 0.5,
-                  base64: true,
-                });
-                processImageResult(result);
-              }}
-            >
-              <Camera size={20} color="#0059AB" style={{ marginRight: 12 }} />
-              <Text style={[styles.bottomSheetOptionText, { color: colors.text }]}>
-                {language === "Indonesia" ? "Ambil Foto (Kamera)" : "Take Photo (Camera)"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.bottomSheetOption, { borderBottomColor: colors.border }]}
-              onPress={async () => {
-                setPhotoModalVisible(false);
-                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (status !== "granted") {
-                  Alert.alert(
-                    language === "Indonesia" ? "Izin Galeri Diperlukan" : "Gallery Permission Required",
-                    language === "Indonesia" ? "Izin akses galeri dibutuhkan untuk mengubah foto profil." : "Gallery access permission is required to change profile photo."
-                  );
-                  return;
-                }
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: 'images',
-                  allowsEditing: true,
-                  aspect: [1, 1],
-                  quality: 0.5,
-                  base64: true,
-                });
-                processImageResult(result);
-              }}
-            >
-              <User size={20} color="#0059AB" style={{ marginRight: 12 }} />
-              <Text style={[styles.bottomSheetOptionText, { color: colors.text }]}>
-                {language === "Indonesia" ? "Pilih dari Galeri" : "Choose from Gallery"}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Cancel Button */}
-            <TouchableOpacity 
-              style={[styles.bottomSheetCancelBtn, { backgroundColor: colors.border }]}
-              onPress={() => setPhotoModalVisible(false)}
-            >
-              <Text style={[styles.bottomSheetCancelText, { color: colors.text }]}>
-                {language === "Indonesia" ? "Batal" : "Cancel"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Fullscreen Photo Preview Modal */}
-      <Modal
+      <PreviewModal
         visible={previewVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPreviewVisible(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setPreviewVisible(false)}
-        >
-          <View style={styles.modalCloseButton}>
-            <Text style={{ color: "#fff", fontSize: 13, fontWeight: "bold" }}>Close</Text>
-          </View>
-          {avatarBase64 ? (
-            <Image
-              source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }}
-              style={styles.previewImage}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.previewPlaceholder}>
-              <User size={120} color="#cbd5e1" />
-              <Text style={{ color: "#94a3b8", marginTop: 12, fontSize: 14 }}>
-                {language === "Indonesia" ? "Tidak ada foto profil" : "No profile photo"}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </Modal>
+        onClose={() => setPreviewVisible(false)}
+        avatarBase64={avatarBase64}
+        language={language}
+      />
     </View>
+  );
+}
+
+// ── Helpers & Subcomponents ───────────────────────────────────────────────
+function NicknameModal({
+  visible,
+  onClose,
+  editNicknameValue,
+  setEditNicknameValue,
+  handleSaveNickname,
+  colors,
+  t,
+  language,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
+          <Text style={[styles.dialogTitle, { color: colors.text }]}>
+            {language === "Indonesia" ? "Ubah Nickname" : "Change Nickname"}
+          </Text>
+          <Input
+            placeholder={language === "Indonesia" ? "Masukkan nickname baru" : "Enter new nickname"}
+            value={editNicknameValue}
+            onChangeText={setEditNicknameValue}
+          />
+          <View style={styles.dialogButtonRow}>
+            <TouchableOpacity
+              style={[styles.dialogBtn, styles.dialogBtnCancel, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
+              onPress={onClose}
+            >
+              <Text style={[styles.dialogBtnCancelText, { color: colors.text }]}>{t("batal")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dialogBtn, styles.dialogBtnSave]}
+              onPress={handleSaveNickname}
+            >
+              <Text style={styles.dialogBtnSaveText}>{t("simpan")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function TimezoneModal({
+  visible,
+  onClose,
+  colors,
+  language,
+  searchTz,
+  setSearchTz,
+  timezones,
+  setTimezone,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={[styles.tzModalContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={onClose}>
+            <ArrowLeft size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.navTitle, { color: colors.text }]}>
+            {language === "Indonesia" ? "Pilih Zona Waktu" : "Select Time Zone"}
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+          <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchBarInput, { color: colors.text }]}
+            placeholder={language === "Indonesia" ? "Cari kota..." : "Search city..."}
+            placeholderTextColor={colors.textMuted}
+            value={searchTz}
+            onChangeText={setSearchTz}
+          />
+        </View>
+
+        <FlatList
+          data={timezones.filter((tz) => tz.city.toLowerCase().includes(searchTz.toLowerCase()))}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.tzItem, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}
+              onPress={() => {
+                setTimezone(item.city);
+                onClose();
+              }}
+            >
+              <Text style={[styles.tzItemText, { color: colors.text }]}>{item.city}</Text>
+              <Text style={styles.tzItemSubText}>{item.id}</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              {language === "Indonesia" ? "Zona waktu tidak ditemukan" : "Time zone not found"}
+            </Text>
+          }
+        />
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function PhotoSourceModal({
+  visible,
+  onClose,
+  colors,
+  language,
+  processImageResult,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity 
+        style={styles.bottomSheetOverlay} 
+        activeOpacity={1} 
+        onPress={onClose}
+      >
+        <View style={[styles.bottomSheetContainer, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.bottomSheetHandle} />
+          <Text style={[styles.bottomSheetTitle, { color: colors.text }]}>
+            {language === "Indonesia" ? "Ubah Foto Profil" : "Change Profile Photo"}
+          </Text>
+          <Text style={[styles.bottomSheetSub, { color: colors.textMuted }]}>
+            {language === "Indonesia" ? "Pilih sumber foto profil Anda:" : "Select your profile photo source:"}
+          </Text>
+
+          {/* Options */}
+          <TouchableOpacity 
+            style={[styles.bottomSheetOption, { borderBottomColor: colors.border }]}
+            onPress={async () => {
+              onClose();
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert(
+                  language === "Indonesia" ? "Izin Kamera Diperlukan" : "Camera Permission Required",
+                  language === "Indonesia" ? "Izin akses kamera dibutuhkan untuk mengambil foto." : "Camera access permission is required to take photos."
+                );
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
+                base64: true,
+              });
+              processImageResult(result);
+            }}
+          >
+            <Camera size={20} color="#0059AB" style={{ marginRight: 12 }} />
+            <Text style={[styles.bottomSheetOptionText, { color: colors.text }]}>
+              {language === "Indonesia" ? "Ambil Foto (Kamera)" : "Take Photo (Camera)"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.bottomSheetOption, { borderBottomColor: colors.border }]}
+            onPress={async () => {
+              onClose();
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert(
+                  language === "Indonesia" ? "Izin Galeri Diperlukan" : "Gallery Permission Required",
+                  language === "Indonesia" ? "Izin akses galeri dibutuhkan untuk mengubah foto profil." : "Gallery access permission is required to change profile photo."
+                );
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
+                base64: true,
+              });
+              processImageResult(result);
+            }}
+          >
+            <User size={20} color="#0059AB" style={{ marginRight: 12 }} />
+            <Text style={[styles.bottomSheetOptionText, { color: colors.text }]}>
+              {language === "Indonesia" ? "Pilih dari Galeri" : "Choose from Gallery"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Cancel Button */}
+          <TouchableOpacity 
+            style={[styles.bottomSheetCancelBtn, { backgroundColor: colors.border }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.bottomSheetCancelText, { color: colors.text }]}>
+              {language === "Indonesia" ? "Batal" : "Cancel"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+function PreviewModal({
+  visible,
+  onClose,
+  avatarBase64,
+  language,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity 
+        style={styles.previewOverlay} 
+        activeOpacity={1} 
+        onPress={onClose}
+      >
+        <View style={styles.modalCloseButton}>
+          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "bold" }}>Close</Text>
+        </View>
+        {avatarBase64 ? (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }}
+            style={styles.previewImage}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={styles.previewPlaceholder}>
+            <User size={120} color="#cbd5e1" />
+            <Text style={{ color: "#94a3b8", marginTop: 12, fontSize: 14 }}>
+              {language === "Indonesia" ? "Tidak ada foto profil" : "No profile photo"}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </Modal>
   );
 }
 
@@ -537,7 +616,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
-  modalOverlay: {
+  previewOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.95)",
     justifyContent: "center",

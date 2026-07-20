@@ -64,7 +64,12 @@ export default function ReportScreen({ navigation }) {
         <View style={styles.periodRow}>
           {["Hari Ini", "Minggu ini", "Bulan ini"].map((p) => {
             const active = selectedPeriod === p;
-            const transP = p === "Hari Ini" ? t("hari_ini") : p === "Minggu ini" ? t("minggu_ini") : t("bulan_ini");
+            let transP = t("bulan_ini");
+            if (p === "Hari Ini") {
+              transP = t("hari_ini");
+            } else if (p === "Minggu ini") {
+              transP = t("minggu_ini");
+            }
             return (
               <TouchableOpacity
                 key={p}
@@ -89,122 +94,149 @@ export default function ReportScreen({ navigation }) {
             <ActivityIndicator size="large" color="#0059AB" />
           </View>
         ) : (
-          /* Ringkasan Monitoring Card */
-          <Card style={[styles.reportCard, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }]}>
-              {t("bahasa") === "Indonesia" ? "Ringkasan Monitoring" : "Monitoring Summary"}
-            </Text>
-            
-            {/* 1. Total Perangkat */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: theme === "Dark Mode" ? "#334155" : "#f1f5f9" }]}>
-                  <Tv size={16} color="#64748b" />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>Total Devices</Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
-                {summary?.totalDevice ?? "-"} {t("bahasa") === "Indonesia" ? "unit" : "units"}
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* 2. Perangkat Online */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#dcfce7" }]}>
-                  <Wifi size={16} color="#10b981" />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>{t("perangkat_online") || "Devices Online"}</Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#10b981" }]}>
-                {summary?.deviceOnline ?? "-"} {t("bahasa") === "Indonesia" ? "unit" : "units"}
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* 3. Perangkat Offline */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#fefeec" }]}>
-                  <WifiOff size={16} color="#ef4444" style={{ marginTop: 2 }} />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>{t("perangkat_offline") || "Devices Offline"}</Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#ef4444" }]}>
-                {summary?.deviceOffline ?? "-"} {t("bahasa") === "Indonesia" ? "unit" : "units"}
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* Total Users */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#f3e8ff" }]}>
-                  <User size={16} color="#a855f7" />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>{t("total_user") || "Total Users"}</Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#a855f7" }]}>
-                {summary?.totalUsers ?? "-"} {t("bahasa") === "Indonesia" ? "orang" : "users"}
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* 4. Rata-rata Suhu */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
-                  <Thermometer size={16} color="#2563eb" />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>
-                  {t("bahasa") === "Indonesia" ? "Rata-rata Suhu" : "Average Temperature"}
-                </Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
-                {summary ? parseFloat(summary.avgTemperature).toFixed(1) : "-"} °C
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* 5. Rata-rata Kelembapan */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
-                  <Droplet size={16} color="#2563eb" />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>
-                  {t("bahasa") === "Indonesia" ? "Rata-rata Kelembapan" : "Average Humidity"}
-                </Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
-                {summary ? parseFloat(summary.avgHumidity).toFixed(1) : "-"} %
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* 6. Total Listrik */}
-            <View style={styles.statRow}>
-              <View style={styles.rowLabelBox}>
-                <View style={[styles.iconContainer, { backgroundColor: "#fefeec" }]}>
-                  <Zap size={16} color="#eab308" />
-                </View>
-                <Text style={[styles.statLabelText, { color: colors.text }]}>
-                  {t("bahasa") === "Indonesia" ? "Total Listrik" : "Total Electricity"}
-                </Text>
-              </View>
-              <Text style={[styles.statValueText, { color: "#2563eb" }]}>
-                {summary ? parseFloat(summary.totalPowerKwh).toFixed(2) : "-"} kWh
-              </Text>
-            </View>
-
-          </Card>
+          <ReportStatsCard summary={summary} colors={colors} theme={theme} t={t} />
         )}
 
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// ── Helpers & Subcomponents ───────────────────────────────────────────────
+function ReportStatsCard({ summary, colors, theme, t }) {
+  if (!summary) return null;
+
+  const totalDevStr = `${summary.totalDevice ?? "-"} ${t("bahasa") === "Indonesia" ? "unit" : "units"}`;
+  const onlineDevStr = `${summary.deviceOnline ?? "-"} ${t("bahasa") === "Indonesia" ? "unit" : "units"}`;
+  const offlineDevStr = `${summary.deviceOffline ?? "-"} ${t("bahasa") === "Indonesia" ? "unit" : "units"}`;
+  const totalUsersStr = `${summary.totalUsers ?? "-"} ${t("bahasa") === "Indonesia" ? "orang" : "users"}`;
+
+  const avgTemp = Number.parseFloat(summary.avgTemperature || 0).toFixed(1);
+  const avgHum = Number.parseFloat(summary.avgHumidity || 0).toFixed(1);
+  const totalPower = Number.parseFloat(summary.totalPowerKwh || 0).toFixed(2);
+
+  const monitoringTitle = t("bahasa") === "Indonesia" ? "Ringkasan Monitoring" : "Monitoring Summary";
+  const deviceOnlineTitle = t("perangkat_online") || "Devices Online";
+  const deviceOfflineTitle = t("perangkat_offline") || "Devices Offline";
+  const totalUserTitle = t("total_user") || "Total Users";
+  const avgSuhuTitle = t("bahasa") === "Indonesia" ? "Rata-rata Suhu" : "Average Temperature";
+  const avgHumiTitle = t("bahasa") === "Indonesia" ? "Rata-rata Kelembapan" : "Average Humidity";
+  const totalPowerTitle = t("bahasa") === "Indonesia" ? "Total Listrik" : "Total Electricity";
+
+  const isDark = theme === "Dark Mode";
+
+  return (
+    <Card style={[styles.reportCard, { backgroundColor: colors.cardBackground }]}>
+      <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }]}>
+        {monitoringTitle}
+      </Text>
+      
+      {/* 1. Total Perangkat */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: isDark ? "#334155" : "#f1f5f9" }]}>
+            <Tv size={16} color="#64748b" />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>Total Devices</Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+          {totalDevStr}
+        </Text>
+      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+      {/* 2. Perangkat Online */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: "#dcfce7" }]}>
+            <Wifi size={16} color="#10b981" />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>{deviceOnlineTitle}</Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#10b981" }]}>
+          {onlineDevStr}
+        </Text>
+      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+      {/* 3. Perangkat Offline */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: "#fefeec" }]}>
+            <WifiOff size={16} color="#ef4444" style={{ marginTop: 2 }} />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>{deviceOfflineTitle}</Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#ef4444" }]}>
+          {offlineDevStr}
+        </Text>
+      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+      {/* Total Users */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: "#f3e8ff" }]}>
+            <User size={16} color="#a855f7" />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>{totalUserTitle}</Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#a855f7" }]}>
+          {totalUsersStr}
+        </Text>
+      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+      {/* 4. Rata-rata Suhu */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
+            <Thermometer size={16} color="#2563eb" />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>
+            {avgSuhuTitle}
+          </Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+          {avgTemp} °C
+        </Text>
+      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+      {/* 5. Rata-rata Kelembapan */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: "#eff6ff" }]}>
+            <Droplet size={16} color="#2563eb" />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>
+            {avgHumiTitle}
+          </Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+          {avgHum} %
+        </Text>
+      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+      {/* 6. Total Listrik */}
+      <View style={styles.statRow}>
+        <View style={styles.rowLabelBox}>
+          <View style={[styles.iconContainer, { backgroundColor: "#fefeec" }]}>
+            <Zap size={16} color="#eab308" />
+          </View>
+          <Text style={[styles.statLabelText, { color: colors.text }]}>
+            {totalPowerTitle}
+          </Text>
+        </View>
+        <Text style={[styles.statValueText, { color: "#2563eb" }]}>
+          {totalPower} kWh
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
 
 const styles = StyleSheet.create({
   container: {

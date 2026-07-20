@@ -49,7 +49,6 @@ export default function AcControlScreen({ navigation }) {
     let lId = "DEV_AC01";
     let tId = "DEV_TEMP01";
     let pwrOn = false;
-    let tempVal = 22;
 
     // Search for AC device in active building
     const acDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "AC");
@@ -65,18 +64,25 @@ export default function AcControlScreen({ navigation }) {
       }
     }
 
-    // Search for Temperature sensor in active building
+    // Search for Temperature sensor in active building (only for device ID)
     const tempDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "Temperatur & Kelembaban");
     if (tempDevInBuilding) {
       tId = tempDevInBuilding.id;
-      const parsed = parseFloat(tempDevInBuilding.status);
-      if (!isNaN(parsed)) tempVal = Math.round(parsed);
     }
 
     setAcDeviceId(lId);
     setTempDeviceId(tId);
     setIsPowerOn(pwrOn);
-    setTemperature(tempVal);
+
+    // Load persisted AC settings from database
+    const savedSettings = await iotService.getAcSettings(lId);
+    if (!savedSettings.error && savedSettings) {
+      setTemperature(savedSettings.temperature ?? 22);
+      setAcMode(savedSettings.mode ?? "Cool");
+      setFanSpeed(savedSettings.fanSpeed ?? "Auto");
+      setSwingMode(savedSettings.swingMode ?? "Auto");
+    }
+
     setIsLoading(false);
   };
 
@@ -107,13 +113,19 @@ export default function AcControlScreen({ navigation }) {
     }
   };
 
+  // Helper: simpan semua setting AC ke database
+  const persistSettings = async (temp, mode, fan, swing) => {
+    await iotService.saveAcSettings(acDeviceId, temp, mode, fan, swing);
+  };
+
   const changeTemperature = async (delta) => {
     if (isViewer) {
       handleViewerBlock();
       return;
     }
 
-    const nextTemp = temperature + delta;
+    const prevTemp = temperature;
+    const nextTemp = prevTemp + delta;
     if (nextTemp < 16 || nextTemp > 30) return;
 
     setTemperature(nextTemp);
@@ -121,8 +133,10 @@ export default function AcControlScreen({ navigation }) {
     
     const response = await iotService.controlAc(topic, String(nextTemp));
     if (response.error) {
-      setTemperature(temperature);
+      setTemperature(prevTemp);
       Alert.alert("Gagal", response.message || "Gagal mengubah suhu AC.");
+    } else {
+      await persistSettings(nextTemp, acMode, fanSpeed, swingMode);
     }
   };
 
@@ -134,6 +148,7 @@ export default function AcControlScreen({ navigation }) {
     setAcMode(mode);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setModeS3" : "setMode00124";
     await iotService.controlAc(topic, String(value));
+    await persistSettings(temperature, mode, fanSpeed, swingMode);
   };
 
   const changeFanSpeed = async (speed, value) => {
@@ -144,6 +159,7 @@ export default function AcControlScreen({ navigation }) {
     setFanSpeed(speed);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setFanS3" : "setFan00123";
     await iotService.controlAc(topic, String(value));
+    await persistSettings(temperature, acMode, speed, swingMode);
   };
 
   const changeSwingMode = async (swing, value) => {
@@ -154,6 +170,7 @@ export default function AcControlScreen({ navigation }) {
     setSwingMode(swing);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setSwingS3" : "setSwing00125";
     await iotService.controlAc(topic, String(value));
+    await persistSettings(temperature, acMode, fanSpeed, swing);
   };
 
   return (

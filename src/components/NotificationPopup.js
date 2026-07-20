@@ -31,6 +31,15 @@ export default function NotificationPopup({
     }
   };
 
+  let confirmBtnBgColor = "#0059AB";
+  if (type === "success") {
+    confirmBtnBgColor = "#10b981";
+  } else if (type === "error") {
+    confirmBtnBgColor = "#ef4444";
+  } else if (type === "warning") {
+    confirmBtnBgColor = "#f59e0b";
+  }
+
   return (
     <Modal
       visible={visible}
@@ -67,14 +76,7 @@ export default function NotificationPopup({
                 styles.btn,
                 styles.btnConfirm,
                 {
-                  backgroundColor:
-                    type === "success"
-                      ? "#10b981"
-                      : type === "error"
-                      ? "#ef4444"
-                      : type === "warning"
-                      ? "#f59e0b"
-                      : "#0059AB",
+                  backgroundColor: confirmBtnBgColor,
                 },
               ]}
               onPress={onConfirm || onClose}

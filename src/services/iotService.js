@@ -121,9 +121,9 @@ export const iotService = {
         macAddress,
         name,
         category,
-        limitMin: limitMin ? parseFloat(limitMin) : null,
-        limitMax: limitMax ? parseFloat(limitMax) : null,
-        locationId: locationId ? parseInt(locationId, 10) : null,
+        limitMin: limitMin ? Number.parseFloat(limitMin) : null,
+        limitMax: limitMax ? Number.parseFloat(limitMax) : null,
+        locationId: locationId ? Number.parseInt(locationId, 10) : null,
       }),
     });
   },
@@ -202,6 +202,20 @@ export const iotService = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(isActive),
+    });
+  },
+
+  // ── AC Settings ──────────────────────────────────────────────────────────
+  getAcSettings: async (deviceId) => {
+    return await apiClient(`/api/Iot/devices/${encodeURIComponent(deviceId)}/ac-settings`, {
+      method: "GET",
+    });
+  },
+
+  saveAcSettings: async (deviceId, temperature, mode, fanSpeed, swingMode) => {
+    return await apiClient(`/api/Iot/devices/${encodeURIComponent(deviceId)}/ac-settings`, {
+      method: "POST",
+      body: JSON.stringify({ temperature, mode, fanSpeed, swingMode }),
     });
   },
 };

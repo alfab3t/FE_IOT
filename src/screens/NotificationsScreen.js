@@ -24,7 +24,7 @@ import {
 } from "lucide-react-native";
 
 export default function NotificationsScreen({ navigation }) {
-  const { colors, theme, t, language, translateNotification } = useUser();
+  const { colors, theme, language, translateNotification } = useUser();
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);

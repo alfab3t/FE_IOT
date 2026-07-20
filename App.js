@@ -1,8 +1,9 @@
 import React from "react";
+import { View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { UserProvider } from "./src/context/UserContext";
+import { UserProvider, useUser } from "./src/context/UserContext";
 
 // Import Screens
 import LoginScreen from "./src/screens/LoginScreen";
@@ -21,9 +22,9 @@ import EditUserScreen from "./src/screens/EditUserScreen";
 import ReportScreen from "./src/screens/ReportScreen";
 import SystemSettingsScreen from "./src/screens/SystemSettingsScreen";
 import NotificationDetailScreen from "./src/screens/NotificationDetailScreen";
-
-import { View } from "react-native";
-import { useUser } from "./src/context/UserContext";
+import PowerMeterScreen from "./src/screens/PowerMeterScreen";
+import SensorDetailScreen from "./src/screens/SensorDetailScreen";
+import WaterMeterScreen from "./src/screens/WaterMeterScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -70,6 +71,9 @@ function AppNavigator() {
           <Stack.Screen name="Report" component={ReportScreen} />
           <Stack.Screen name="SystemSettings" component={SystemSettingsScreen} />
           <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
+          <Stack.Screen name="PowerMeterDetail" component={PowerMeterScreen} />
+          <Stack.Screen name="SensorDetail" component={SensorDetailScreen} />
+          <Stack.Screen name="WaterMeterDetail" component={WaterMeterScreen} />
         </Stack.Navigator>
       </View>
     </NavigationContainer>

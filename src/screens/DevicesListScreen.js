@@ -250,36 +250,77 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       return dev.status || "OFF";
     }
     if (cat === "AC" || name.toLowerCase().includes("ac")) {
-      return dev.status === "ON" ? "26.1°C" : "OFF";
+      return dev.status === "ON" ? "ON" : "OFF";
     }
-    if (cat === "Listrik" || name.toLowerCase().includes("listrik")) {
-      return "542.7 kWh";
+    // Cek Debit Air DULU sebelum Listrik agar kata "meter" tidak salah tangkap
+    if (cat === "Debit Air" || name.toLowerCase().includes("debit") || (name.toLowerCase().includes("air") && !name.toLowerCase().includes("pair"))) {
+      if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
+        return `${Number(dev.limitMin).toFixed(2)} m³`;
+      }
+      return "— m³";
     }
-    if (cat === "Debit Air" || name.toLowerCase().includes("air")) {
-      return "13.8 m³";
+    if (cat === "Listrik" || name.toLowerCase().includes("listrik") || name.toLowerCase().includes("pwr")) {
+      if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
+        return `${(Number(dev.limitMin) / 1000).toFixed(2)} kWh`;
+      }
+      return "— kWh";
     }
-    return "26.3°C";
+    // Temperatur & Kelembaban
+    if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
+      return `${Number(dev.limitMin).toFixed(1)}°C`;
+    }
+    return "—";
   };
 
   const renderDeviceRow = ({ item }) => {
     const isActive = item.isActive !== false; // default true
     const isOnline = isActive;
+    
+    let cardBgColor;
+    if (isActive) {
+      cardBgColor = colors.cardBackground;
+    } else {
+      cardBgColor = theme === "Dark Mode" ? "#1e293b" : "#f1f5f9";
+    }
+
     return (
       <Card
         style={[
           styles.deviceRowCard,
-          { backgroundColor: isActive ? colors.cardBackground : (theme === "Dark Mode" ? "#1e293b" : "#f1f5f9") },
+          { backgroundColor: cardBgColor },
           !isActive && styles.deviceRowCardInactive,
         ]}
       >
         <TouchableOpacity
           style={[styles.deviceClickArea, !isActive && { opacity: 0.45 }]}
           onPress={() => {
-            if (!isActive) return; // disabled jika offline
-            if (item.category === "Lampu" || item.name?.toLowerCase().includes("lamp")) {
+            if (!isActive) return;
+            const cat = item.category || "";
+            const name = item.name?.toLowerCase() || "";
+
+            if (cat === "Lampu" || name.includes("lamp")) {
               navigation.navigate("LampControl");
-            } else {
+            } else if (cat === "Debit Air" || name.includes("debit") || (name.includes("air") && !name.includes("pair"))) {
+              navigation.navigate("WaterMeterDetail", {
+                deviceId: item.id,
+                deviceName: item.name,
+                deviceLocation: [item.ruangan, item.gedung].filter(Boolean).join(" — "),
+              });
+            } else if (cat === "Listrik" || name.includes("listrik") || name.includes("power meter") || name.includes("pwr")) {
+              navigation.navigate("PowerMeterDetail", {
+                deviceId: item.id,
+                deviceName: item.name,
+                deviceLocation: [item.ruangan, item.gedung].filter(Boolean).join(" — "),
+              });
+            } else if (cat === "AC" || name.includes("ac")) {
               navigation.navigate("AcControl");
+            } else {
+              // Fallback untuk Temperatur & Kelembaban dan sensor/device lainnya
+              navigation.navigate("SensorDetail", {
+                deviceId: item.id,
+                deviceName: item.name,
+                deviceLocation: [item.ruangan, item.gedung].filter(Boolean).join(" — "),
+              });
             }
           }}
         >

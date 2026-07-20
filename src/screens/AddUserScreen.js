@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
-import { iotService } from "../services/iotService";
 import Input from "../components/Input";
 import NotificationPopup from "../components/NotificationPopup";
 import {
@@ -32,7 +30,7 @@ export default function AddUserScreen({ navigation }) {
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
   const [popupType, setPopupType] = useState("info");
-  const [popupConfirmText, setPopupConfirmText] = useState("OK");
+  const [popupConfirmText] = useState("OK");
   const [onConfirmAction, setOnConfirmAction] = useState(null);
 
   // Validation Error States
@@ -75,6 +73,16 @@ export default function AddUserScreen({ navigation }) {
       setPopupVisible(true);
     }
   };
+
+  let activeBgColor = colors.cardBackground;
+  if (status === "Aktif") {
+    activeBgColor = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
+  }
+
+  let inactiveBgColor = colors.cardBackground;
+  if (status === "Nonaktif") {
+    inactiveBgColor = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -171,7 +179,7 @@ export default function AddUserScreen({ navigation }) {
             styles.radioItemRow,
             {
               borderColor: status === "Aktif" ? "#0059AB" : colors.border,
-              backgroundColor: status === "Aktif" ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : colors.cardBackground
+              backgroundColor: activeBgColor
             }
           ]}
           onPress={() => setStatus("Aktif")}
@@ -192,7 +200,7 @@ export default function AddUserScreen({ navigation }) {
             styles.radioItemRow,
             {
               borderColor: status === "Nonaktif" ? "#0059AB" : colors.border,
-              backgroundColor: status === "Nonaktif" ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : colors.cardBackground
+              backgroundColor: inactiveBgColor
             }
           ]}
           onPress={() => setStatus("Nonaktif")}
