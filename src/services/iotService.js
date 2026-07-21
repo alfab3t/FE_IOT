@@ -148,6 +148,14 @@ export const iotService = {
     });
   },
 
+  setDeviceLocation: async (id, locationId) => {
+    return await apiClient(`/api/Iot/devices/${encodeURIComponent(id)}/location`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Number(locationId)),
+    });
+  },
+
   // ── User Management ──────────────────────────────────────────────────────
 
   getUsers: async (keyword = "", roleId = "", status = "") => {

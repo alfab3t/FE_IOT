@@ -57,13 +57,11 @@ export default function LoginScreen({ navigation }) {
 
           {/* Center Logo Card */}
           <View style={styles.logoCard}>
-            <View style={styles.logoRow}>
-              <Text style={styles.logoLetter}>I</Text>
-              <View style={styles.logoCircleIcon}>
-                <Radio size={14} color="#fff" />
-              </View>
-              <Text style={styles.logoLetter}>T</Text>
-            </View>
+            <Image
+              source={require("../../assets/logo_icon_iot.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
 
           {/* 6 Orbiting Network Badges around Logo */}
@@ -337,36 +335,24 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   logoCard: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "#fff",
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: "#0059AB",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: "#bae6fd",
+    overflow: "hidden",
   },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoCircleIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#0059AB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 3,
-  },
-  logoLetter: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#0059AB",
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   badgeContainer: {
     width: 36,
