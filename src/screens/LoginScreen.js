@@ -44,6 +44,7 @@ export default function LoginScreen({ navigation }) {
   const [captchaInput, setCaptchaInput] = useState("");
   const [captchaCode, setCaptchaCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasSeenIntro, setHasSeenIntro] = useState(false);
 
   const memoizedHeader = useMemo(() => {
     return (
@@ -161,20 +162,33 @@ export default function LoginScreen({ navigation }) {
               <AnimatedEntrance type="slideUp" delay={300} style={styles.loginBtnWrapper}>
                 <TouchableOpacity
                   style={styles.splashLoginBtn}
-                  onPress={() => setShowLoginForm(true)}
+                  onPress={() => {
+                    setShowLoginForm(true);
+                    setHasSeenIntro(true);
+                  }}
                 >
                   <Text style={styles.splashLoginBtnText}>Login</Text>
                 </TouchableOpacity>
               </AnimatedEntrance>
 
               {/* Campus Building Illustration at the bottom */}
-              <AnimatedEntrance type="fade" delay={500} style={styles.campusIllustrationWrapper}>
-                <Image
-                  source={require("../../assets/campus_illustration.png")}
-                  style={styles.campusImage}
-                  resizeMode="contain"
-                />
-              </AnimatedEntrance>
+              {hasSeenIntro ? (
+                <View style={styles.campusIllustrationWrapper}>
+                  <Image
+                    source={require("../../assets/login_bottom.png")}
+                    style={styles.campusImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : (
+                <AnimatedEntrance type="fade" delay={500} style={styles.campusIllustrationWrapper}>
+                  <Image
+                    source={require("../../assets/login_bottom.png")}
+                    style={styles.campusImage}
+                    resizeMode="contain"
+                  />
+                </AnimatedEntrance>
+              )}
             </View>
           ) : (
             /* ================= LOGIN FORM BOTTOM SHEET ================= */
@@ -341,12 +355,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#0059AB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: "#bae6fd",
     overflow: "hidden",
   },
@@ -361,11 +370,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: "#bae6fd",
   },
   titleWrapper: {
     alignItems: "center",
@@ -405,11 +411,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
   },
   splashLoginBtnText: {
     fontSize: 15,
@@ -419,12 +420,13 @@ const styles = StyleSheet.create({
   },
   campusIllustrationWrapper: {
     width: width,
-    height: height * 0.28,
+    height: height * 0.20,
     alignItems: "center",
     justifyContent: "flex-end",
+    marginBottom: 10,
   },
   campusImage: {
-    width: "100%",
+    width: "85%",
     height: "100%",
   },
   bottomSheet: {

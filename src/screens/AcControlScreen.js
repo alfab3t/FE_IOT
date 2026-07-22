@@ -15,10 +15,10 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import { ArrowLeft, Wind, Snowflake, Compass } from "lucide-react-native";
 
-export default function AcControlScreen({ navigation }) {
+export default function AcControlScreen({ route, navigation }) {
   const { user, colors } = useUser();
   const [activeBuilding, setActiveBuilding] = useState("");
-  const [acDeviceId, setAcDeviceId] = useState("DEV_LAMP01");
+  const [acDeviceId, setAcDeviceId] = useState("DEV_AC01");
   const [tempDeviceId, setTempDeviceId] = useState("DEV_TEMP01");
   const [isPowerOn, setIsPowerOn] = useState(false);
   const [temperature, setTemperature] = useState(22);
@@ -32,55 +32,49 @@ export default function AcControlScreen({ navigation }) {
 
   const loadAcStatus = async () => {
     setIsLoading(true);
-    const response = await iotService.getDashboardLatest();
+    const selectedDeviceId = route.params?.deviceId;
     
+    const response = await iotService.getDashboardLatest();
     if (response.error) {
       Alert.alert("Gagal", response.message || "Gagal mengambil status AC.");
       setIsLoading(false);
       return;
     }
 
-    let building = "Gedung Utama";
-    if (response.length > 0) {
-      building = response[0].gedung || "Gedung Utama";
+    let currentDevice = null;
+    if (selectedDeviceId) {
+      currentDevice = response.find(dev => dev.id === selectedDeviceId);
     }
-    setActiveBuilding(building);
+    
+    // Fallback: find first AC category device, or first overall device
+    if (!currentDevice) {
+      currentDevice = response.find(dev => dev.category === "AC") || response[0];
+    }
 
-    let lId = "DEV_AC01";
-    let tId = "DEV_TEMP01";
-    let pwrOn = false;
+    if (currentDevice) {
+      const locText = [currentDevice.ruangan, currentDevice.gedung].filter(Boolean).join(" — ");
+      setActiveBuilding(locText || "Gedung Utama");
+      setAcDeviceId(currentDevice.id);
+      setIsPowerOn(currentDevice.status === "ON");
 
-    // Search for AC device in active building
-    const acDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "AC");
-    if (acDevInBuilding) {
-      lId = acDevInBuilding.id;
-      pwrOn = acDevInBuilding.status === "ON";
-    } else {
-      // Fallback to Lampu if no AC category device in building
-      const lampDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "Lampu");
-      if (lampDevInBuilding) {
-        lId = lampDevInBuilding.id;
-        pwrOn = lampDevInBuilding.status === "ON";
+      const buildingName = currentDevice.gedung || "";
+      const tempDevInBuilding = response.find(
+        (dev) => dev?.gedung?.toLowerCase() === buildingName.toLowerCase() && dev.category.includes("Temp")
+      );
+      if (tempDevInBuilding) {
+        setTempDeviceId(tempDevInBuilding.id);
+      } else {
+        setTempDeviceId(currentDevice.id === "DEV_AC01" ? "DEV_TEMP02" : "DEV_TEMP01");
       }
-    }
 
-    // Search for Temperature sensor in active building (only for device ID)
-    const tempDevInBuilding = response.find((dev) => dev?.gedung?.toLowerCase() === building.toLowerCase() && dev.category === "Temperatur & Kelembaban");
-    if (tempDevInBuilding) {
-      tId = tempDevInBuilding.id;
-    }
-
-    setAcDeviceId(lId);
-    setTempDeviceId(tId);
-    setIsPowerOn(pwrOn);
-
-    // Load persisted AC settings from database
-    const savedSettings = await iotService.getAcSettings(lId);
-    if (!savedSettings.error && savedSettings) {
-      setTemperature(savedSettings.temperature ?? 22);
-      setAcMode(savedSettings.mode ?? "Cool");
-      setFanSpeed(savedSettings.fanSpeed ?? "Auto");
-      setSwingMode(savedSettings.swingMode ?? "Auto");
+      // Load persisted AC settings from database
+      const savedSettings = await iotService.getAcSettings(currentDevice.id);
+      if (!savedSettings.error && savedSettings) {
+        setTemperature(savedSettings.temperature ?? 22);
+        setAcMode(savedSettings.mode ?? "Cool");
+        setFanSpeed(savedSettings.fanSpeed ?? "Auto");
+        setSwingMode(savedSettings.swingMode ?? "Auto");
+      }
     }
 
     setIsLoading(false);

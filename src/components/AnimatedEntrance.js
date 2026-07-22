@@ -66,7 +66,7 @@ export default function AnimatedEntrance({
   };
 
   return (
-    <Animated.View style={[getStyleOverrides(), style]}>
+    <Animated.View style={[{ opacity: 0 }, style, getStyleOverrides()]}>
       {children}
     </Animated.View>
   );

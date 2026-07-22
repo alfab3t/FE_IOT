@@ -91,33 +91,39 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
   const loadDashboardData = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
-    const devResponse = await iotService.getDashboardLatest();
-    const actResponse = await iotService.getNotifications();
-    const statsResponse = await iotService.getDashboardStats();
-    if (showLoader) setIsLoading(false);
-    setIsRefreshing(false);
+    try {
+      const devResponse = await iotService.getDashboardLatest();
+      const actResponse = await iotService.getNotifications();
+      const statsResponse = await iotService.getDashboardStats();
 
-    if (!devResponse.error && Array.isArray(devResponse)) {
-      setDevices(devResponse);
-      loadChartData(activeChartTab, devResponse);
-    }
-    if (!statsResponse.error && statsResponse) {
-      setStats(statsResponse);
-    }
-    if (!actResponse.error && Array.isArray(actResponse)) {
-      setActivities(actResponse);
+      if (!devResponse.error && Array.isArray(devResponse)) {
+        setDevices(devResponse);
+        loadChartData(activeChartTab, devResponse);
+      }
+      if (!statsResponse.error && statsResponse) {
+        setStats(statsResponse);
+      }
+      if (!actResponse.error && Array.isArray(actResponse)) {
+        setActivities(actResponse);
 
-      actResponse.forEach((notif) => {
-        const isUrgent = notif.alertType === "Urgent" || notif.message?.toLowerCase().includes("melampaui") || notif.message?.toLowerCase().includes("warning");
-        if (notif.status !== "Read" && isUrgent) {
-          if (!seenNotifsRef.current.has(notif.id)) {
-            seenNotifsRef.current.add(notif.id);
-            showToast(`⚠️ Alarm: ${translateNotification(notif.message)}`, "warning", () => {
-              navigation.navigate("NotificationDetail", { notification: notif });
-            });
+        actResponse.forEach((notif) => {
+          const isUrgent = notif.alertType === "Urgent" || notif.message?.toLowerCase().includes("melampaui") || notif.message?.toLowerCase().includes("warning");
+          if (notif.status !== "Read" && isUrgent) {
+            if (!seenNotifsRef.current.has(notif.id)) {
+              seenNotifsRef.current.add(notif.id);
+              showToast(`⚠️ Alarm: ${translateNotification(notif.message)}`, "warning", () => {
+                navigation.navigate("NotificationDetail", { notification: notif });
+              });
+            }
           }
-        }
-      });
+        });
+      }
+    } catch (error) {
+      console.error("loadDashboardData error:", error);
+      showToast("Gagal menyinkronkan data dashboard.", "error");
+    } finally {
+      if (showLoader) setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -515,7 +521,17 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
               <TouchableOpacity
                 key={dev.id}
                 style={[styles.listItemRow, { paddingVertical: 14 }, { borderBottomColor: colors.border }]}
-                onPress={() => navigation.navigate(dev.category === "AC" ? "AcControl" : "LampControl")}
+                onPress={() => {
+                  if (dev.category === "AC") {
+                    navigation.navigate("AcControl", {
+                      deviceId: dev.id,
+                      deviceName: dev.name,
+                      deviceLocation: [dev.ruangan, dev.gedung].filter(Boolean).join(" — "),
+                    });
+                  } else {
+                    navigation.navigate("LampControl");
+                  }
+                }}
               >
                 <View>
                   <Text style={[styles.listItemName, { color: colors.text }]}>{dev.name}</Text>
@@ -597,8 +613,8 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             </View>
             <Text style={[styles.welcomeDate, { color: colors.textMuted }]}>{getIndonesianDate()}</Text>
           </View>
-          <Image
-            source={require("../../assets/campus_illustration.png")}
+           <Image
+            source={require("../../assets/beranda_welcome.png")}
             style={styles.welcomeImage}
             resizeMode="contain"
           />

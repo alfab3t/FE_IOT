@@ -105,24 +105,30 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
   const loadDevicesAndLocations = async () => {
     setIsLoading(true);
-    const devResponse = await iotService.getDevices();
-    const locResponse = await iotService.getLocations();
-    setIsLoading(false);
+    try {
+      const devResponse = await iotService.getDevices();
+      const locResponse = await iotService.getLocations();
 
-    if (!devResponse?.error) {
-      const list = Array.isArray(devResponse)
-        ? devResponse
-        : (devResponse.data || devResponse.Data || []);
-      setDevices(list);
-    }
-    if (!locResponse?.error) {
-      const locList = Array.isArray(locResponse)
-        ? locResponse
-        : (locResponse.data || locResponse.Data || []);
-      setLocations(locList);
-      if (locList.length > 0 && !formLocationId) {
-        setFormLocationId(String(locList[0].id));
+      if (!devResponse?.error) {
+        const list = Array.isArray(devResponse)
+          ? devResponse
+          : (devResponse.data || devResponse.Data || []);
+        setDevices(list);
       }
+      if (!locResponse?.error) {
+        const locList = Array.isArray(locResponse)
+          ? locResponse
+          : (locResponse.data || locResponse.Data || []);
+        setLocations(locList);
+        if (locList.length > 0 && !formLocationId) {
+          setFormLocationId(String(locList[0].id));
+        }
+      }
+    } catch (error) {
+      console.error("loadDevicesAndLocations error:", error);
+      showToast("Gagal memuat data dari server.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -211,10 +217,23 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     const devName = device?.name || device?.Name || device?.dev_name || "";
     setEditDevice({ ...device, id: devId, name: devName });
     setEditFormName(devName);
-    setEditFormNameError("");
-    const matchingLoc = locations.find(
-      (loc) => loc.ruangan === (device?.ruangan || device?.loc_ruangan) || loc.gedung === (device?.gedung || device?.loc_gedung)
-    );
+    const targetLocId = device?.locationId || device?.LocationId || device?.loc_id;
+    let matchingLoc = null;
+    if (targetLocId) {
+      matchingLoc = locations.find(
+        (loc) => String(loc.id || loc.Id || loc.loc_id) === String(targetLocId)
+      );
+    }
+    if (!matchingLoc) {
+      const devRuangan = device?.ruangan || device?.loc_ruangan || "";
+      const devGedung = device?.gedung || device?.loc_gedung || "";
+      matchingLoc = locations.find(
+        (loc) =>
+          (loc.ruangan || loc.rua_nama || loc.loc_ruangan) === devRuangan &&
+          (loc.gedung || loc.rua_gedung || loc.loc_gedung) === devGedung
+      );
+    }
+
     setEditFormLocationId(matchingLoc ? String(matchingLoc.id || matchingLoc.Id || matchingLoc.loc_id) : locations.length > 0 ? String(locations[0].id || locations[0].Id || locations[0].loc_id) : "");
     setEditModalVisible(true);
   };
@@ -442,7 +461,11 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                 deviceLocation: [item.ruangan, item.gedung].filter(Boolean).join(" — "),
               });
             } else if (cat === "AC" || name.includes("ac")) {
-              navigation.navigate("AcControl");
+              navigation.navigate("AcControl", {
+                deviceId: item.id,
+                deviceName: item.name,
+                deviceLocation: [item.ruangan || item.loc_ruangan, item.gedung || item.loc_gedung].filter(Boolean).join(" — "),
+              });
             } else {
               navigation.navigate("SensorDetail", {
                 deviceId: item.id,
@@ -458,7 +481,9 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
           <View style={styles.deviceDetails}>
             <Text style={[styles.deviceNameText, { color: colors.text }]}>{item.name}</Text>
-            <Text style={[styles.deviceLocText, { color: colors.textMuted }]}>{item.ruangan || "Lobby Utama"}</Text>
+            <Text style={[styles.deviceLocText, { color: colors.textMuted }]}>
+              {[item.ruangan || item.loc_ruangan || "Lobby Utama", item.gedung || item.loc_gedung].filter(Boolean).join(" — ")}
+            </Text>
             <View style={styles.statusDotRow}>
               <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
               <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
@@ -760,7 +785,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                 <View>
                   <Text style={[styles.locationRuanganText, { color: colors.text }]}>{loc.ruangan}</Text>
                   <Text style={[styles.locationGedungText, { color: colors.textMuted }]}>
-                    Lantai {loc.lantai} — {loc.gedung}
+                    {loc.lantai} — {loc.gedung}
                   </Text>
                 </View>
               </View>
