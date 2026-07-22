@@ -6,11 +6,11 @@
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
-    "expo": "~54.0.0",
+    "expo": "~54.0.36",
     "expo-camera": "~17.0.10",
     "expo-image-picker": "~17.0.11",
     "expo-status-bar": "~3.0.9",
-    "lucide-react-native": "^0.300.0",
+    "lucide-react-native": "^1.25.0",
     "prop-types": "^15.8.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
@@ -20,6 +20,7 @@
     "react-native-svg": "15.12.1"
   },
   "scripts": {
+    "dev": "expo start",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
