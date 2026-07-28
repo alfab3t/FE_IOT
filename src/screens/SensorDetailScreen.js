@@ -60,9 +60,10 @@ export default function SensorDetailScreen({ navigation, route }) {
   }, [deviceId]);
 
   // Load chart data
-  const loadChartData = useCallback(async (period) => {
+  const loadChartData = useCallback(async (period, mode) => {
     setIsChartLoading(true);
-    const response = await iotService.getGraphData(deviceId, period);
+    const type = mode === "temp" ? "Temperature" : "Humidity";
+    const response = await iotService.getGraphData(deviceId, period, type);
     setIsChartLoading(false);
     if (!response.error && Array.isArray(response) && response.length > 0) {
       setGraphData(response);
@@ -72,7 +73,7 @@ export default function SensorDetailScreen({ navigation, route }) {
   }, [deviceId]);
 
   useEffect(() => { loadLatestData(); }, [loadLatestData]);
-  useEffect(() => { loadChartData(selectedPeriod); }, [selectedPeriod, loadChartData]);
+  useEffect(() => { loadChartData(selectedPeriod, chartMode); }, [selectedPeriod, chartMode, loadChartData]);
 
   if (isLoading) {
     return (
@@ -95,55 +96,57 @@ export default function SensorDetailScreen({ navigation, route }) {
         <SensorStatusCard temperature={temperature} humidity={humidity} colors={colors} />
 
         {/* Chart Section */}
-        <Card style={[styles.chartCard, { backgroundColor: colors.cardBackground }]}>
-          <Text style={[styles.chartTitle, { color: colors.text }]}>Grafik Historis</Text>
+        {deviceId !== "DEV_TEMP01" && (
+          <Card style={[styles.chartCard, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>Grafik Historis</Text>
 
-          {/* Chart Mode Toggle */}
-          <View style={styles.chartModeRow}>
-            <TouchableOpacity
-              style={[styles.modeBtn, chartMode === "temp" && styles.modeBtnActiveRed]}
-              onPress={() => setChartMode("temp")}
-            >
-              <Thermometer size={14} color={chartMode === "temp" ? "#fff" : "#ef4444"} />
-              <Text style={[styles.modeBtnText, { color: chartMode === "temp" ? "#fff" : colors.textMuted }]}>Suhu</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeBtn, chartMode === "humi" && styles.modeBtnActiveBlue]}
-              onPress={() => setChartMode("humi")}
-            >
-              <Droplets size={14} color={chartMode === "humi" ? "#fff" : "#0284c7"} />
-              <Text style={[styles.modeBtnText, { color: chartMode === "humi" ? "#fff" : colors.textMuted }]}>Kelembaban</Text>
-            </TouchableOpacity>
-          </View>
+            {/* Chart Mode Toggle */}
+            <View style={styles.chartModeRow}>
+              <TouchableOpacity
+                style={[styles.modeBtn, chartMode === "temp" && styles.modeBtnActiveRed]}
+                onPress={() => setChartMode("temp")}
+              >
+                <Thermometer size={14} color={chartMode === "temp" ? "#fff" : "#ef4444"} />
+                <Text style={[styles.modeBtnText, { color: chartMode === "temp" ? "#fff" : colors.textMuted }]}>Suhu</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeBtn, chartMode === "humi" && styles.modeBtnActiveBlue]}
+                onPress={() => setChartMode("humi")}
+              >
+                <Droplets size={14} color={chartMode === "humi" ? "#fff" : "#0284c7"} />
+                <Text style={[styles.modeBtnText, { color: chartMode === "humi" ? "#fff" : colors.textMuted }]}>Kelembaban</Text>
+              </TouchableOpacity>
+            </View>
 
-          {/* Period Selector */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
-            {PERIOD_OPTIONS.map((p) => {
-              const isActive = selectedPeriod === p.value;
-              return (
-                <TouchableOpacity
-                  key={p.value}
-                  style={[styles.periodBtn, isActive && styles.periodBtnActive]}
-                  onPress={() => setSelectedPeriod(p.value)}
-                >
-                  <Text style={[styles.periodBtnText, { color: isActive ? "#fff" : colors.textMuted }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+            {/* Period Selector */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
+              {PERIOD_OPTIONS.map((p) => {
+                const isActive = selectedPeriod === p.value;
+                return (
+                  <TouchableOpacity
+                    key={p.value}
+                    style={[styles.periodBtn, isActive && styles.periodBtnActive]}
+                    onPress={() => setSelectedPeriod(p.value)}
+                  >
+                    <Text style={[styles.periodBtnText, { color: isActive ? "#fff" : colors.textMuted }]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-          {/* Chart */}
-          <View style={{ minHeight: CHART_HEIGHT + 20 }}>
-            <SensorChart
-              isChartLoading={isChartLoading}
-              graphData={graphData}
-              chartMode={chartMode}
-              colors={colors}
-            />
-          </View>
-        </Card>
+            {/* Chart */}
+            <View style={{ minHeight: CHART_HEIGHT + 20 }}>
+              <SensorChart
+                isChartLoading={isChartLoading}
+                graphData={graphData}
+                chartMode={chartMode}
+                colors={colors}
+              />
+            </View>
+          </Card>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

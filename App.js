@@ -1,8 +1,11 @@
 import React from "react";
-import { View } from "react-native";
+import { View, LogBox } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+// Silence expo-notifications warnings in development mode (Expo Go)
+LogBox.ignoreLogs(["expo-notifications"]);
 import { UserProvider, useUser } from "./src/context/UserContext";
 
 // Import Screens

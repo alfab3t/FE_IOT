@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { StyleSheet, View, Text, TouchableOpacity, Platform, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
+import * as Device from "expo-device";
 
 // Import Tab Screens
 import DeviceDashboardScreen from "./DeviceDashboardScreen";
@@ -14,23 +15,156 @@ import ProfileScreen from "./ProfileScreen";
 // Import Icons
 import { LayoutDashboard, Smartphone, Activity, Bell, User } from "lucide-react-native";
 
+// Import Expo Notifications
+let Notifications = null;
+let isExpoGo = false;
+try {
+  const Constants = require("expo-constants").default;
+  isExpoGo = Constants.appOwnership === "expo";
+} catch (e) {
+  // Safe fallback if Constants is not available
+}
+
+try {
+  Notifications = require("expo-notifications");
+  // Configure foreground notification presentation options
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+} catch (e) {
+  console.log("Failed to load expo-notifications:", e);
+}
+
 export default function HomeScreen({ navigation }) {
   const { colors, t } = useUser();
   const [activeTab, setActiveTab] = useState(0); // 0: Beranda, 1: Perangkat, 2: Monitoring, 3: Notifikasi, 4: Profil
-  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const maxNotifIdRef = useRef(0);
 
   const checkUnreadNotifs = async () => {
-    const response = await iotService.getNotifications();
-    if (!response.error && Array.isArray(response)) {
-      const unread = response.some((n) => n.status !== "Read");
-      setHasUnread(unread);
+    try {
+      const response = await iotService.getNotifications();
+      if (!response.error && Array.isArray(response)) {
+        const unreadList = response.filter((n) => n.status !== "Read");
+        setUnreadCount(unreadList.length);
+
+        // Cari ID notifikasi terbesar dari semua notifikasi yang diambil
+        let currentMaxId = 0;
+        response.forEach((n) => {
+          if (n.id > currentMaxId) currentMaxId = n.id;
+        });
+
+        // Jika ada notifikasi baru dengan ID lebih tinggi, dan statusnya belum dibaca
+        if (maxNotifIdRef.current > 0 && currentMaxId > maxNotifIdRef.current) {
+          const newNotif = response.find((n) => n.id === currentMaxId);
+          if (newNotif && newNotif.status !== "Read" && Notifications) {
+            try {
+              // Trigger local notification to show in system status bar
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: "Peringatan Sensor!",
+                  body: newNotif.message,
+                  sound: true,
+                },
+                trigger: null,
+              });
+            } catch (err) {
+              console.log("Error scheduling local notification:", err);
+            }
+          }
+        }
+
+        if (currentMaxId > 0) {
+          maxNotifIdRef.current = currentMaxId;
+        }
+      }
+    } catch (e) {
+      console.log("Error inside checkUnreadNotifs polling loop:", e);
+    }
+  };
+
+  const registerForPushNotifications = async () => {
+    if (!Notifications) return;
+
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== "granted") {
+        console.log("Failed to get notification permissions!");
+        return;
+      }
+
+      // Set up notification channel for Android Oreo and above
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7A",
+        });
+      }
+
+      if (isExpoGo) {
+        console.log("Expo Go: push token registration skipped. Local notification fallback enabled.");
+        return;
+      }
+
+      if (!Device.isDevice) {
+        console.log("Push notifications require a physical device.");
+        return;
+      }
+
+      // Retrieve Native Device Push Token (FCM token on Android, APNs token on iOS)
+      const tokenData = await Notifications.getDevicePushTokenAsync();
+      const token = tokenData.data;
+      console.log("Device Push Token (FCM):", token);
+
+      // Register the push token on the backend
+      await iotService.registerPushToken(token);
+    } catch (error) {
+      console.log("Push token registration skipped:", error);
     }
   };
 
   useEffect(() => {
+    registerForPushNotifications();
     checkUnreadNotifs();
     const interval = setInterval(checkUnreadNotifs, 10000);
-    return () => clearInterval(interval);
+
+    let notificationListener = null;
+    let responseListener = null;
+
+    if (Notifications) {
+      // Listen to notifications received while the app is in the foreground
+      notificationListener = Notifications.addNotificationReceivedListener((notification) => {
+        checkUnreadNotifs();
+      });
+
+      // Navigate to notifications tab when user taps on push notification popup
+      responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+        setActiveTab(3);
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (notificationListener) {
+        notificationListener.remove();
+      }
+      if (responseListener) {
+        responseListener.remove();
+      }
+    };
   }, []);
 
   const renderActiveScreen = () => {
@@ -42,7 +176,7 @@ export default function HomeScreen({ navigation }) {
       case 2:
         return <AggregateDashboardScreen navigation={navigation} isTab={true} route={{ params: { category: "Suhu" } }} />;
       case 3:
-        return <NotificationsScreen navigation={navigation} />;
+        return <NotificationsScreen navigation={navigation} onNotificationsUpdated={checkUnreadNotifs} />;
       case 4:
         return <ProfileScreen navigation={navigation} />;
       default:
@@ -98,13 +232,17 @@ export default function HomeScreen({ navigation }) {
           style={styles.tabItem}
           onPress={() => {
             setActiveTab(3);
-            setHasUnread(false);
+            setUnreadCount(0);
           }}
           activeOpacity={0.8}
         >
           <View style={styles.iconContainer}>
             <Bell size={22} color={activeTab === 3 ? "#0059AB" : colors.textMuted} />
-            {hasUnread && <View style={styles.badgeDot} />}
+            {unreadCount > 0 && (
+              <View style={styles.badgeCount}>
+                <Text style={styles.badgeText}>{unreadCount}</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.tabLabel, { color: activeTab === 3 ? "#0059AB" : colors.textMuted }]}>
             {t("notifikasi")}
@@ -159,14 +297,23 @@ const styles = StyleSheet.create({
   iconContainer: {
     position: "relative",
   },
-  badgeDot: {
+  badgeCount: {
     position: "absolute",
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: -4,
+    right: -6,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: "#ef4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "800",
+    textAlign: "center",
   },
   tabLabel: {
     fontSize: 10,

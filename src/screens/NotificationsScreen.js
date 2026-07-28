@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,9 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from "react-native";
 import { iotService } from "../services/iotService";
 import { useUser } from "../context/UserContext";
@@ -23,7 +26,55 @@ import {
   Edit2,
 } from "lucide-react-native";
 
-export default function NotificationsScreen({ navigation }) {
+// Custom Swipeable Wrapper using React Native PanResponder & Animated
+function SwipeableItem({ children, onDelete }) {
+  const pan = useRef(new Animated.ValueXY()).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only trigger horizontal swipe-right gestures
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 8 && gestureState.dx > 0;
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: pan.x }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dx > 120) {
+          // Swipe right threshold met -> slide off-screen to the right and trigger delete callback
+          Animated.timing(pan, {
+            toValue: { x: Dimensions.get("window").width, y: 0 },
+            duration: 150,
+            useNativeDriver: false,
+          }).start(() => {
+            onDelete();
+          });
+        } else {
+          // Bounce back to center
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            friction: 5,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ translateX: pan.x }],
+      }}
+      {...panResponder.panHandlers}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+export default function NotificationsScreen({ navigation, onNotificationsUpdated }) {
   const { colors, theme, language, translateNotification } = useUser();
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
@@ -49,6 +100,7 @@ export default function NotificationsScreen({ navigation }) {
     }
 
     setNotifications(response || []);
+    if (onNotificationsUpdated) onNotificationsUpdated();
   };
 
   useEffect(() => {
@@ -130,6 +182,7 @@ export default function NotificationsScreen({ navigation }) {
     );
     setIsEditMode(false);
     setSelectedIds(new Set());
+    if (onNotificationsUpdated) onNotificationsUpdated();
 
     const response = await iotService.markNotificationsReadBulk(ids);
     if (response.error) {
@@ -139,9 +192,10 @@ export default function NotificationsScreen({ navigation }) {
   };
 
   const executeDelete = async (ids) => {
-    setNotifications((prev) => prev.filter((notif) => !selectedIds.has(notif.id)));
+    setNotifications((prev) => prev.filter((notif) => !ids.includes(notif.id)));
     setIsEditMode(false);
     setSelectedIds(new Set());
+    if (onNotificationsUpdated) onNotificationsUpdated();
 
     const response = await iotService.deleteNotificationsBulk(ids);
     if (response.error) {
@@ -198,6 +252,7 @@ export default function NotificationsScreen({ navigation }) {
         setNotifications((prev) =>
           prev.map((notif) => (notif.id === item.id ? { ...notif, status: "Read" } : notif))
         );
+        if (onNotificationsUpdated) onNotificationsUpdated();
       }
       navigation.navigate("NotificationDetail", { notification: item });
     }
@@ -212,48 +267,50 @@ export default function NotificationsScreen({ navigation }) {
     const readBg = theme === "Dark Mode" ? "#0b0f19" : "#cbd5e1";
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => handleItemPress(item)}
-      >
-        <Card style={[
-          styles.notifCard,
-          { backgroundColor: colors.cardBackground },
-          !isUnread && {
-            backgroundColor: readBg,
-            shadowOpacity: 0,
-            elevation: 0,
-            opacity: 0.55,
-          }
-        ]}>
-          {isEditMode && (
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => toggleItemSelection(item.id)}
-            >
-              {isSelected ? (
-                <CheckSquare size={20} color="#0059AB" />
-              ) : (
-                <Square size={20} color={colors.textMuted} />
-              )}
-            </TouchableOpacity>
-          )}
+      <SwipeableItem onDelete={() => executeDelete([item.id])}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => handleItemPress(item)}
+        >
+          <Card style={[
+            styles.notifCard,
+            { backgroundColor: colors.cardBackground },
+            !isUnread && {
+              backgroundColor: readBg,
+              shadowOpacity: 0,
+              elevation: 0,
+              opacity: 0.55,
+            }
+          ]}>
+            {isEditMode && (
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => toggleItemSelection(item.id)}
+              >
+                {isSelected ? (
+                  <CheckSquare size={20} color="#0059AB" />
+                ) : (
+                  <Square size={20} color={colors.textMuted} />
+                )}
+              </TouchableOpacity>
+            )}
 
-          <View style={[styles.iconBox, { backgroundColor: colors.background }]}>
-            <Icon size={20} color={iconConfig.fill} />
-          </View>
-
-          <View style={styles.contentBox}>
-            <View style={styles.notifHeader}>
-              <Text style={[styles.notifTitle, { color: colors.text }]}>{getNotificationTitle(item.message)}</Text>
-              <Text style={[styles.notifTime, { color: colors.textMuted }]}>{time}</Text>
+            <View style={[styles.iconBox, { backgroundColor: colors.background }]}>
+              <Icon size={20} color={iconConfig.fill} />
             </View>
-            <Text style={[styles.notifMessage, { color: colors.textMuted }]} numberOfLines={2}>
-              {translateNotification(item.message)}
-            </Text>
-          </View>
-        </Card>
-      </TouchableOpacity>
+
+            <View style={styles.contentBox}>
+              <View style={styles.notifHeader}>
+                <Text style={[styles.notifTitle, { color: colors.text }]}>{getNotificationTitle(item.message)}</Text>
+                <Text style={[styles.notifTime, { color: colors.textMuted }]}>{time}</Text>
+              </View>
+              <Text style={[styles.notifMessage, { color: colors.textMuted }]} numberOfLines={2}>
+                {translateNotification(item.message)}
+              </Text>
+            </View>
+          </Card>
+        </TouchableOpacity>
+      </SwipeableItem>
     );
   };
 

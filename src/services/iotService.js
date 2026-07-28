@@ -34,7 +34,10 @@ export const iotService = {
   },
 
   getDevices: async (searchKeyword = "", category = "", status = "") => {
-    const params = {};
+    const params = {
+      PageNumber: 1,
+      PageSize: 100, // Ambil semua perangkat sekaligus (hingga 100) agar sinkron dan tampil semua
+    };
     if (searchKeyword) params.SearchKeyword = searchKeyword;
     if (category) params.Category = category;
     if (status) params.Status = status;
@@ -81,8 +84,9 @@ export const iotService = {
     });
   },
 
-  getGraphData: async (deviceId, period = "Daily") => {
+  getGraphData: async (deviceId, period = "Daily", type = null) => {
     const params = { period };
+    if (type) params.type = type;
     return await apiClient(`/api/Iot/dashboard/graph/${deviceId}`, {
       method: "GET",
     }, params);
@@ -128,8 +132,9 @@ export const iotService = {
     });
   },
 
-  controlAc: async (topic, payload) => {
+  controlAc: async (topic, payload, deviceId) => {
     const params = { topic, payload };
+    if (deviceId) params.deviceId = deviceId;
     return await apiClient("/api/Iot/devices/control-ac", {
       method: "POST",
     }, params);
@@ -224,6 +229,13 @@ export const iotService = {
     return await apiClient(`/api/Iot/devices/${encodeURIComponent(deviceId)}/ac-settings`, {
       method: "POST",
       body: JSON.stringify({ temperature, mode, fanSpeed, swingMode }),
+    });
+  },
+
+  registerPushToken: async (token) => {
+    return await apiClient("/api/Iot/register-push-token", {
+      method: "POST",
+      body: JSON.stringify({ token }),
     });
   },
 };

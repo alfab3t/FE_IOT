@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "343507128734",
+    "project_id": "astratech-iot",
+    "storage_bucket": "astratech-iot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:343507128734:android:e8e1e77236990fa769868f",
+        "android_client_info": {
+          "package_name": "com.kelompok7.feiot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVHSOy7_JQJCa9YbtTtRq43V6vruvWLeo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

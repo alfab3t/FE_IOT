@@ -43,7 +43,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme } = useUser();
   const [devices, setDevices] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
+  const [stats, setStats] = useState({ totalDevices: null, onlineDevices: null, offlineDevices: null, totalUsers: null, avgSuhu: null, avgHumi: null, avgPower: null, estKWh: null });
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -61,6 +61,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
   // Chart Interactive State
   const [activeChartTab, setActiveChartTab] = useState("Suhu"); // Suhu, Kelembaban, Listrik
+  const activeChartTabRef = useRef(activeChartTab);
   const [chartDataState, setChartDataState] = useState([]);
   const [chartLabelsState, setChartLabelsState] = useState([]);
 
@@ -92,13 +93,15 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const loadDashboardData = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
     try {
-      const devResponse = await iotService.getDashboardLatest();
-      const actResponse = await iotService.getNotifications();
-      const statsResponse = await iotService.getDashboardStats();
+      const [devResponse, actResponse, statsResponse] = await Promise.all([
+        iotService.getDashboardLatest(),
+        iotService.getNotifications(),
+        iotService.getDashboardStats()
+      ]);
 
       if (!devResponse.error && Array.isArray(devResponse)) {
         setDevices(devResponse);
-        loadChartData(activeChartTab, devResponse);
+        loadChartData(activeChartTabRef.current, devResponse);
       }
       if (!statsResponse.error && statsResponse) {
         setStats(statsResponse);
@@ -129,6 +132,9 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
   useEffect(() => {
     loadDashboardData();
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadDashboardData(false);
+    });
 
     if (user && !user.foto) {
       authService.getProfilePhoto().then((res) => {
@@ -145,11 +151,14 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
     const timer = setInterval(() => {
       loadDashboardData(false);
-      loadChartData(activeChartTab);
+      loadChartData(activeChartTabRef.current);
     }, intervalMs);
 
-    return () => clearInterval(timer);
-  }, [refreshInterval, activeChartTab]);
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, [navigation, refreshInterval]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -191,6 +200,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   };
 
   useEffect(() => {
+    activeChartTabRef.current = activeChartTab;
     loadChartData(activeChartTab);
   }, [activeChartTab]);
 
@@ -253,22 +263,22 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#0059AB" />
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Devices</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalDevices || 54}</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalDevices ?? 54}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#10b981" />
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("device_online")}</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{onlineDevices || 42}</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{onlineDevices ?? 42}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#ef4444" />
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("device_offline")}</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{offlineDevices || 12}</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{offlineDevices ?? 12}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <User size={24} color="#8b5cf6" />
             <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("total_user")}</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{stats.totalUsers || 6}</Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>{stats.totalUsers ?? 6}</Text>
           </Card>
         </View>
 
@@ -364,7 +374,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 <View style={styles.statusRowBadge}>
                   <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
                   <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                    {isOnline ? "Online" : "Offline"}
+                    {isOnline ? "ON" : "OFF"}
                   </Text>
                 </View>
               </View>
@@ -540,7 +550,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 <View style={styles.statusRowBadge}>
                   <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
                   <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                    {isOnline ? "Online" : "Offline"}
+                    {isOnline ? "ON" : "OFF"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -595,7 +605,11 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         </View>
         <TouchableOpacity style={styles.bellBtn} onPress={() => setActiveTab(3)}>
           <Bell size={24} color={colors.text} />
-          {activities.some((n) => n.status !== "Read") && <View style={styles.bellBadge} />}
+          {activities.filter((n) => n.status !== "Read").length > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{activities.filter((n) => n.status !== "Read").length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -892,12 +906,21 @@ const styles = StyleSheet.create({
   },
   bellBadge: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 2,
+    right: 2,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: "#ef4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  bellBadgeText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "800",
+    textAlign: "center",
   },
   scrollContent: {
     padding: 16,

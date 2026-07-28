@@ -134,7 +134,11 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
   useEffect(() => {
     loadDevicesAndLocations();
-  }, []);
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadDevicesAndLocations();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // Switch wizard steps instantly without flickering
   const animateNextStep = (nextStep) => {
@@ -402,22 +406,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     if (cat === "AC" || name.toLowerCase().includes("ac")) {
       return dev.status === "ON" ? "ON" : "OFF";
     }
-    if (cat === "Debit Air" || name.toLowerCase().includes("debit") || (name.toLowerCase().includes("air") && !name.toLowerCase().includes("pair"))) {
-      if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-        return `${Number(dev.limitMin).toFixed(2)} m³`;
-      }
-      return "— m³";
-    }
-    if (cat === "Listrik" || name.toLowerCase().includes("listrik") || name.toLowerCase().includes("pwr")) {
-      if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-        return `${(Number(dev.limitMin) / 1000).toFixed(2)} kWh`;
-      }
-      return "— kWh";
-    }
-    if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-      return `${Number(dev.limitMin).toFixed(1)}°C`;
-    }
-    return "—";
+    return "";
   };
 
   const renderDeviceRow = ({ item }) => {

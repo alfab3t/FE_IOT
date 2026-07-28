@@ -99,7 +99,7 @@ export default function AcControlScreen({ route, navigation }) {
     
     // Decouple AC control from Lamp control completely
     const topic = tempDeviceId === "DEV_TEMP02" ? "setPowerS3" : "setPowerAC01";
-    const response = await iotService.controlAc(topic, cmd);
+    const response = await iotService.controlAc(topic, cmd, acDeviceId);
     
     if (response.error) {
       setIsPowerOn(!value);
@@ -125,7 +125,7 @@ export default function AcControlScreen({ route, navigation }) {
     setTemperature(nextTemp);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setTempS3" : "setTemp00122";
     
-    const response = await iotService.controlAc(topic, String(nextTemp));
+    const response = await iotService.controlAc(topic, String(nextTemp), tempDeviceId);
     if (response.error) {
       setTemperature(prevTemp);
       Alert.alert("Gagal", response.message || "Gagal mengubah suhu AC.");
@@ -141,7 +141,7 @@ export default function AcControlScreen({ route, navigation }) {
     }
     setAcMode(mode);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setModeS3" : "setMode00124";
-    await iotService.controlAc(topic, String(value));
+    await iotService.controlAc(topic, String(value), acDeviceId);
     await persistSettings(temperature, mode, fanSpeed, swingMode);
   };
 
@@ -152,7 +152,7 @@ export default function AcControlScreen({ route, navigation }) {
     }
     setFanSpeed(speed);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setFanS3" : "setFan00123";
-    await iotService.controlAc(topic, String(value));
+    await iotService.controlAc(topic, String(value), acDeviceId);
     await persistSettings(temperature, acMode, speed, swingMode);
   };
 
@@ -163,7 +163,7 @@ export default function AcControlScreen({ route, navigation }) {
     }
     setSwingMode(swing);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setSwingS3" : "setSwing00125";
-    await iotService.controlAc(topic, String(value));
+    await iotService.controlAc(topic, String(value), acDeviceId);
     await persistSettings(temperature, acMode, fanSpeed, swing);
   };
 
