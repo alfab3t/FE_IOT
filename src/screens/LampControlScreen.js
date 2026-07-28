@@ -22,7 +22,8 @@ export default function LampControlScreen({ navigation }) {
   const [isLampOn, setIsLampOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isViewer = user?.selectedRole?.roleId === "ROL003";
+  const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
+  const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
   const loadLampStatus = async () => {
     setIsLoading(true);
@@ -109,16 +110,21 @@ export default function LampControlScreen({ navigation }) {
             <View style={styles.controlHeader}>
               <Text style={[styles.controlTitle, { color: colors.text }]}>Sakelar Lampu</Text>
               <Text style={[styles.controlSubtitle, { color: colors.textMuted }]}>
-                Hidupkan atau matikan aliran listrik lampu utama.
+                {isViewer ? "Status lampu saat ini (Mode Lihat)." : "Hidupkan atau matikan aliran listrik lampu utama."}
               </Text>
             </View>
-            <Switch
-              value={isLampOn}
-              onValueChange={handleToggle}
-              trackColor={{ false: "#dee2e6", true: "#0059AB" }}
-              thumbColor={isLampOn ? "#fff" : "#f4f3f4"}
-              disabled={isViewer}
-            />
+            {isViewer ? (
+              <View style={[styles.readOnlyBadge, { backgroundColor: colors.border }]}>
+                <Text style={[styles.readOnlyText, { color: colors.textMuted }]}>Read Only</Text>
+              </View>
+            ) : (
+              <Switch
+                value={isLampOn}
+                onValueChange={handleToggle}
+                trackColor={{ false: "#dee2e6", true: "#0059AB" }}
+                thumbColor={isLampOn ? "#fff" : "#f4f3f4"}
+              />
+            )}
           </Card>
         </ScrollView>
       )}

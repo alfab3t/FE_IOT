@@ -85,9 +85,9 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
   // Role Permissions
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
-  const isAdmin = user?.selectedRole?.roleId === "ROL001" || selectedRoleName.toLowerCase().includes("admin");
+  const isAdmin = user?.selectedRole?.roleId === "ROL001" || user?.selectedRole?.roleId === "ROL01" || selectedRoleName.toLowerCase().includes("admin");
   const isOwner = selectedRoleName.toLowerCase().includes("owner") || selectedRoleName.toLowerCase().includes("controller") || user?.selectedRole?.roleId === "ROL002";
-  const canCrud = isAdmin || isOwner;
+  const canCrud = isAdmin; // Hanya Admin yang bisa Tambah, Edit, Hapus Perangkat! Controller hanya bisa ON/OFF & Remot AC.
 
   // Check if routed with scan parameters
   useEffect(() => {
@@ -406,18 +406,15 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
         return `${Number(dev.limitMin).toFixed(2)} m³`;
       }
-      return "— m³";
+      return "";
     }
     if (cat === "Listrik" || name.toLowerCase().includes("listrik") || name.toLowerCase().includes("pwr")) {
-      if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-        return `${(Number(dev.limitMin) / 1000).toFixed(2)} kWh`;
-      }
-      return "— kWh";
+      return "";
     }
     if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
       return `${Number(dev.limitMin).toFixed(1)}°C`;
     }
-    return "—";
+    return "";
   };
 
   const renderDeviceRow = ({ item }) => {
@@ -495,7 +492,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
         <View style={styles.rightStateColumn}>
           <View style={styles.topRightRow}>
-            {isActive && (
+            {isActive && Boolean(getValueDisplay(item)) && (
               <Text style={[styles.valueText, { color: colors.text }]}>{getValueDisplay(item)}</Text>
             )}
             {canCrud && isActive && (

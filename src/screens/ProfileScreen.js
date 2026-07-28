@@ -31,16 +31,15 @@ import {
 
 export default function ProfileScreen({ navigation }) {
   const { user, setUser, logout, colors, showToast, t, language } = useUser();
-  const [nickname, setNickname] = useState(user?.nickname || user?.username || "Pengguna");
   const [timezone, setTimezone] = useState("Asia/Jakarta (WIB)");
   const [avatarBase64, setAvatarBase64] = useState(user?.foto || null);
 
   // Modals and Previews
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
+  const [usernameModalVisible, setUsernameModalVisible] = useState(false);
   const [timezoneModalVisible, setTimezoneModalVisible] = useState(false);
-  const [editNicknameValue, setEditNicknameValue] = useState("");
+  const [editUsernameValue, setEditUsernameValue] = useState("");
   const [searchTz, setSearchTz] = useState("");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
 
@@ -59,23 +58,31 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  // Load nickname from AsyncStorage on mount (keyed per username so multi-user safe)
+  // Load avatar from AsyncStorage on mount
   useEffect(() => {
-    const loadNickname = async () => {
+    const loadProfileData = async () => {
       try {
-        const key = `nickname_${user?.username}`;
-        const saved = await AsyncStorage.getItem(key);
-        if (saved) {
-          setNickname(saved);
-          setUser((prev) => ({ ...prev, nickname: saved }));
+        const uKey = (user?.username || "admin").toLowerCase();
+        const savedPhoto = await AsyncStorage.getItem(`avatar_${uKey}`);
+        if (savedPhoto) {
+          setAvatarBase64(savedPhoto);
+          setUser((prev) => ({ ...prev, foto: savedPhoto }));
+        } else {
+          const response = await authService.getProfilePhoto();
+          if (!response?.error && response?.photo) {
+            setAvatarBase64(response.photo);
+            setUser((prev) => ({ ...prev, foto: response.photo }));
+          } else {
+            setAvatarBase64(null);
+            setUser((prev) => ({ ...prev, foto: null }));
+          }
         }
       } catch (e) {
-        console.warn("AsyncStorage read nickname failed:", e);
+        console.warn("AsyncStorage load profile failed:", e);
       }
     };
-    loadNickname();
-    fetchProfile();
-  }, []);
+    loadProfileData();
+  }, [user?.username]);
 
   const handlePhotoSelect = () => {
     setPhotoModalVisible(true);
@@ -87,6 +94,13 @@ export default function ProfileScreen({ navigation }) {
       setAvatarBase64(b64);
       // Save profile photo to global context
       setUser((prev) => ({ ...prev, foto: b64 }));
+      // Save profile photo strictly for this username
+      try {
+        const uKey = (user?.username || "admin").toLowerCase();
+        await AsyncStorage.setItem(`avatar_${uKey}`, b64);
+      } catch (e) {
+        console.warn("AsyncStorage save photo failed:", e);
+      }
       // Save profile photo to backend database
       const response = await authService.updateProfilePhoto(b64);
       if (response?.error) {
@@ -103,28 +117,46 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const handleSaveNickname = async () => {
-    if (!editNicknameValue.trim()) {
+  const handleSaveUsername = async () => {
+    if (!editUsernameValue.trim()) {
       showToast(
-        language === "Indonesia" ? "Nickname tidak boleh kosong." : "Nickname cannot be empty.",
+        language === "Indonesia" ? "Username tidak boleh kosong." : "Username cannot be empty.",
         "error"
       );
       return;
     }
-    const nextVal = editNicknameValue.trim();
-    setNickname(nextVal);
-    // Persist nickname in global user context so it survives navigation remount
-    setUser((prev) => ({ ...prev, nickname: nextVal }));
-    // Persist nickname locally on device so it survives app restart
+    const nextVal = editUsernameValue.trim();
+    const oldVal = user?.username || "admin";
+
+    // 1. Update global user context & local storage immediately
+    setUser((prev) => ({
+      ...(prev || {}),
+      username: nextVal,
+      nama: nextVal,
+      nickname: nextVal,
+    }));
+
     try {
-      const key = `nickname_${user?.username}`;
-      await AsyncStorage.setItem(key, nextVal);
+      await AsyncStorage.setItem("username", nextVal);
+      await AsyncStorage.setItem(`nickname_${nextVal.toLowerCase()}`, nextVal);
+      if (user?.foto) {
+        await AsyncStorage.setItem(`avatar_${nextVal.toLowerCase()}`, user.foto);
+      }
     } catch (e) {
-      console.warn("AsyncStorage write nickname failed:", e);
+      console.warn("AsyncStorage write username failed:", e);
     }
-    setNicknameModalVisible(false);
+
+    setUsernameModalVisible(false);
+
+    // 2. Call backend API in background to sync SQL Server database
+    authService.updateUsername(nextVal, oldVal).then((res) => {
+      if (res?.error) {
+        console.warn("Backend username sync warning:", res?.message);
+      }
+    }).catch(() => {});
+
     showToast(
-      language === "Indonesia" ? "Nickname berhasil diperbarui!" : "Nickname successfully updated!",
+      language === "Indonesia" ? "Username berhasil diperbarui!" : "Username successfully updated!",
       "success"
     );
   };
@@ -133,12 +165,15 @@ export default function ProfileScreen({ navigation }) {
     setLogoutPopupVisible(true);
   };
 
-  const roleName = user?.selectedRole?.roleName || "Viewer";
-  const userEmail = user?.email || `${user?.username?.toLowerCase() || "user"}@astra.ac.id`;
+  const roleName = user?.selectedRole?.roleName || "Admin";
+  const userEmail = user?.email || `${user?.username?.toLowerCase() || "admin"}@astratech.ac.id`;
+  const selectedRoleLower = (user?.selectedRole?.roleName || "").toLowerCase();
+  const roleId = user?.selectedRole?.roleId || "";
+
   let accessRights;
-  if (user?.selectedRole?.roleId === "ROL001") {
-    accessRights = language === "Indonesia" ? "Mengelola Sistem" : "System Administration";
-  } else if (user?.selectedRole?.roleId === "ROL002") {
+  if (roleId === "ROL001" || roleId === "ROL01" || selectedRoleLower.includes("admin")) {
+    accessRights = language === "Indonesia" ? "Full Access (Mengelola Sistem)" : "System Administration";
+  } else if (roleId === "ROL002" || roleId === "ROL02" || selectedRoleLower.includes("owner") || selectedRoleLower.includes("controller")) {
     accessRights = "Control & Monitor";
   } else {
     accessRights = "Monitoring Only";
@@ -184,7 +219,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={[styles.infoLabel, { color: colors.textMuted }]}>
               {language === "Indonesia" ? "Nama" : "Name"}
             </Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{nickname}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.nama || user?.username || "Pengguna"}</Text>
           </View>
           <View style={[styles.infoDivider, { backgroundColor: colors.border }]} />
 
@@ -213,15 +248,15 @@ export default function ProfileScreen({ navigation }) {
           <TouchableOpacity
             style={styles.settingRow}
             onPress={() => {
-              setEditNicknameValue(nickname);
-              setNicknameModalVisible(true);
+              setEditUsernameValue(user?.username || "");
+              setUsernameModalVisible(true);
             }}
           >
             <View style={styles.rowInfo}>
               <Text style={[styles.rowLabel, { color: colors.text }]}>
-                {language === "Indonesia" ? "Ubah Nickname" : "Change Nickname"}
+                {language === "Indonesia" ? "Ubah Username" : "Change Username"}
               </Text>
-              <Text style={[styles.rowValue, { color: colors.textMuted }]}>{nickname}</Text>
+              <Text style={[styles.rowValue, { color: colors.textMuted }]}>{user?.username || "admin"}</Text>
             </View>
             <Edit2 size={16} color="#0059AB" />
           </TouchableOpacity>
@@ -244,12 +279,12 @@ export default function ProfileScreen({ navigation }) {
         </TouchableOpacity>
       </ScrollView>
 
-      <NicknameModal
-        visible={nicknameModalVisible}
-        onClose={() => setNicknameModalVisible(false)}
-        editNicknameValue={editNicknameValue}
-        setEditNicknameValue={setEditNicknameValue}
-        handleSaveNickname={handleSaveNickname}
+      <UsernameModal
+        visible={usernameModalVisible}
+        onClose={() => setUsernameModalVisible(false)}
+        editUsernameValue={editUsernameValue}
+        setEditUsernameValue={setEditUsernameValue}
+        handleSaveUsername={handleSaveUsername}
         colors={colors}
         t={t}
         language={language}
@@ -300,12 +335,12 @@ export default function ProfileScreen({ navigation }) {
 }
 
 // ── Helpers & Subcomponents ───────────────────────────────────────────────
-function NicknameModal({
+function UsernameModal({
   visible,
   onClose,
-  editNicknameValue,
-  setEditNicknameValue,
-  handleSaveNickname,
+  editUsernameValue,
+  setEditUsernameValue,
+  handleSaveUsername,
   colors,
   t,
   language,
@@ -320,12 +355,12 @@ function NicknameModal({
       <View style={styles.modalOverlay}>
         <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
           <Text style={[styles.dialogTitle, { color: colors.text }]}>
-            {language === "Indonesia" ? "Ubah Nickname" : "Change Nickname"}
+            {language === "Indonesia" ? "Ubah Username" : "Change Username"}
           </Text>
           <Input
-            placeholder={language === "Indonesia" ? "Masukkan nickname baru" : "Enter new nickname"}
-            value={editNicknameValue}
-            onChangeText={setEditNicknameValue}
+            placeholder={language === "Indonesia" ? "Masukkan username baru" : "Enter new username"}
+            value={editUsernameValue}
+            onChangeText={setEditUsernameValue}
           />
           <View style={styles.dialogButtonRow}>
             <TouchableOpacity
@@ -336,7 +371,7 @@ function NicknameModal({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.dialogBtn, styles.dialogBtnSave]}
-              onPress={handleSaveNickname}
+              onPress={handleSaveUsername}
             >
               <Text style={styles.dialogBtnSaveText}>{t("simpan")}</Text>
             </TouchableOpacity>

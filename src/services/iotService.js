@@ -34,14 +34,13 @@ export const iotService = {
   },
 
   getDevices: async (searchKeyword = "", category = "", status = "") => {
-    const params = {};
+    const params = { PageSize: 100 };
     if (searchKeyword) params.SearchKeyword = searchKeyword;
     if (category) params.Category = category;
     if (status) params.Status = status;
 
     return await apiClient("/api/Iot/devices", {
       method: "GET",
-      // apiClient will append params to URL if it's GET
     }, params);
   },
 
@@ -86,6 +85,10 @@ export const iotService = {
     return await apiClient(`/api/Iot/dashboard/graph/${deviceId}`, {
       method: "GET",
     }, params);
+  },
+
+  getDashboardGraph: async (deviceId, period = "Daily") => {
+    return await iotService.getGraphData(deviceId, period);
   },
 
   getGraphAverage: async (category, period = "Daily") => {

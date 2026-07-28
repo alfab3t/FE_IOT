@@ -33,16 +33,44 @@ export default function UsersListScreen({ navigation }) {
   const [allUsers, setAllUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isAdmin = user?.selectedRole?.roleId === "ROL001";
+  const isAdmin =
+    user?.selectedRole?.roleId === "ROL01" ||
+    user?.selectedRole?.roleId === "ROL001" ||
+    user?.selectedRole?.roleName?.toLowerCase().includes("admin");
+
+  useEffect(() => {
+    if (!isAdmin) {
+      showToast("Akses ditolak: Hanya Admin yang dapat mengelola pengguna.", "warning");
+      navigation.goBack();
+    }
+  }, [isAdmin]);
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
-    // Fetch all users and role count statistics dynamically from the Stored Procedure response
     const response = await iotService.getUsers("", "", "");
     setIsLoading(false);
-    if (!response.error && response.users) {
-      setAllUsers(response.users);
-      setDbRoles(response.roles || []);
+    if (response && !response.error) {
+      const rawUsers = response.users || response.Users || (Array.isArray(response) ? response : response.data || []);
+      const rawRoles = response.roles || response.Roles || [];
+
+      const mappedUsers = (Array.isArray(rawUsers) ? rawUsers : []).map((u) => ({
+        ...u,
+        username: u.username || u.Username || u.use_id || "",
+        fullName: u.fullName || u.FullName || u.username || u.Username || u.use_id || "",
+        email: u.email || u.Email || "",
+        status: u.status || u.Status || u.use_status || "Aktif",
+        roleName: u.roleName || u.RoleName || u.rol_deskripsi || "User",
+        roleId: u.roleId || u.RoleId || u.rol_id || "ROL01",
+      }));
+
+      const mappedRoles = (Array.isArray(rawRoles) ? rawRoles : []).map((r) => ({
+        roleId: r.roleId || r.RoleId || "",
+        roleName: r.roleName || r.RoleName || "",
+        count: r.count !== undefined ? r.count : (r.Count !== undefined ? r.Count : 0),
+      }));
+
+      setAllUsers(mappedUsers);
+      setDbRoles(mappedRoles);
     }
   }, []);
 
@@ -59,7 +87,10 @@ export default function UsersListScreen({ navigation }) {
 
   // Locally filter users dynamically by active role ID, status filter, and keyword search
   const filteredUsers = allUsers.filter((u) => {
-    const matchTab = !activeRoleId ? true : u.roleId === activeRoleId;
+    const normUserRole = (u.roleId || "").replace("ROL00", "ROL0").replace("ROL0", "ROL");
+    const normActiveRole = (activeRoleId || "").replace("ROL00", "ROL0").replace("ROL0", "ROL");
+
+    const matchTab = !activeRoleId ? true : (u.roleId === activeRoleId || normUserRole === normActiveRole);
 
     const matchStatus = statusFilter === "Semua" ? true : u.status === statusFilter;
 

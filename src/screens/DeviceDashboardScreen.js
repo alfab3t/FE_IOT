@@ -39,6 +39,9 @@ import {
 
 const chartWidth = Dimensions.get("window").width - 32;
 
+// Persistent global set to track shown notifications across tab switches and remounts
+const globalSeenNotifsSet = new Set();
+
 export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme } = useUser();
   const [devices, setDevices] = useState([]);
@@ -46,8 +49,6 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const seenNotifsRef = useRef(new Set());
 
   // Custom Navigation Drawers / Modals
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -65,9 +66,12 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const [chartLabelsState, setChartLabelsState] = useState([]);
 
   const loadChartData = async (tab, devicesList = devices) => {
-    // Call the average graph endpoint directly with the selected category tab
-    const response = await iotService.getGraphAverage(tab, "Minutely");
+    // Call the average graph endpoint directly with the selected category tab (Hourly / Per Jam)
+    let response = await iotService.getGraphAverage(tab, "Hourly");
     if (!response.error && Array.isArray(response) && response.length > 0) {
+      if (response.length > 8) {
+        response = response.slice(-8);
+      }
       const labels = response.map((pt) => pt.labelText || "");
       const values = response.map((pt) => Number.parseFloat(pt.averageValue || 0));
       setChartLabelsState(labels);
@@ -109,8 +113,8 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         actResponse.forEach((notif) => {
           const isUrgent = notif.alertType === "Urgent" || notif.message?.toLowerCase().includes("melampaui") || notif.message?.toLowerCase().includes("warning");
           if (notif.status !== "Read" && isUrgent) {
-            if (!seenNotifsRef.current.has(notif.id)) {
-              seenNotifsRef.current.add(notif.id);
+            if (!globalSeenNotifsSet.has(notif.id)) {
+              globalSeenNotifsSet.add(notif.id);
               showToast(`⚠️ Alarm: ${translateNotification(notif.message)}`, "warning", () => {
                 navigation.navigate("NotificationDetail", { notification: notif });
               });
@@ -149,7 +153,11 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshInterval, activeChartTab]);
+  }, [refreshInterval]);
+
+  useEffect(() => {
+    loadChartData(activeChartTab);
+  }, [activeChartTab]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -234,13 +242,14 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   // Thin out labels: only show every Nth label to prevent X-axis overlap
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
+    const len = labels.length;
     let n = 3;
-    if (labels.length <= 6) {
+    if (len <= 6) {
       n = 1;
-    } else if (labels.length <= 12) {
+    } else if (len <= 12) {
       n = 2;
     }
-    return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
+    return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
   };
 
   // Render Admin Dashboard
@@ -593,10 +602,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         <View style={styles.navbarCenter}>
           <Text style={[styles.navTitleCenter, { color: colors.text }]}>ASTRATech IoT</Text>
         </View>
-        <TouchableOpacity style={styles.bellBtn} onPress={() => setActiveTab(3)}>
-          <Bell size={24} color={colors.text} />
-          {activities.some((n) => n.status !== "Read") && <View style={styles.bellBadge} />}
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView

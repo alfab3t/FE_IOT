@@ -28,7 +28,8 @@ export default function AcControlScreen({ route, navigation }) {
   const [swingMode, setSwingMode] = useState("Auto");
   const [isLoading, setIsLoading] = useState(false);
 
-  const isViewer = user?.selectedRole?.roleId === "ROL003";
+  const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
+  const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
   const loadAcStatus = async () => {
     setIsLoading(true);
@@ -97,8 +98,8 @@ export default function AcControlScreen({ route, navigation }) {
     setIsPowerOn(value);
     const cmd = value ? "1" : "0";
     
-    // Decouple AC control from Lamp control completely
-    const topic = tempDeviceId === "DEV_TEMP02" ? "setPowerS3" : "setPowerAC01";
+    // Send valid AC power topic (setPowerS3 for S3, setPower00121 for standard AC)
+    const topic = tempDeviceId === "DEV_TEMP02" ? "setPowerS3" : "setPower00121";
     const response = await iotService.controlAc(topic, cmd);
     
     if (response.error) {
@@ -194,36 +195,45 @@ export default function AcControlScreen({ route, navigation }) {
               <Text style={[styles.powerTitle, { color: colors.text }]}>Daya AC</Text>
               <Text style={styles.powerStatusText}>{isPowerOn ? "ON" : "OFF"}</Text>
             </View>
-            <Switch
-              value={isPowerOn}
-              onValueChange={handlePowerToggle}
-              trackColor={{ false: "#dee2e6", true: "#0059AB" }}
-              thumbColor={isPowerOn ? "#fff" : "#f4f3f4"}
-              disabled={isViewer}
-            />
+            {isViewer ? (
+              <View style={[styles.readOnlyBadge, { backgroundColor: colors.border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }]}>
+                <Text style={{ color: colors.textMuted, fontWeight: "600", fontSize: 12 }}>Read Only</Text>
+              </View>
+            ) : (
+              <Switch
+                value={isPowerOn}
+                onValueChange={handlePowerToggle}
+                trackColor={{ false: "#dee2e6", true: "#0059AB" }}
+                thumbColor={isPowerOn ? "#fff" : "#f4f3f4"}
+              />
+            )}
           </Card>
 
           {/* Temperature Controls */}
           <Card style={[styles.tempCard, { backgroundColor: colors.cardBackground }]}>
             <Text style={[styles.tempHeaderTitle, { color: colors.text }]}>Target Temperatur</Text>
-            <View style={styles.tempSelectorRow}>
-              <TouchableOpacity
-                style={[styles.tempBtn, isViewer && styles.disabledBtn]}
-                onPress={() => changeTemperature(-1)}
-                disabled={isViewer || temperature <= 16}
-              >
-                <Text style={styles.tempBtnText}>-</Text>
-              </TouchableOpacity>
+            <View style={[styles.tempSelectorRow, { justifyContent: "center" }]}>
+              {!isViewer && (
+                <TouchableOpacity
+                  style={[styles.tempBtn, isViewer && styles.disabledBtn]}
+                  onPress={() => changeTemperature(-1)}
+                  disabled={temperature <= 16}
+                >
+                  <Text style={styles.tempBtnText}>-</Text>
+                </TouchableOpacity>
+              )}
 
-              <Text style={[styles.tempValueText, { color: colors.text }]}>{temperature}°C</Text>
+              <Text style={[styles.tempValueText, { color: colors.text, marginHorizontal: isViewer ? 0 : 24 }]}>{temperature}°C</Text>
 
-              <TouchableOpacity
-                style={[styles.tempBtn, isViewer && styles.disabledBtn]}
-                onPress={() => changeTemperature(1)}
-                disabled={isViewer || temperature >= 30}
-              >
-                <Text style={styles.tempBtnText}>+</Text>
-              </TouchableOpacity>
+              {!isViewer && (
+                <TouchableOpacity
+                  style={[styles.tempBtn, isViewer && styles.disabledBtn]}
+                  onPress={() => changeTemperature(1)}
+                  disabled={temperature >= 30}
+                >
+                  <Text style={styles.tempBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </Card>
 

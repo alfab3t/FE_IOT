@@ -20,10 +20,9 @@ const CHART_WIDTH = SCREEN_WIDTH - 32 - 48;
 const CHART_HEIGHT = 130;
 
 const PERIOD_OPTIONS = [
-  { label: "Per Menit", value: "Minutely" },
   { label: "Per Jam", value: "Hourly" },
   { label: "Harian", value: "Daily" },
-  { label: "Bulanan", value: "Monthly" },
+  { label: "Mingguan", value: "Weekly" },
 ];
 
 export default function SensorDetailScreen({ navigation, route }) {
@@ -39,11 +38,11 @@ export default function SensorDetailScreen({ navigation, route }) {
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
   const [chartMode, setChartMode] = useState("temp"); // "temp" | "humi"
 
-  // Load latest readings
-  const loadLatestData = useCallback(async () => {
-    setIsLoading(true);
+  // Load latest readings (Real-time telemetry)
+  const loadLatestData = useCallback(async (isInitial = true) => {
+    if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
-    setIsLoading(false);
+    if (isInitial) setIsLoading(false);
     if (!response.error && Array.isArray(response)) {
       const dev = response.find((d) => d.id === deviceId);
       if (dev) {
@@ -60,19 +59,33 @@ export default function SensorDetailScreen({ navigation, route }) {
   }, [deviceId]);
 
   // Load chart data
-  const loadChartData = useCallback(async (period) => {
+  const loadChartData = useCallback(async (period, mode = chartMode) => {
     setIsChartLoading(true);
-    const response = await iotService.getGraphData(deviceId, period);
+    let response;
+    if (mode === "humi") {
+      response = await iotService.getGraphAverage("Kelembaban", period);
+    } else {
+      response = await iotService.getGraphData(deviceId, period);
+    }
     setIsChartLoading(false);
-    if (!response.error && Array.isArray(response) && response.length > 0) {
+    if (!response?.error && Array.isArray(response) && response.length > 0) {
       setGraphData(response);
     } else {
       setGraphData([]);
     }
-  }, [deviceId]);
+  }, [deviceId, chartMode]);
 
-  useEffect(() => { loadLatestData(); }, [loadLatestData]);
-  useEffect(() => { loadChartData(selectedPeriod); }, [selectedPeriod, loadChartData]);
+  useEffect(() => {
+    loadLatestData(true);
+    const timer = setInterval(() => {
+      loadLatestData(false);
+    }, 5000); // 5s REAL-TIME live telemetry updates
+    return () => clearInterval(timer);
+  }, [loadLatestData]);
+
+  useEffect(() => {
+    loadChartData(selectedPeriod, chartMode);
+  }, [selectedPeriod, chartMode, loadChartData]);
 
   if (isLoading) {
     return (
@@ -258,11 +271,12 @@ function SensorStatusCard({ temperature, humidity, colors }) {
 
 const thinLabels = (labels) => {
   if (!labels || labels.length === 0) return [];
+  const len = labels.length;
   let n;
-  if (labels.length <= 6) { n = 1; }
-  else if (labels.length <= 12) { n = 2; }
+  if (len <= 6) { n = 1; }
+  else if (len <= 12) { n = 2; }
   else { n = 3; }
-  return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
+  return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
 };
 
 function SensorChart({ isChartLoading, graphData, chartMode, colors }) {

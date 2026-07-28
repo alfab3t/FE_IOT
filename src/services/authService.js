@@ -48,4 +48,14 @@ export const authService = {
       }),
     });
   },
+
+  updateUsername: async (newUsername, currentUsername = "") => {
+    return await apiClient("/api/Iot/users/profile/username", {
+      method: "PUT",
+      body: JSON.stringify({
+        currentUsername: currentUsername,
+        newUsername: newUsername,
+      }),
+    });
+  },
 };

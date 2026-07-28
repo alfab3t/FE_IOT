@@ -2,8 +2,8 @@
 // export const BASE_URL = "http://192.168.1.12:5234/";
 
 // 🏠 IP Jaringan RUMAH
-// export const BASE_URL = "http://192.168.1.7:5234/";
+//export const BASE_URL = "http://192.168.18.8:5234/";
 
 //🏢 IP Jaringan KAMPUS ASTRA
-export const BASE_URL = "http://10.1.1.185:5234/";
+export const BASE_URL = "http://10.1.11.55:5234/";
 

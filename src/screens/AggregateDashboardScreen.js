@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -21,20 +21,21 @@ const chartWidth = Dimensions.get("window").width - 32;
 export default function AggregateDashboardScreen({ route, navigation, isTab = false }) {
   const { colors, refreshInterval, theme, t, language } = useUser();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGraphLoading, setIsGraphLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("Semua"); // Semua, Suhu, Kelembapan, Listrik
   const [toggleMode, setToggleMode] = useState("Grafik"); // Grafik, Data
-  const [timePeriod, setTimePeriod] = useState("Hari Ini"); // Hari Ini, Minggu Ini, Bulan Ini
+  const [timePeriod, setTimePeriod] = useState("Per Jam"); // Per Jam, Per Hari, Per Minggu
 
   const [devices, setDevices] = useState([]);
   const [activeDevice, setActiveDevice] = useState(null);
   const [devicePickerVisible, setDevicePickerVisible] = useState(false);
 
-  // Real database telemetry graph points
+  // Telemetry graph & table data
   const [tempPoints, setTempPoints] = useState([]);
   const [humiPoints, setHumiPoints] = useState([]);
   const [powerPoints, setPowerPoints] = useState([]);
   const [graphLabels, setGraphLabels] = useState([]);
-  // Tab switch simply changes the active tab filter without overriding the user's selected device
+
   const handleTabSwitch = (tab) => {
     setActiveTab(tab);
   };
@@ -46,82 +47,131 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
 
     if (!response.error && Array.isArray(response) && response.length > 0) {
       setDevices(response);
-      // Only auto-pick on first load (when no device selected yet)
-      // Do NOT override user's manual selection
-      if (isInitialLoad) {
-        const picked = response.find((d) => d.category === "Temperatur & Kelembaban") || response.find((d) => d.category === "AC") || response[0];
-        setActiveDevice(picked);
-      } else if (activeDevice) {
-        // On background refresh: only update current device's latest values (status/limitMin)
-        const updated = response.find((d) => d.id === activeDevice.id);
-        if (updated) setActiveDevice(updated);
-      }
+      setActiveDevice((prev) => {
+        if (!prev) return null; // Keep null as default for "Semua Perangkat" (System Overview) so graphs never flash/disappear!
+        const updated = response.find((d) => d.id === prev.id);
+        return updated || prev;
+      });
     }
   };
 
-  const loadGraphs = async (deviceId, category) => {
-    if (!deviceId) return;
+  const loadGraphs = async (showSpinner = false) => {
+    if (showSpinner) setIsGraphLoading(true);
 
-    // Reset previous states to prevent cache leakage between different devices
-    setGraphLabels([]);
-    setTempPoints([]);
-    setHumiPoints([]);
-    setPowerPoints([]);
-
-    let period = "Monthly";
-    if (timePeriod === "Hari Ini") {
-      period = "Minutely";
-    } else if (timePeriod === "Minggu Ini") {
+    let period = "Hourly";
+    if (timePeriod === "Per Jam") {
+      period = "Hourly";
+    } else if (timePeriod === "Per Hari") {
       period = "Daily";
+    } else if (timePeriod === "Per Minggu") {
+      period = "Monthly";
     }
-    
-    const response = await iotService.getGraphData(deviceId, period);
-    if (!response.error && Array.isArray(response) && response.length > 0) {
-      const labels = response.map((pt) => pt.labelText || "");
-      const values = response.map((pt) => Number.parseFloat(pt.averageValue || 0));
-      setGraphLabels(labels);
 
-      if (category === "Temperatur & Kelembaban" || category === "AC") {
-        setTempPoints(values);
-        // Inverse relationship: humVal = 110.0 - (tempVal * 1.8) (same as Android Studio!)
-        const humValues = values.map((tempVal) => {
-          let humVal = 110.0 - (tempVal * 1.8);
-          if (humVal < 40) humVal = 40;
-          if (humVal > 90) humVal = 90;
-          return humVal;
-        });
-        setHumiPoints(humValues);
-      } else if (category === "Listrik") {
-        // Convert Watts to kWh: value / 1000.0 (same as Android Studio!)
-        const powerKWh = values.map((v) => v / 1000.0);
-        setPowerPoints(powerKWh);
+    try {
+      if (activeDevice && activeDevice.id) {
+        let res = await iotService.getDashboardGraph(activeDevice.id, period);
+        if (!res?.error && Array.isArray(res) && res.length > 0) {
+          if (period === "Hourly" && res.length > 8) {
+            res = res.slice(-8);
+          }
+          const values = res.map((pt) => Number.parseFloat(pt.averageValue || 0));
+          const labels = res.map((pt) => pt.labelText || "");
+          setGraphLabels(labels);
+
+          const cat = activeDevice.category || "";
+          const nameLower = (activeDevice.name || "").toLowerCase();
+          const isAcOrLampOrPowerDev =
+            cat === "AC" ||
+            cat === "Lampu" ||
+            cat === "Listrik" ||
+            cat.toLowerCase().includes("power") ||
+            nameLower.includes("ac") ||
+            nameLower.includes("lamp") ||
+            nameLower.includes("power") ||
+            nameLower.includes("listrik") ||
+            nameLower.includes("pwr");
+
+          if (isAcOrLampOrPowerDev) {
+            setTempPoints([]);
+            setHumiPoints([]);
+            setPowerPoints(values.map((v) => (v > 100 ? v / 1000.0 : v)));
+          } else {
+            setTempPoints(values);
+            setHumiPoints(values.map((v) => Math.min(100, Math.max(20, v * 1.2))));
+            setPowerPoints([]);
+          }
+        } else {
+          setTempPoints([]);
+          setHumiPoints([]);
+          setPowerPoints([]);
+          setGraphLabels([]);
+        }
+      } else {
+        // Fallback: Fetch category average
+        let [suhuRes, humiRes, pwrRes] = await Promise.all([
+          iotService.getGraphAverage("Suhu", period),
+          iotService.getGraphAverage("Kelembaban", period),
+          iotService.getGraphAverage("Listrik", period),
+        ]);
+
+        if (period === "Hourly") {
+          if (Array.isArray(suhuRes) && suhuRes.length > 8) suhuRes = suhuRes.slice(-8);
+          if (Array.isArray(humiRes) && humiRes.length > 8) humiRes = humiRes.slice(-8);
+          if (Array.isArray(pwrRes) && pwrRes.length > 8) pwrRes = pwrRes.slice(-8);
+        }
+
+        let labels = [];
+        if (!suhuRes?.error && Array.isArray(suhuRes) && suhuRes.length > 0) {
+          setTempPoints(suhuRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
+          labels = suhuRes.map((pt) => pt.labelText || "");
+        } else {
+          setTempPoints([]);
+        }
+
+        if (!humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
+          setHumiPoints(humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
+          if (labels.length === 0) labels = humiRes.map((pt) => pt.labelText || "");
+        } else {
+          setHumiPoints([]);
+        }
+
+        if (!pwrRes?.error && Array.isArray(pwrRes) && pwrRes.length > 0) {
+          setPowerPoints(pwrRes.map((pt) => Number.parseFloat(pt.averageValue || 0) / 1000.0));
+          if (labels.length === 0) labels = pwrRes.map((pt) => pt.labelText || "");
+        } else {
+          setPowerPoints([]);
+        }
+
+        setGraphLabels(labels);
       }
+    } catch (err) {
+      console.error("loadGraphs error:", err);
+    } finally {
+      if (showSpinner) setIsGraphLoading(false);
     }
   };
 
   useEffect(() => {
-    // Initial load only
     loadMonitoringData(true);
+  }, []);
 
+  useEffect(() => {
+    loadGraphs(true);
+  }, [timePeriod, activeDevice?.id]);
+
+  useEffect(() => {
     let intervalMs = 30000;
     if (refreshInterval === "5 detik") intervalMs = 5000;
     else if (refreshInterval === "10 detik") intervalMs = 10000;
     else if (refreshInterval === "60 detik") intervalMs = 60000;
 
-    // Background refresh: update devices list + current device status only
-    // Does NOT reset activeDevice to default
     const timer = setInterval(() => {
       loadMonitoringData(false);
+      loadGraphs(false);
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshInterval]); // ← removed activeDevice?.id: no more reset loop!
-
-  useEffect(() => {
-    if (activeDevice) {
-      loadGraphs(activeDevice.id, activeDevice.category);
-    }
-  }, [activeDevice?.id, timePeriod]);
+  }, [refreshInterval, timePeriod, activeDevice?.id]);
 
   const chartConfig = {
     backgroundColor: colors.cardBackground,
@@ -135,38 +185,50 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     propsForLabels: { fontSize: 9 },
   };
 
-  // Generate dynamic historical log values for the table data based on active telemetry
-  const latestTemp = (activeDevice?.category === "Temperatur & Kelembaban" || activeDevice?.category === "AC") && activeDevice?.limitMin ? Number.parseFloat(activeDevice.limitMin) : 21.8;
-  const latestHumi = (activeDevice?.category === "Temperatur & Kelembaban" || activeDevice?.category === "AC") && activeDevice?.limitMax ? Number.parseFloat(activeDevice.limitMax) : 50.0;
-  const latestPower = activeDevice?.category === "Listrik" && activeDevice?.limitMin ? Number.parseFloat(activeDevice.limitMin) : 36.4;
+  const latestTemp = tempPoints.length > 0 ? tempPoints[tempPoints.length - 1] : 23.5;
+  const latestHumi = humiPoints.length > 0 ? humiPoints[humiPoints.length - 1] : 45.0;
+  const latestPower = powerPoints.length > 0 ? powerPoints[powerPoints.length - 1] : 98.5;
 
-  const tableLogs = graphLabels.length > 0 ? graphLabels.map((lbl, idx) => ({
-    time: lbl,
-    temp: tempPoints[idx] !== undefined ? tempPoints[idx].toFixed(1) : latestTemp.toFixed(1),
-    hum: humiPoints[idx] !== undefined ? humiPoints[idx].toFixed(1) : latestHumi.toFixed(1),
-    power: powerPoints[idx] !== undefined ? powerPoints[idx].toFixed(1) : latestPower.toFixed(1),
-    status: "Normal"
-  })).reverse() : [
-    { time: "08:31", temp: `${latestTemp.toFixed(1)}`, hum: `${latestHumi.toFixed(1)}`, power: `${latestPower.toFixed(1)}`, status: "Normal" },
-    { time: "08:26", temp: `${(latestTemp - 0.1).toFixed(1)}`, hum: `${(latestHumi - 0.2).toFixed(1)}`, power: `${(latestPower - 0.8).toFixed(1)}`, status: "Normal" },
-    { time: "08:21", temp: `${(latestTemp - 0.2).toFixed(1)}`, hum: `${(latestHumi - 0.5).toFixed(1)}`, power: `${(latestPower - 1.4).toFixed(1)}`, status: "Normal" },
-    { time: "08:16", temp: `${(latestTemp - 0.1).toFixed(1)}`, hum: `${(latestHumi + 0.1).toFixed(1)}`, power: `${(latestPower - 2.2).toFixed(1)}`, status: "Normal" },
-    { time: "08:11", temp: `${(latestTemp - 0.2).toFixed(1)}`, hum: `${(latestHumi + 0.4).toFixed(1)}`, power: `${(latestPower - 2.9).toFixed(1)}`, status: "Normal" },
-  ];
+  const tableLogs = graphLabels.length > 0
+    ? graphLabels.map((lbl, idx) => ({
+        time: lbl,
+        temp: tempPoints[idx] !== undefined ? tempPoints[idx].toFixed(1) : latestTemp.toFixed(1),
+        hum: humiPoints[idx] !== undefined ? humiPoints[idx].toFixed(1) : latestHumi.toFixed(1),
+        power: powerPoints[idx] !== undefined ? powerPoints[idx].toFixed(1) : latestPower.toFixed(1),
+        status: "Normal"
+      })).reverse()
+    : [];
 
-  // Use data presence + activeTab to decide what to show
-  // This decouples chart visibility from activeDevice.category
-  // so Listrik chart shows even if no Listrik device is in device list
-  const showSuhu  = (activeTab === "Semua" || activeTab === "Suhu") && tempPoints.length > 0;
-  const showHumi  = (activeTab === "Semua" || activeTab === "Kelembapan") && humiPoints.length > 0;
-  const showPower = (activeTab === "Semua" || activeTab === "Listrik") && powerPoints.length > 0;
+  const deviceCategory = (activeDevice?.category || "").toLowerCase();
+  const deviceNameLower = (activeDevice?.name || "").toLowerCase();
+  const isAcOrLampOrPower =
+    Boolean(activeDevice) && (
+      deviceCategory.includes("ac") ||
+      deviceCategory.includes("lamp") ||
+      deviceCategory.includes("listrik") ||
+      deviceCategory.includes("power") ||
+      deviceCategory.includes("elektronik") ||
+      deviceCategory.includes("aktuator") ||
+      deviceNameLower.includes("ac") ||
+      deviceNameLower.includes("lamp") ||
+      deviceNameLower.includes("power") ||
+      deviceNameLower.includes("listrik") ||
+      deviceNameLower.includes("pwr")
+    );
 
-  // hasTelemetry: true if we have data points to render for the active tab
+  const showSuhu = !isAcOrLampOrPower && tempPoints.length > 0;
+  const showHumi = !isAcOrLampOrPower && humiPoints.length > 0;
+  const showPower = (isAcOrLampOrPower || !activeDevice) && powerPoints.length > 0;
+
   const hasTelemetry = (() => {
-    if (activeTab === "Suhu") return showSuhu;
-    if (activeTab === "Kelembapan") return showHumi;
-    if (activeTab === "Listrik") return showPower;
-    return showSuhu || showHumi || showPower;
+    if (activeTab === "Suhu") return !isAcOrLampOrPower && tempPoints.length > 0;
+    if (activeTab === "Kelembapan") return !isAcOrLampOrPower && humiPoints.length > 0;
+    if (activeTab === "Listrik") return (isAcOrLampOrPower || !activeDevice) && powerPoints.length > 0;
+    if (activeDevice) {
+      if (isAcOrLampOrPower) return powerPoints.length > 0;
+      return tempPoints.length > 0 || humiPoints.length > 0;
+    }
+    return tempPoints.length > 0 || humiPoints.length > 0 || powerPoints.length > 0;
   })();
 
   const renderDataTableMode = () => {
@@ -187,7 +249,6 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
             {tableTitleText}
           </Text>
           <Text style={[styles.unitSubtitle, { color: colors.textMuted }]}>
-            {/* Satuan unit berdasarkan tab aktif */}
             {(() => {
               let unit = t("semua");
               if (activeTab === "Suhu") unit = "°C";
@@ -197,77 +258,104 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
             })()}
           </Text>
         </View>
-  
+
         {/* Time Period Filter above Table */}
-        {hasTelemetry && (
-          <View style={[styles.timeFilterRow, { marginTop: 0, marginBottom: 16 }]}>
-            {["Hari Ini", "Minggu Ini", "Bulan Ini"].map((p) => {
-              const active = timePeriod === p;
-              let transP = t("bulan_ini");
-              if (p === "Hari Ini") {
-                transP = t("hari_ini");
-              } else if (p === "Minggu Ini") {
-                transP = t("minggu_ini");
-              }
-              return (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.timeBtn,
-                    { backgroundColor: colors.cardBackground, borderColor: colors.border },
-                    active && [styles.timeBtnActive, { backgroundColor: "#0059AB", borderColor: "#0059AB" }]
-                  ]}
-                  onPress={() => setTimePeriod(p)}
-                >
-                  <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>
-                    {transP}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        <View style={[styles.timeFilterRow, { marginTop: 0, marginBottom: 16 }]}>
+          {["Per Jam", "Per Hari", "Per Minggu"].map((p) => {
+            const active = timePeriod === p;
+            return (
+              <TouchableOpacity
+                key={p}
+                style={[
+                  styles.timeBtn,
+                  { backgroundColor: colors.cardBackground, borderColor: colors.border },
+                  active && [styles.timeBtnActive, { backgroundColor: "#0059AB", borderColor: "#0059AB" }]
+                ]}
+                onPress={() => setTimePeriod(p)}
+              >
+                <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>
+                  {p}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {isGraphLoading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color="#0059AB" />
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>Memuat data tabel...</Text>
           </View>
-        )}
-  
-        {!hasTelemetry ? (
+        ) : !hasTelemetry || tableLogs.length === 0 ? (
           <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground, padding: 24, alignItems: "center" }]}>
-            <Text style={{ color: colors.text, fontWeight: "600", fontSize: 16, textAlign: "center", marginBottom: 8 }}>
+            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16, textAlign: "center", marginBottom: 8 }}>
               {language === "Indonesia" ? "Tidak Ada Data Telemetri" : "No Telemetry Data"}
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
-              {language === "Indonesia" 
-                ? "Perangkat ini tidak merekam riwayat data tabel." 
-                : "This device category does not record historical data tables."}
+              {(() => {
+                if (activeTab === "Suhu" && isAcOrLampOrPower) {
+                  return "Perangkat ini tidak mengukur data suhu.";
+                }
+                if (activeTab === "Kelembapan" && isAcOrLampOrPower) {
+                  return "Perangkat ini tidak mengukur data kelembapan.";
+                }
+                if (activeTab === "Listrik" && !isAcOrLampOrPower && activeDevice) {
+                  return "Perangkat ini tidak mengukur daya listrik.";
+                }
+                return language === "Indonesia"
+                  ? "Belum ada riwayat data tabel pada periode ini."
+                  : "No historical data table recorded for this period.";
+              })()}
             </Text>
           </Card>
         ) : (
           <>
             <Card style={[styles.tableCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               {/* Header */}
-              <View style={[styles.tableHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.thText, { flex: 0.8, color: colors.textMuted }]}>{t("waktu")}</Text>
+              <View style={[styles.tableHead, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.thText, { flex: 1.2, color: colors.textMuted }]}>{t("waktu")}</Text>
                 {activeTab === "Semua" ? (
-                  <>
-                    <Text style={[styles.thText, { color: colors.textMuted }]}>{t("suhu")}</Text>
-                    <Text style={[styles.thText, { color: colors.textMuted }]}>{t("kelembapan")}</Text>
-                    <Text style={[styles.thText, { color: colors.textMuted }]}>{t("listrik")}</Text>
-                  </>
+                  isAcOrLampOrPower ? (
+                    <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("listrik")} (kWh)</Text>
+                  ) : activeDevice ? (
+                    <>
+                      <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
+                      <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
+                      <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
+                      <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("listrik")}</Text>
+                    </>
+                  )
                 ) : (
-                  <Text style={[styles.thText, { flex: 2, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>
+                  <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>
                 )}
                 <Text style={[styles.thText, { flex: 1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
               </View>
-  
-              {tableLogs.map((log) => (
-                <View key={log.time} style={[styles.tableRow, tableLogs.indexOf(log) === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.tdText, { flex: 0.8, color: colors.textMuted }]}>{log.time}</Text>
+
+              {/* Data Rows */}
+              {tableLogs.map((log, idx) => (
+                <View key={log.time + idx} style={[styles.tableRow, idx === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.tdText, { flex: 1.2, color: colors.textMuted }]}>{log.time}</Text>
                   {activeTab === "Semua" ? (
-                    <>
-                      <Text style={[styles.tdText, { color: colors.text }]}>{log.temp}°</Text>
-                      <Text style={[styles.tdText, { color: colors.text }]}>{log.hum}%</Text>
-                      <Text style={[styles.tdText, { color: colors.text }]}>{log.power}</Text>
-                    </>
+                    isAcOrLampOrPower ? (
+                      <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power} kWh</Text>
+                    ) : activeDevice ? (
+                      <>
+                        <Text style={[styles.tdText, { flex: 1.5, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
+                        <Text style={[styles.tdText, { flex: 1.5, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
+                        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
+                        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.power}</Text>
+                      </>
+                    )
                   ) : (
-                    <Text style={[styles.tdText, { flex: 2, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>
+                    <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>
                       {(() => {
                         if (activeTab === "Suhu") return `${log.temp} °C`;
                         if (activeTab === "Kelembapan") return `${log.hum} %`;
@@ -275,9 +363,9 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
                       })()}
                     </Text>
                   )}
-                  <View style={[styles.tdText, { flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }]}>
+                  <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
                     <View style={styles.normalDot} />
-                    <Text style={[styles.tdText, { color: "#10b981", fontWeight: "700" }]}>{log.status}</Text>
+                    <Text style={[styles.tdText, { flex: 0, color: "#10b981", fontWeight: "700" }]}>{log.status}</Text>
                   </View>
                 </View>
               ))}
@@ -300,6 +388,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     if (toggleMode === "Grafik") {
       return (
         <GrafikMode
+          isGraphLoading={isGraphLoading}
           hasTelemetry={hasTelemetry}
           showSuhu={showSuhu}
           showHumi={showHumi}
@@ -318,6 +407,8 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
           chartConfig={chartConfig}
           timePeriod={timePeriod}
           setTimePeriod={setTimePeriod}
+          activeTab={activeTab}
+          activeDevice={activeDevice}
         />
       );
     }
@@ -360,17 +451,19 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Device Header Selector Card */}
-        {activeDevice && (
-          <Card style={[styles.deviceHeaderCard, { backgroundColor: colors.cardBackground }]}>
-            <View>
-              <Text style={[styles.deviceCardName, { color: colors.text }]}>{activeDevice.name}</Text>
-              <Text style={[styles.deviceCardSub, { color: colors.textMuted }]}>{activeDevice.ruangan || "Ruang Meeting"}</Text>
-            </View>
-            <View style={styles.onlineBadge}>
-              <Text style={styles.onlineBadgeText}>ONLINE</Text>
-            </View>
-          </Card>
-        )}
+        <Card style={[styles.deviceHeaderCard, { backgroundColor: colors.cardBackground }]}>
+          <View>
+            <Text style={[styles.deviceCardName, { color: colors.text }]}>
+              {activeDevice ? activeDevice.name : (language === "Indonesia" ? "Semua Perangkat" : "All Devices")}
+            </Text>
+            <Text style={[styles.deviceCardSub, { color: colors.textMuted }]}>
+              {activeDevice ? (activeDevice.ruangan || "Ruang Meeting") : (language === "Indonesia" ? "Menampilkan rata-rata seluruh sensor" : "Showing all sensor averages")}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setDevicePickerVisible(true)} style={styles.onlineBadge}>
+            <Text style={styles.onlineBadgeText}>{activeDevice ? "ONLINE" : "SISTEM AKTIF"}</Text>
+          </TouchableOpacity>
+        </Card>
 
         {/* Toggle Mode Buttons: Grafik / Data */}
         <View style={[styles.modeToggleContainer, { backgroundColor: colors.cardBackground }]}>
@@ -403,19 +496,36 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
-            {/* Header Icon */}
             <View style={[styles.iconContainer, { backgroundColor: colors.background }]}>
               <SlidersHorizontal size={32} color="#0059AB" />
             </View>
             <Text style={[styles.dialogTitle, { color: colors.text, textAlign: "center", marginBottom: 8 }]}>{t("pilih_perangkat")}</Text>
 
-            {/* Message */}
             <Text style={[styles.dialogMessage, { color: colors.textMuted }]}>
               {t("pilih_perangkat_desc")}
             </Text>
 
-            {/* Scrollable Options List */}
             <ScrollView style={{ maxHeight: 200, width: "100%" }} contentContainerStyle={{ paddingBottom: 10 }}>
+              {/* Option 1: Semua Perangkat */}
+              <TouchableOpacity
+                style={[
+                  styles.optionRowBtn,
+                  {
+                    borderColor: !activeDevice ? "#0059AB" : colors.border,
+                    backgroundColor: !activeDevice ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : "transparent",
+                    marginTop: 8
+                  }
+                ]}
+                onPress={() => {
+                  setActiveDevice(null);
+                  setDevicePickerVisible(false);
+                }}
+              >
+                <Text style={[styles.optionRowText, { color: !activeDevice ? "#0059AB" : colors.text, fontWeight: "700" }]}>
+                  {language === "Indonesia" ? "Semua Perangkat" : "All Devices"}
+                </Text>
+              </TouchableOpacity>
+
               {devices.map((dev) => {
                 const isSelected = activeDevice?.id === dev.id;
                 return (
@@ -445,7 +555,6 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
               })}
             </ScrollView>
 
-            {/* Cancel Button */}
             <TouchableOpacity
               style={[styles.cancelBtnTextBox, { marginTop: 16 }]}
               onPress={() => setDevicePickerVisible(false)}
@@ -462,13 +571,14 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
 // ── Helpers & Subcomponents ───────────────────────────────────────────────
 const thinLabels = (labels) => {
   if (!labels || labels.length === 0) return [];
+  const len = labels.length;
   let n = 3;
-  if (labels.length <= 6) {
+  if (len <= 6) {
     n = 1;
-  } else if (labels.length <= 12) {
+  } else if (len <= 12) {
     n = 2;
   }
-  return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
+  return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
 };
 
 function TelemetryEmptyState({ hasTelemetry, colors, language }) {
@@ -479,9 +589,9 @@ function TelemetryEmptyState({ hasTelemetry, colors, language }) {
         {language === "Indonesia" ? "Tidak Ada Data Telemetri" : "No Telemetry Data"}
       </Text>
       <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
-        {language === "Indonesia" 
-          ? "Perangkat ini tidak merekam riwayat telemetri grafik grafik." 
-          : "This device category does not record historical telemetry graphs."}
+        {language === "Indonesia"
+          ? "Belum ada riwayat telemetri grafik pada periode ini."
+          : "No historical telemetry graph recorded for this period."}
       </Text>
     </Card>
   );
@@ -489,7 +599,7 @@ function TelemetryEmptyState({ hasTelemetry, colors, language }) {
 
 function SuhuChart({ showSuhu, tempPoints, latestTemp, colors, theme, language, t, graphLabels, chartConfig }) {
   if (!showSuhu || tempPoints.length === 0) return null;
-  
+
   const avgTemp = tempPoints.reduce((a, b) => a + b, 0) / tempPoints.length;
   const maxTemp = Math.max(...tempPoints);
   const minTemp = Math.min(...tempPoints);
@@ -625,19 +735,11 @@ function PowerChart({ showPower, powerPoints, latestPower, colors, theme, langua
   );
 }
 
-function TimePeriodFilter({ hasTelemetry, timePeriod, setTimePeriod, colors, t }) {
-  if (!hasTelemetry) return null;
+function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
   return (
     <View style={styles.timeFilterRow}>
-      {["Hari Ini", "Minggu Ini", "Bulan Ini"].map((p) => {
+      {["Per Jam", "Per Hari", "Per Minggu"].map((p) => {
         const active = timePeriod === p;
-        let transP = t("bulan_ini");
-        if (p === "Hari Ini") {
-          transP = t("hari_ini");
-        } else if (p === "Minggu Ini") {
-          transP = t("minggu_ini");
-        }
-
         return (
           <TouchableOpacity
             key={p}
@@ -649,7 +751,7 @@ function TimePeriodFilter({ hasTelemetry, timePeriod, setTimePeriod, colors, t }
             onPress={() => setTimePeriod(p)}
           >
             <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>
-              {transP}
+              {p}
             </Text>
           </TouchableOpacity>
         );
@@ -657,77 +759,301 @@ function TimePeriodFilter({ hasTelemetry, timePeriod, setTimePeriod, colors, t }
     </View>
   );
 }
+  
+  function CategoryEmptyCard({ title, subtext, colors, theme }) {
+    return (
+      <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground, padding: 20 }]}>
+        <View style={styles.chartMetricHeader}>
+          <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{title}</Text>
+        </View>
+        <View style={[{ paddingVertical: 24, alignItems: "center", justifyContent: "center", borderRadius: 12, marginTop: 8 }, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
+          <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15, textAlign: "center", marginBottom: 4 }}>
+            Tidak Ada Data Telemetri
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
+            {subtext}
+          </Text>
+        </View>
+      </Card>
+    );
+  }
+  
+  function GrafikMode({
+    isGraphLoading,
+    tempPoints,
+    humiPoints,
+    powerPoints,
+    latestTemp,
+    latestHumi,
+    latestPower,
+    colors,
+    theme,
+    t,
+    language,
+    graphLabels,
+    chartConfig,
+    timePeriod,
+    setTimePeriod,
+    activeTab,
+    activeDevice
+  }) {
+    const deviceCategory = (activeDevice?.category || "").toLowerCase();
+    const deviceNameLower = (activeDevice?.name || "").toLowerCase();
+    const isAcOrLampOrPowerDev =
+      Boolean(activeDevice) && (
+        deviceCategory.includes("ac") ||
+        deviceCategory.includes("lamp") ||
+        deviceCategory.includes("listrik") ||
+        deviceCategory.includes("power") ||
+        deviceCategory.includes("elektronik") ||
+        deviceCategory.includes("aktuator") ||
+        deviceNameLower.includes("ac") ||
+        deviceNameLower.includes("lamp") ||
+        deviceNameLower.includes("power") ||
+        deviceNameLower.includes("listrik") ||
+        deviceNameLower.includes("pwr")
+      );
 
-function GrafikMode({
-  hasTelemetry,
-  showSuhu,
-  showHumi,
-  showPower,
-  tempPoints,
-  humiPoints,
-  powerPoints,
-  latestTemp,
-  latestHumi,
-  latestPower,
-  colors,
-  theme,
-  t,
-  language,
-  graphLabels,
-  chartConfig,
-  timePeriod,
-  setTimePeriod
-}) {
-  return (
-    <View>
-      <TelemetryEmptyState hasTelemetry={hasTelemetry} colors={colors} language={language} />
+    const renderSuhuSection = () => {
+      if (!isAcOrLampOrPowerDev && tempPoints.length > 0) {
+        return (
+          <SuhuChart
+            showSuhu={true}
+            tempPoints={tempPoints}
+            latestTemp={latestTemp}
+            colors={colors}
+            theme={theme}
+            language={language}
+            t={t}
+            graphLabels={graphLabels}
+            chartConfig={chartConfig}
+          />
+        );
+      }
+      return (
+        <CategoryEmptyCard
+          title={`${t("suhu")} (°C)`}
+          subtext={
+            isAcOrLampOrPowerDev
+              ? "Perangkat ini tidak mengukur data suhu."
+              : "Belum ada riwayat data telemetri suhu."
+          }
+          colors={colors}
+          theme={theme}
+        />
+      );
+    };
 
-      <SuhuChart
-        showSuhu={showSuhu}
-        tempPoints={tempPoints}
-        latestTemp={latestTemp}
-        colors={colors}
-        theme={theme}
-        language={language}
-        t={t}
-        graphLabels={graphLabels}
-        chartConfig={chartConfig}
-      />
+    const renderHumiSection = () => {
+      if (!isAcOrLampOrPowerDev && humiPoints.length > 0) {
+        return (
+          <HumiChart
+            showHumi={true}
+            humiPoints={humiPoints}
+            latestHumi={latestHumi}
+            colors={colors}
+            theme={theme}
+            language={language}
+            t={t}
+            graphLabels={graphLabels}
+            chartConfig={chartConfig}
+          />
+        );
+      }
+      return (
+        <CategoryEmptyCard
+          title={`${t("kelembapan")} (%)`}
+          subtext={
+            isAcOrLampOrPowerDev
+              ? "Perangkat ini tidak mengukur data kelembapan."
+              : "Belum ada riwayat data telemetri kelembapan."
+          }
+          colors={colors}
+          theme={theme}
+        />
+      );
+    };
 
-      <HumiChart
-        showHumi={showHumi}
-        humiPoints={humiPoints}
-        latestHumi={latestHumi}
-        colors={colors}
-        theme={theme}
-        language={language}
-        t={t}
-        graphLabels={graphLabels}
-        chartConfig={chartConfig}
-      />
+    const renderPowerSection = () => {
+      if ((isAcOrLampOrPowerDev || !activeDevice) && powerPoints.length > 0) {
+        return (
+          <PowerChart
+            showPower={true}
+            powerPoints={powerPoints}
+            latestPower={latestPower}
+            colors={colors}
+            theme={theme}
+            language={language}
+            t={t}
+            graphLabels={graphLabels}
+            chartConfig={chartConfig}
+          />
+        );
+      }
+      return (
+        <CategoryEmptyCard
+          title={`${t("listrik")} (kWh)`}
+          subtext={
+            !isAcOrLampOrPowerDev && activeDevice
+              ? "Perangkat ini tidak mengukur daya listrik."
+              : "Belum ada riwayat data telemetri listrik."
+          }
+          colors={colors}
+          theme={theme}
+        />
+      );
+    };
 
-      <PowerChart
-        showPower={showPower}
-        powerPoints={powerPoints}
-        latestPower={latestPower}
-        colors={colors}
-        theme={theme}
-        language={language}
-        t={t}
-        graphLabels={graphLabels}
-        chartConfig={chartConfig}
-      />
+    const renderContentForTab = () => {
+      if (activeTab === "Suhu") {
+        return renderSuhuSection();
+      }
+      if (activeTab === "Kelembapan") {
+        return renderHumiSection();
+      }
+      if (activeTab === "Listrik") {
+        return renderPowerSection();
+      }
 
-      <TimePeriodFilter
-        hasTelemetry={hasTelemetry}
-        timePeriod={timePeriod}
-        setTimePeriod={setTimePeriod}
-        colors={colors}
-        t={t}
-      />
-    </View>
-  );
-}
+      // activeTab === "Semua"
+      // Tampilkan data yang ada saja (tanpa card kosong jika perangkat hanya mendukung tipe telemetri tertentu)
+      if (activeDevice) {
+        if (isAcOrLampOrPowerDev) {
+          // Perangkat Elektronik: Hanya tampilkan Listrik (jika ada data)
+          if (powerPoints.length > 0) {
+            return renderPowerSection();
+          }
+          return (
+            <TelemetryEmptyState
+              hasTelemetry={false}
+              colors={colors}
+              language={language}
+            />
+          );
+        } else {
+          // Perangkat Suhu & Kelembapan: Tampilkan Suhu dan/atau Kelembapan
+          const hasTemp = tempPoints.length > 0;
+          const hasHumi = humiPoints.length > 0;
+          if (!hasTemp && !hasHumi) {
+            return (
+              <TelemetryEmptyState
+                hasTelemetry={false}
+                colors={colors}
+                language={language}
+              />
+            );
+          }
+          return (
+            <>
+              {hasTemp && (
+                <SuhuChart
+                  showSuhu={true}
+                  tempPoints={tempPoints}
+                  latestTemp={latestTemp}
+                  colors={colors}
+                  theme={theme}
+                  language={language}
+                  t={t}
+                  graphLabels={graphLabels}
+                  chartConfig={chartConfig}
+                />
+              )}
+              {hasHumi && (
+                <HumiChart
+                  showHumi={true}
+                  humiPoints={humiPoints}
+                  latestHumi={latestHumi}
+                  colors={colors}
+                  theme={theme}
+                  language={language}
+                  t={t}
+                  graphLabels={graphLabels}
+                  chartConfig={chartConfig}
+                />
+              )}
+            </>
+          );
+        }
+      } else {
+        // activeDevice === null ("Semua Perangkat / Ringkasan Sistem")
+        const hasTemp = tempPoints.length > 0;
+        const hasHumi = humiPoints.length > 0;
+        const hasPower = powerPoints.length > 0;
+        if (!hasTemp && !hasHumi && !hasPower) {
+          return (
+            <TelemetryEmptyState
+              hasTelemetry={false}
+              colors={colors}
+              language={language}
+            />
+          );
+        }
+        return (
+          <>
+            {hasTemp && (
+              <SuhuChart
+                showSuhu={true}
+                tempPoints={tempPoints}
+                latestTemp={latestTemp}
+                colors={colors}
+                theme={theme}
+                language={language}
+                t={t}
+                graphLabels={graphLabels}
+                chartConfig={chartConfig}
+              />
+            )}
+            {hasHumi && (
+              <HumiChart
+                showHumi={true}
+                humiPoints={humiPoints}
+                latestHumi={latestHumi}
+                colors={colors}
+                theme={theme}
+                language={language}
+                t={t}
+                graphLabels={graphLabels}
+                chartConfig={chartConfig}
+              />
+            )}
+            {hasPower && (
+              <PowerChart
+                showPower={true}
+                powerPoints={powerPoints}
+                latestPower={latestPower}
+                colors={colors}
+                theme={theme}
+                language={language}
+                t={t}
+                graphLabels={graphLabels}
+                chartConfig={chartConfig}
+              />
+            )}
+          </>
+        );
+      }
+    };
+
+    return (
+      <View>
+        <TimePeriodFilter
+          timePeriod={timePeriod}
+          setTimePeriod={setTimePeriod}
+          colors={colors}
+          t={t}
+        />
+
+        {isGraphLoading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color="#0059AB" />
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>Memuat grafik telemetri...</Text>
+          </View>
+        ) : (
+          renderContentForTab()
+        )}
+      </View>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: {
@@ -886,8 +1212,8 @@ const styles = StyleSheet.create({
   timeFilterRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 4,
+    marginBottom: 16,
     gap: 8,
   },
   timeBtn: {
@@ -933,14 +1259,16 @@ const styles = StyleSheet.create({
   },
   tableHead: {
     flexDirection: "row",
-    paddingVertical: 8,
+    alignItems: "center",
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
     backgroundColor: "#f8fafc",
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    marginBottom: 4,
   },
   thText: {
-    flex: 1,
     fontSize: 10,
     fontWeight: "800",
     color: "#64748b",
@@ -950,11 +1278,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#f1f5f9",
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     alignItems: "center",
   },
   tdText: {
-    flex: 1,
     fontSize: 10,
     fontWeight: "600",
     color: "#0f172a",

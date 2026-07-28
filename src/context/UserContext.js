@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useRef } from "react";
 import { StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authService } from "../services/authService";
 import { iotService } from "../services/iotService";
 import { setAuthToken } from "../services/apiClient";
@@ -366,11 +367,25 @@ export function UserProvider({ children }) {
       listAplikasi: response.listAplikasi,
     });
 
+    // Set user immediately so UI responds instantly without any delay!
     setUser({
       username: username,
       nama: response.nama,
+      nickname: response.nama || username,
       foto: response.foto || null,
     });
+
+    // Load custom nickname & avatar in background asynchronously
+    const safeUserKey = (username || "admin").toLowerCase();
+    AsyncStorage.getItem(`nickname_${safeUserKey}`).then((nick) => {
+      if (nick) setUser((prev) => (prev ? { ...prev, nickname: nick } : prev));
+    }).catch(() => {});
+
+    AsyncStorage.getItem(`avatar_${safeUserKey}`).then((savedPhoto) => {
+      if (savedPhoto) {
+        setUser((prev) => (prev ? { ...prev, foto: savedPhoto } : prev));
+      }
+    }).catch(() => {});
 
     return response;
   };

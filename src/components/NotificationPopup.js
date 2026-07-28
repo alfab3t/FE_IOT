@@ -9,6 +9,7 @@ export default function NotificationPopup({
   message,
   onClose,
   onConfirm,
+  showCancel = false,
   confirmText = "OK",
   cancelText = "Batal",
   type = "info", // info, success, warning, error, question
@@ -62,7 +63,7 @@ export default function NotificationPopup({
 
           {/* Buttons Row */}
           <View style={styles.buttonRow}>
-            {onConfirm && (
+            {onConfirm && showCancel && (
               <TouchableOpacity
                 style={[styles.btn, styles.btnCancel, { borderColor: colors.border }]}
                 onPress={onClose}

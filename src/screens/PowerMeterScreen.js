@@ -20,10 +20,9 @@ const CHART_WIDTH = SCREEN_WIDTH - 32 - 32; // padding horizontal
 const CHART_HEIGHT = 160;
 
 const PERIOD_OPTIONS = [
-  { label: "Per Menit", value: "Minutely" },
   { label: "Per Jam", value: "Hourly" },
   { label: "Harian", value: "Daily" },
-  { label: "Bulanan", value: "Monthly" },
+  { label: "Mingguan", value: "Weekly" },
 ];
 
 export default function PowerMeterScreen({ navigation, route }) {
@@ -37,22 +36,30 @@ export default function PowerMeterScreen({ navigation, route }) {
   const [graphData, setGraphData] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
 
-  // Load latest reading from dashboard (only for status & location)
-  const loadLatestData = useCallback(async () => {
-    setIsLoading(true);
+  // Load latest reading from dashboard (Real-time telemetry)
+  const loadLatestData = useCallback(async (isInitial = true) => {
+    if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
-    setIsLoading(false);
+    if (isInitial) setIsLoading(false);
     if (!response.error && Array.isArray(response)) {
-      const dev = response.find((d) => d.id === deviceId);
+      const dev = response.find(
+        (d) =>
+          d.id === deviceId ||
+          (d.name && deviceName && d.name.toLowerCase() === deviceName.toLowerCase())
+      );
       if (dev) {
         setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
-        // limitMin is mapped from LatestValue (latest telemetry reading) in the SP
         if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-          setLatestValue(Number(dev.limitMin));
+          const val = Number(dev.limitMin);
+          setLatestValue(val > 100 ? val / 1000.0 : val);
+        } else {
+          setLatestValue(null);
         }
+      } else {
+        setLatestValue(null);
       }
     }
-  }, [deviceId]);
+  }, [deviceId, deviceName]);
 
   // Load chart data
   const loadChartData = useCallback(async (period) => {
@@ -67,7 +74,11 @@ export default function PowerMeterScreen({ navigation, route }) {
   }, [deviceId]);
 
   useEffect(() => {
-    loadLatestData();
+    loadLatestData(true);
+    const timer = setInterval(() => {
+      loadLatestData(false);
+    }, 5000); // 5s REAL-TIME live telemetry updates
+    return () => clearInterval(timer);
   }, [loadLatestData]);
 
   useEffect(() => {
@@ -77,11 +88,12 @@ export default function PowerMeterScreen({ navigation, route }) {
   // ── Line Chart ───────────────────────────────────────────────────────────
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
+    const len = labels.length;
     let n;
-    if (labels.length <= 6) { n = 1; }
-    else if (labels.length <= 12) { n = 2; }
+    if (len <= 6) { n = 1; }
+    else if (len <= 12) { n = 2; }
     else { n = 3; }
-    return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
+    return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
   };
 
   const chartConfig = {

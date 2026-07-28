@@ -276,18 +276,10 @@ export default function LoginScreen({ navigation }) {
                 </View>
               </View>
 
-              {/* Back to Splash and Submit Buttons */}
+              {/* Submit Button */}
               <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={styles.btnBack}
-                  onPress={() => setShowLoginForm(false)}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.btnBackText}>Kembali</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.btnSubmit}
+                  style={[styles.btnSubmit, { flex: 1 }]}
                   onPress={handleLogin}
                   disabled={isLoading}
                 >

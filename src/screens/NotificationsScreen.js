@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,8 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Animated,
+  PanResponder,
 } from "react-native";
 import { iotService } from "../services/iotService";
 import { useUser } from "../context/UserContext";
@@ -23,6 +25,149 @@ import {
   Edit2,
 } from "lucide-react-native";
 
+function SwipeableNotifItem({
+  item,
+  isUnread,
+  isEditMode,
+  isSelected,
+  onPress,
+  onSingleDelete,
+  toggleItemSelection,
+  getIconConfig,
+  getNotificationTitle,
+  translateNotification,
+  colors,
+  theme,
+}) {
+  const pan = useRef(new Animated.ValueXY()).current;
+  const [isOpen, setIsOpen] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) {
+          pan.setValue({ x: Math.max(-85, gestureState.dx), y: 0 });
+        } else if (isOpen && gestureState.dx > 0) {
+          pan.setValue({ x: Math.min(0, -85 + gestureState.dx), y: 0 });
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -35) {
+          Animated.spring(pan, {
+            toValue: { x: -85, y: 0 },
+            useNativeDriver: false,
+          }).start();
+          setIsOpen(true);
+        } else {
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+          }).start();
+          setIsOpen(false);
+        }
+      },
+    })
+  ).current;
+
+  const closeSwipe = () => {
+    Animated.spring(pan, {
+      toValue: { x: 0, y: 0 },
+      useNativeDriver: false,
+    }).start();
+    setIsOpen(false);
+  };
+
+  const time = item.triggeredDate ? item.triggeredDate.substring(11, 16) : "00:00";
+  const iconConfig = getIconConfig(item.message);
+  const Icon = iconConfig.icon;
+  const readBg = theme === "Dark Mode" ? "#0b0f19" : "#cbd5e1";
+
+  const deleteOpacity = pan.x.interpolate({
+    inputRange: [-85, -15, 0],
+    outputRange: [1, 0, 0],
+    extrapolate: "clamp",
+  });
+
+  return (
+    <View style={styles.swipeRowContainer}>
+      <Animated.View style={[styles.deleteActionBox, { opacity: deleteOpacity }]}>
+        <TouchableOpacity
+          style={styles.deleteActionInner}
+          activeOpacity={0.85}
+          onPress={() => {
+            closeSwipe();
+            onSingleDelete(item.id);
+          }}
+        >
+          <Trash2 size={22} color="#ffffff" />
+          <Text style={styles.deleteActionText}>Hapus</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <Animated.View
+        style={[{ transform: [{ translateX: pan.x }] }]}
+        {...(!isEditMode ? panResponder.panHandlers : {})}
+      >
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => {
+            if (isOpen) {
+              closeSwipe();
+            } else {
+              onPress(item);
+            }
+          }}
+        >
+          <Card
+            style={[
+              styles.notifCard,
+              { backgroundColor: colors.cardBackground },
+              !isUnread && {
+                backgroundColor: readBg,
+                shadowOpacity: 0,
+                elevation: 0,
+                opacity: 0.55,
+              },
+            ]}
+          >
+            {isEditMode && (
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => toggleItemSelection(item.id)}
+              >
+                {isSelected ? (
+                  <CheckSquare size={20} color="#0059AB" />
+                ) : (
+                  <Square size={20} color={colors.textMuted} />
+                )}
+              </TouchableOpacity>
+            )}
+
+            <View style={[styles.iconBox, { backgroundColor: colors.background }]}>
+              <Icon size={20} color={iconConfig.fill} />
+            </View>
+
+            <View style={styles.contentBox}>
+              <View style={styles.notifHeader}>
+                <Text style={[styles.notifTitle, { color: colors.text }]}>
+                  {getNotificationTitle(item.message)}
+                </Text>
+                <Text style={[styles.notifTime, { color: colors.textMuted }]}>{time}</Text>
+              </View>
+              <Text style={[styles.notifMessage, { color: colors.textMuted }]} numberOfLines={2}>
+                {translateNotification(item.message)}
+              </Text>
+            </View>
+          </Card>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function NotificationsScreen({ navigation }) {
   const { colors, theme, language, translateNotification } = useUser();
   const [notifications, setNotifications] = useState([]);
@@ -32,7 +177,7 @@ export default function NotificationsScreen({ navigation }) {
 
   // Tabs: 0: Alarm, 1: Home, 2: Bulletin
   const [activeTab, setActiveTab] = useState(1); // Default to Home
-  
+
   // Edit mode states
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -55,38 +200,9 @@ export default function NotificationsScreen({ navigation }) {
     loadNotifications();
   }, []);
 
-  // Filter logic based on category message matches
   useEffect(() => {
-    const filtered = notifications.filter((notif) => {
-      const msg = (notif.message || "").toLowerCase();
-      let cat = 2; // Bulletin
-      
-      if (
-        msg.includes("added") ||
-        msg.includes("removed") ||
-        msg.includes("deleted") ||
-        msg.includes("reset") ||
-        msg.includes("home")
-      ) {
-        cat = 1; // Home
-      } else if (
-        msg.includes("melampaui") ||
-        msg.includes("warning") ||
-        msg.includes("normal") ||
-        msg.includes("alert") ||
-        msg.includes("limit") ||
-        msg.includes("suhu") ||
-        msg.includes("kelembaban") ||
-        msg.includes("watt")
-      ) {
-        cat = 0; // Alarm
-      }
-
-      return cat === activeTab;
-    });
-
-    setFilteredNotifications(filtered);
-  }, [notifications, activeTab]);
+    setFilteredNotifications(notifications);
+  }, [notifications]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -122,9 +238,8 @@ export default function NotificationsScreen({ navigation }) {
 
   const handleMarkAsRead = async () => {
     if (selectedIds.size === 0) return;
-    
+
     const ids = Array.from(selectedIds);
-    // Optimistic UI update
     setNotifications((prev) =>
       prev.map((notif) => (selectedIds.has(notif.id) ? { ...notif, status: "Read" } : notif))
     );
@@ -139,7 +254,7 @@ export default function NotificationsScreen({ navigation }) {
   };
 
   const executeDelete = async (ids) => {
-    setNotifications((prev) => prev.filter((notif) => !selectedIds.has(notif.id)));
+    setNotifications((prev) => prev.filter((notif) => !ids.includes(notif.id)));
     setIsEditMode(false);
     setSelectedIds(new Set());
 
@@ -148,6 +263,17 @@ export default function NotificationsScreen({ navigation }) {
       Alert.alert("Gagal", "Gagal menghapus dari server.");
       loadNotifications(false);
     }
+  };
+
+  const handleSingleDelete = (id) => {
+    Alert.alert("Hapus Notifikasi", "Apakah Anda yakin ingin menghapus notifikasi ini?", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: () => executeDelete([id]),
+      },
+    ]);
   };
 
   const handleDeleteSelected = async () => {
@@ -193,7 +319,6 @@ export default function NotificationsScreen({ navigation }) {
     if (isEditMode) {
       toggleItemSelection(item.id);
     } else {
-      // Optimistically mark as Read in local UI
       if (item.status !== "Read") {
         setNotifications((prev) =>
           prev.map((notif) => (notif.id === item.id ? { ...notif, status: "Read" } : notif))
@@ -206,54 +331,22 @@ export default function NotificationsScreen({ navigation }) {
   const renderNotifItem = ({ item }) => {
     const isUnread = item.status !== "Read";
     const isSelected = selectedIds.has(item.id);
-    const time = item.triggeredDate ? item.triggeredDate.substring(11, 16) : "00:00";
-    const iconConfig = getIconConfig(item.message);
-    const Icon = iconConfig.icon;
-    const readBg = theme === "Dark Mode" ? "#0b0f19" : "#cbd5e1";
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => handleItemPress(item)}
-      >
-        <Card style={[
-          styles.notifCard,
-          { backgroundColor: colors.cardBackground },
-          !isUnread && {
-            backgroundColor: readBg,
-            shadowOpacity: 0,
-            elevation: 0,
-            opacity: 0.55,
-          }
-        ]}>
-          {isEditMode && (
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => toggleItemSelection(item.id)}
-            >
-              {isSelected ? (
-                <CheckSquare size={20} color="#0059AB" />
-              ) : (
-                <Square size={20} color={colors.textMuted} />
-              )}
-            </TouchableOpacity>
-          )}
-
-          <View style={[styles.iconBox, { backgroundColor: colors.background }]}>
-            <Icon size={20} color={iconConfig.fill} />
-          </View>
-
-          <View style={styles.contentBox}>
-            <View style={styles.notifHeader}>
-              <Text style={[styles.notifTitle, { color: colors.text }]}>{getNotificationTitle(item.message)}</Text>
-              <Text style={[styles.notifTime, { color: colors.textMuted }]}>{time}</Text>
-            </View>
-            <Text style={[styles.notifMessage, { color: colors.textMuted }]} numberOfLines={2}>
-              {translateNotification(item.message)}
-            </Text>
-          </View>
-        </Card>
-      </TouchableOpacity>
+      <SwipeableNotifItem
+        item={item}
+        isUnread={isUnread}
+        isEditMode={isEditMode}
+        isSelected={isSelected}
+        onPress={handleItemPress}
+        onSingleDelete={handleSingleDelete}
+        toggleItemSelection={toggleItemSelection}
+        getIconConfig={getIconConfig}
+        getNotificationTitle={getNotificationTitle}
+        translateNotification={translateNotification}
+        colors={colors}
+        theme={theme}
+      />
     );
   };
 
@@ -283,32 +376,6 @@ export default function NotificationsScreen({ navigation }) {
           </TouchableOpacity>
         )}
       </View>
-
-      {/* Tabs Header */}
-      {!isEditMode && (
-        <View style={[styles.tabsHeader, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
-          {[
-            { id: 0, label: "Alarm", icon: Bell },
-            { id: 1, label: "Home", icon: Home },
-            { id: 2, label: "Bulletin", icon: FileText },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            const TabIcon = tab.icon;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                style={[styles.tabItem, isActive ? [styles.tabItemActive, { backgroundColor: colors.background, borderColor: "#0059AB" }] : { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
-                onPress={() => setActiveTab(tab.id)}
-              >
-                <TabIcon size={16} color={isActive ? "#0059AB" : colors.textMuted} />
-                <Text style={[styles.tabText, isActive ? styles.tabTextActive : { color: colors.textMuted }]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
 
       {isLoading ? (
         <View style={styles.loaderContainer}>
@@ -509,5 +576,33 @@ const styles = StyleSheet.create({
   },
   panelBtnTextDisabled: {
     color: "#adb5bd",
+  },
+  swipeRowContainer: {
+    position: "relative",
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  deleteActionBox: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    backgroundColor: "#ef4444",
+    borderRadius: 12,
+    zIndex: 0,
+  },
+  deleteActionInner: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+  },
+  deleteActionText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 2,
   },
 });

@@ -43,19 +43,22 @@ export default function UserDetailScreen({ route, navigation }) {
       setIsLoading(true);
       const response = await iotService.getUserDetail(username);
       setIsLoading(false);
-      if (!response.error && response.username) {
+      if (response && !response.error) {
+        const uName = response.username || response.Username || username;
+        const rawPhone = response.phone || response.Phone;
+        const phoneVal = (rawPhone && String(rawPhone).trim() !== "") ? String(rawPhone).trim() : "—";
         setSelectedUserObj({
-          id: response.username,
-          name: response.fullName || response.username,
-          email: response.email || "-",
-          role: response.roleName,
-          roleId: response.roleId,
-          phone: response.phone || "-",
-          status: response.status || "Aktif",
-          registeredSince: "-",
-          lastLogin: "-",
-          photo: response.photo,
-          canManage: response.canManage,
+          id: uName,
+          name: response.fullName || response.FullName || uName,
+          email: response.email || response.Email || `${uName}@astratech.ac.id`,
+          role: response.roleName || response.RoleName || "User",
+          roleId: response.roleId || response.RoleId || "ROL01",
+          phone: phoneVal,
+          status: response.status || response.Status || "Aktif",
+          registeredSince: response.registeredSince || response.RegisteredSince || "09 Jul 2026",
+          lastLogin: response.lastLogin || response.LastLogin || "09 Jul 2026, 02:01",
+          photo: response.photo || response.Photo,
+          canManage: response.canManage ?? response.CanManage ?? true,
         });
       }
     };
