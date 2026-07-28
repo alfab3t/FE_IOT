@@ -127,7 +127,7 @@ export function UserProvider({ children }) {
       tambah_user: "Tambah User",
       simpan: "Simpan",
       aktif: "Aktif",
-      nonaktif: "Nonaktif",
+      nonaktif: "Tidak Aktif",
       notifikasi: "Notifikasi",
       notifikasi_desc: "Aktifkan atau nonaktifkan notifikasi aplikasi",
       refresh_interval: "Interval Refresh",

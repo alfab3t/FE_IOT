@@ -90,9 +90,9 @@ export default function LoginScreen({ navigation }) {
 
         {/* ASTRATech IoT Title Header */}
         <AnimatedEntrance type="fade" delay={200} style={styles.titleWrapper}>
-          <Text style={styles.appTitle}>ASTRATech IoT</Text>
+          <Text style={styles.appTitle}>ASTRAtech IoT</Text>
           <Text style={styles.appDescription}>
-            Kelola perangkat, pantau data sensor, dan kendalikan sistem IoT secara real-time dalam satu platform yang terintegrasi
+            Kelola perangkat, pantau data sensor, dan kendalikan sistem IoT secara real-time dalam satu platform yang terintegrasi.
           </Text>
         </AnimatedEntrance>
       </View>
@@ -118,7 +118,7 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!username || !password || !captchaInput) {
-      showToast("Nama akun, kata sandi, dan captcha wajib diisi.", "error");
+      showToast("Username, Password, dan Captcha wajib diisi.", "error");
       return;
     }
 
@@ -133,7 +133,7 @@ export default function LoginScreen({ navigation }) {
     setIsLoading(false);
 
     if (response.error) {
-      showToast(response.message || "Nama akun atau kata sandi tidak valid.", "error");
+      showToast(response.message || "Username atau password tidak valid.", "error");
       generateCaptcha();
     } else {
       showToast("Login berhasil!", "success");
@@ -199,7 +199,7 @@ export default function LoginScreen({ navigation }) {
               {/* Input Username */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.inputLabel}>
-                  Nama Akun<Text style={styles.requiredAsterisk}>*</Text>
+                  Username<Text style={styles.requiredAsterisk}>*</Text>
                 </Text>
                 <View style={styles.inputWrapper}>
                   <User size={18} color="#94a3b8" style={styles.inputIcon} />
@@ -218,7 +218,7 @@ export default function LoginScreen({ navigation }) {
               {/* Input Password */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.inputLabel}>
-                  Kata Sandi<Text style={styles.requiredAsterisk}>*</Text>
+                  Password<Text style={styles.requiredAsterisk}>*</Text>
                 </Text>
                 <View style={styles.inputWrapper}>
                   <Lock size={18} color="#94a3b8" style={styles.inputIcon} />

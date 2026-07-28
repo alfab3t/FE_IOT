@@ -80,7 +80,7 @@ export default function AddUserScreen({ navigation }) {
   }
 
   let inactiveBgColor = colors.cardBackground;
-  if (status === "Nonaktif") {
+  if (status === "Tidak Aktif") {
     inactiveBgColor = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
   }
 
@@ -194,20 +194,20 @@ export default function AddUserScreen({ navigation }) {
           </View>
         </TouchableOpacity>
 
-        {/* Option 2: Nonaktif */}
+        {/* Option 2: Tidak Aktif */}
         <TouchableOpacity
           style={[
             styles.radioItemRow,
             {
-              borderColor: status === "Nonaktif" ? "#0059AB" : colors.border,
+              borderColor: status === "Tidak Aktif" ? "#0059AB" : colors.border,
               backgroundColor: inactiveBgColor
             }
           ]}
-          onPress={() => setStatus("Nonaktif")}
+          onPress={() => setStatus("Tidak Aktif")}
           activeOpacity={0.9}
         >
-          <View style={[styles.radioOuterCircle, { borderColor: status === "Nonaktif" ? "#0059AB" : colors.textMuted }]}>
-            {status === "Nonaktif" && <View style={styles.radioInnerCircle} />}
+          <View style={[styles.radioOuterCircle, { borderColor: status === "Tidak Aktif" ? "#0059AB" : colors.textMuted }]}>
+            {status === "Tidak Aktif" && <View style={styles.radioInnerCircle} />}
           </View>
           <View style={styles.radioTextContainer}>
             <Text style={[styles.radioTitleText, { color: colors.text }]}>{t("nonaktif")}</Text>

@@ -626,14 +626,6 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             color: "#0284c7",
             bgColor: "#e0f2fe",
           },
-          {
-            id: "Debit Air",
-            title: "Meteran Air",
-            desc: "Monitoring debit & penggunaan air",
-            icon: Droplet,
-            color: "#10b981",
-            bgColor: "#dcfce7",
-          },
         ].map((item) => {
           const IconComp = item.icon;
           const isSelected = formCategory === item.id;
@@ -918,9 +910,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.navTitle, { color: colors.text }]}>{t("tambah_perangkat")}</Text>
-            <TouchableOpacity style={styles.scanBtn} onPress={handleScanQR}>
-              <Camera size={22} color={colors.primary || "#0059AB"} />
-            </TouchableOpacity>
+            <View style={{ width: 40 }} />
           </View>
 
           {renderStepProgressTracker()}
@@ -1129,12 +1119,6 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
             {/* Buttons Row */}
             <View style={styles.deleteModalBtnRow}>
-              <TouchableOpacity
-                style={[styles.deleteModalCancelBtn, { borderColor: colors.border }]}
-                onPress={() => setSuccessModalVisible(false)}
-              >
-                <Text style={[styles.deleteModalCancelText, { color: colors.textMuted }]}>Batal</Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.successModalOkBtn}
                 onPress={() => setSuccessModalVisible(false)}

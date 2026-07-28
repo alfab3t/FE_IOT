@@ -600,7 +600,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
           <Menu size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.navbarCenter}>
-          <Text style={[styles.navTitleCenter, { color: colors.text }]}>ASTRATech IoT</Text>
+          <Text style={[styles.navTitleCenter, { color: colors.text }]}>ASTRAtech IoT</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -657,7 +657,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 <View style={styles.logoBadge}>
                   <Radio size={18} color="#0059AB" />
                 </View>
-                <Text style={[styles.drawerBrandText, { color: colors.text }]}>ASTRATech IoT</Text>
+                <Text style={[styles.drawerBrandText, { color: colors.text }]}>ASTRAtech IoT</Text>
               </View>
             </View>
 
@@ -674,7 +674,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 )}
               </View>
               <View style={styles.drawerProfileInfo}>
-                <Text style={[styles.drawerProfileName, { color: colors.text }]}>{user?.nickname || user?.username || "Admin ASTRATech"}</Text>
+                <Text style={[styles.drawerProfileName, { color: colors.text }]}>{user?.nickname || user?.username || "Admin ASTRAtech"}</Text>
                 <View style={styles.drawerStatusRow}>
                   <View style={styles.drawerStatusDot} />
                   <Text style={[styles.drawerStatusText, { color: colors.textMuted }]}>Online</Text>
@@ -785,7 +785,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
           <ScrollView contentContainerStyle={styles.aboutContent}>
             <Card style={[styles.aboutBrandCard, { backgroundColor: colors.cardBackground }]}>
-              <Text style={[styles.aboutLogoText, { color: colors.text }]}>ASTRATech IoT</Text>
+              <Text style={[styles.aboutLogoText, { color: colors.text }]}>ASTRAtech IoT</Text>
               <Text style={[styles.aboutDescText, { color: colors.textMuted }]}>
                 Aplikasi monitoring perangkat IoT untuk memantau sensor dan mengendalikan perangkat secara real-time.
               </Text>
@@ -839,7 +839,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             </Card>
 
             <View style={styles.aboutFooterBox}>
-              <Text style={[styles.aboutFooterText, { color: colors.textMuted }]}>© 2026 AstraTech IoT</Text>
+              <Text style={[styles.aboutFooterText, { color: colors.textMuted }]}>© 2026 Astratech IoT</Text>
               <Text style={[styles.aboutFooterSubText, { color: colors.textMuted }]}>Semua hak dilindungi.</Text>
             </View>
           </ScrollView>
