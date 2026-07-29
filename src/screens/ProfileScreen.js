@@ -30,8 +30,7 @@ import {
 } from "lucide-react-native";
 
 export default function ProfileScreen({ navigation }) {
-  const { user, setUser, logout, colors, showToast, t, language } = useUser();
-  const [timezone, setTimezone] = useState("Asia/Jakarta (WIB)");
+  const { user, setUser, logout, colors, showToast, t, language, timezone, setTimezone } = useUser();
   const [avatarBase64, setAvatarBase64] = useState(user?.foto || null);
 
   // Modals and Previews
@@ -427,7 +426,7 @@ function TimezoneModal({
             <TouchableOpacity
               style={[styles.tzItem, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}
               onPress={() => {
-                setTimezone(item.city);
+                setTimezone(item.id);
                 onClose();
               }}
             >

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   StyleSheet,
   Text,
@@ -132,9 +133,11 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     }
   };
 
-  useEffect(() => {
-    loadDevicesAndLocations();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadDevicesAndLocations();
+    }, [])
+  );
 
   // Switch wizard steps instantly without flickering
   const animateNextStep = (nextStep) => {
@@ -1146,7 +1149,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             <Text style={[styles.dialogMessage, { color: colors.textMuted }]}>
               {t("pilih_kategori")}
             </Text>
-            {["Semua", "Lampu", "AC", "Listrik", "Debit Air", "Temperatur & Kelembaban"].map((catOption) => {
+            {["Semua", "Lampu", "AC", "Listrik", "Temperatur & Kelembaban"].map((catOption) => {
               const isSelected = selectedCategoryFilter === catOption;
               const transCatLabel = catOption === "Semua" ? t("semua") : catOption;
               return (

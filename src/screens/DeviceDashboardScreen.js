@@ -43,7 +43,7 @@ const chartWidth = Dimensions.get("window").width - 32;
 const globalSeenNotifsSet = new Set();
 
 export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
-  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme } = useUser();
+  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme, timezone } = useUser();
   const [devices, setDevices] = useState([]);
   const [activities, setActivities] = useState([]);
   const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
@@ -164,15 +164,30 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     loadDashboardData(false);
   };
 
-  // Generate date string in Indonesian/English based on translation context
+  // Generate date string in Indonesian/English based on translation context and selected timezone (WIB/WITA/WIT)
   const getIndonesianDate = () => {
     const date = new Date();
+    let offsetHours = 0;
+    let tzLabel = "WIB";
+
+    if (timezone === "WITA" || timezone?.includes("WITA")) {
+      offsetHours = 1;
+      tzLabel = "WITA";
+    } else if (timezone === "WIT" || timezone?.includes("WIT")) {
+      offsetHours = 2;
+      tzLabel = "WIT";
+    } else {
+      offsetHours = 0;
+      tzLabel = "WIB";
+    }
+
+    const targetTime = new Date(date.getTime() + offsetHours * 3600 * 1000);
     const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
     const isId = t("bahasa") === "Indonesia";
-    const dateStr = date.toLocaleDateString(isId ? "id-ID" : "en-US", options);
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${dateStr} • ${hours}:${minutes} WIB`;
+    const dateStr = targetTime.toLocaleDateString(isId ? "id-ID" : "en-US", options);
+    const hours = String(targetTime.getHours()).padStart(2, "0");
+    const minutes = String(targetTime.getMinutes()).padStart(2, "0");
+    return `${dateStr} • ${hours}:${minutes} ${tzLabel}`;
   };
 
   // Extract Summary Statistics

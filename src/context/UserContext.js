@@ -58,6 +58,7 @@ export function UserProvider({ children }) {
   const [refreshInterval, setRefreshInterval] = useState("30 detik");
   const [language, setLanguage] = useState("Indonesia");
   const [theme, setTheme] = useState("Light Mode");
+  const [timezone, setTimezone] = useState("WIB");
 
   // Toast state and auto-dismiss timer reference
   const [toast, setToast] = useState(null); // { message, type: 'info' | 'success' | 'warning' | 'error' }
@@ -454,6 +455,8 @@ export function UserProvider({ children }) {
     setLanguage,
     theme,
     setTheme,
+    timezone,
+    setTimezone,
     t,
     translateNotification,
     colors,
@@ -467,6 +470,7 @@ export function UserProvider({ children }) {
     refreshInterval,
     language,
     theme,
+    timezone,
     showToast
   ]);
 
