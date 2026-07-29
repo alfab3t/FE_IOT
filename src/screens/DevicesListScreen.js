@@ -158,7 +158,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   };
 
   const handleOpenAdd = () => {
-    if (!canCrud) {
+    if (!isAdmin) {
       showToast("Anda tidak memiliki hak akses untuk menambahkan perangkat.", "error");
       return;
     }
@@ -880,7 +880,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
                 {t("tidak_ada_perangkat_desc")}
               </Text>
-              {canCrud && (
+              {isAdmin && (
                 <TouchableOpacity style={styles.emptyAddBtn} onPress={handleOpenAdd}>
                   <Text style={styles.emptyAddBtnText}>{t("tambah_perangkat_btn")}</Text>
                 </TouchableOpacity>
@@ -890,8 +890,8 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
         />
       )}
 
-      {/* Floating Add Button for Admin / Owner / Controller */}
-      {canCrud && filteredDevices.length > 0 && (
+      {/* Floating Add Button for Admin */}
+      {isAdmin && filteredDevices.length > 0 && (
         <TouchableOpacity style={styles.floatingAddBtn} onPress={handleOpenAdd}>
           <Plus size={20} color="#fff" style={{ marginRight: 6 }} />
           <Text style={styles.floatingAddBtnText}>{t("tambah_perangkat")}</Text>

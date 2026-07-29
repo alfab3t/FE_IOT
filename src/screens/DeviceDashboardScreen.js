@@ -64,6 +64,9 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const activeChartTabRef = useRef(activeChartTab);
   const [chartDataState, setChartDataState] = useState([]);
   const [chartLabelsState, setChartLabelsState] = useState([]);
+  const [suhuAvgHist, setSuhuAvgHist] = useState(null);
+  const [humiAvgHist, setHumiAvgHist] = useState(null);
+  const [powerAvgHist, setPowerAvgHist] = useState(null);
 
   const loadChartData = async (tab, devicesList = devices) => {
     // Call the average graph endpoint directly with the selected category tab
@@ -93,10 +96,13 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const loadDashboardData = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
     try {
-      const [devResponse, actResponse, statsResponse] = await Promise.all([
+      const [devResponse, actResponse, statsResponse, graphSuhu, graphHumi, graphPower] = await Promise.all([
         iotService.getDashboardLatest(),
         iotService.getNotifications(),
-        iotService.getDashboardStats()
+        iotService.getDashboardStats(),
+        iotService.getGraphAverage("Suhu", "Minutely"),
+        iotService.getGraphAverage("Kelembaban", "Minutely"),
+        iotService.getGraphAverage("Listrik", "Minutely")
       ]);
 
       if (!devResponse.error && Array.isArray(devResponse)) {
@@ -106,6 +112,32 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
       if (!statsResponse.error && statsResponse) {
         setStats(statsResponse);
       }
+      
+      // Calculate averages from graph responses
+      if (!graphSuhu.error && Array.isArray(graphSuhu) && graphSuhu.length > 0) {
+        const values = graphSuhu.map((pt) => Number.parseFloat(pt.averageValue || 0));
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        setSuhuAvgHist(avg);
+      } else {
+        setSuhuAvgHist(null);
+      }
+
+      if (!graphHumi.error && Array.isArray(graphHumi) && graphHumi.length > 0) {
+        const values = graphHumi.map((pt) => Number.parseFloat(pt.averageValue || 0));
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        setHumiAvgHist(avg);
+      } else {
+        setHumiAvgHist(null);
+      }
+
+      if (!graphPower.error && Array.isArray(graphPower) && graphPower.length > 0) {
+        const values = graphPower.map((pt) => Number.parseFloat(pt.averageValue || 0));
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        setPowerAvgHist(avg / 1000.0); // Convert Watts to kW
+      } else {
+        setPowerAvgHist(null);
+      }
+
       if (!actResponse.error && Array.isArray(actResponse)) {
         setActivities(actResponse);
 
@@ -184,14 +216,14 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   // Active Metric values
   const getMetricValue = (category) => {
     if (category === "Suhu") {
-      return stats.avgSuhu > 0 ? `${stats.avgSuhu.toFixed(1)}°C` : "26.3°C";
+      return suhuAvgHist !== null ? `${suhuAvgHist.toFixed(1)}°C` : (stats.avgSuhu > 0 ? `${stats.avgSuhu.toFixed(1)}°C` : "26.3°C");
     }
     if (category === "Kelembaban") {
-      return stats.avgHumi > 0 ? `${stats.avgHumi.toFixed(1)}%` : "64.2%";
+      return humiAvgHist !== null ? `${humiAvgHist.toFixed(1)}%` : (stats.avgHumi > 0 ? `${stats.avgHumi.toFixed(1)}%` : "64.2%");
     }
     if (category === "Listrik") {
       // stats.avgPower is in Watts, convert to kW
-      return stats.avgPower > 0 ? `${(stats.avgPower / 1000.0).toFixed(1)} kW` : "542.7 kWh";
+      return powerAvgHist !== null ? `${powerAvgHist.toFixed(1)} kW` : (stats.avgPower > 0 ? `${(stats.avgPower / 1000.0).toFixed(1)} kW` : "542.7 kW");
     }
     if (category === "Air") {
       return "13.8 m³";

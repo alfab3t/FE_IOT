@@ -82,7 +82,7 @@ export default function NotificationsScreen({ navigation, onNotificationsUpdated
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Tabs: 0: Alarm, 1: Home, 2: Bulletin
-  const [activeTab, setActiveTab] = useState(1); // Default to Home
+  const [activeTab, setActiveTab] = useState(0); // Default to Alarm
   
   // Edit mode states
   const [isEditMode, setIsEditMode] = useState(false);
@@ -341,31 +341,7 @@ export default function NotificationsScreen({ navigation, onNotificationsUpdated
         )}
       </View>
 
-      {/* Tabs Header */}
-      {!isEditMode && (
-        <View style={[styles.tabsHeader, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
-          {[
-            { id: 0, label: "Alarm", icon: Bell },
-            { id: 1, label: "Home", icon: Home },
-            { id: 2, label: "Bulletin", icon: FileText },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            const TabIcon = tab.icon;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                style={[styles.tabItem, isActive ? [styles.tabItemActive, { backgroundColor: colors.background, borderColor: "#0059AB" }] : { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
-                onPress={() => setActiveTab(tab.id)}
-              >
-                <TabIcon size={16} color={isActive ? "#0059AB" : colors.textMuted} />
-                <Text style={[styles.tabText, isActive ? styles.tabTextActive : { color: colors.textMuted }]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+
 
       {isLoading ? (
         <View style={styles.loaderContainer}>
