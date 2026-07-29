@@ -694,19 +694,21 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             <ScrollView contentContainerStyle={styles.drawerMenuScroll}>
               <Text style={[styles.drawerSectionHeader, { color: colors.textMuted }]}>{t("menu_admin")}</Text>
 
-              <TouchableOpacity
-                style={styles.drawerMenuItem}
-                onPress={() => {
-                  setDrawerVisible(false);
-                  navigation.navigate("UsersList");
-                }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: colors.background }]}>
-                  <User size={18} color="#0059AB" />
-                </View>
-                <Text style={[styles.menuItemText, { color: colors.text }]}>{t("kelola_pengguna")}</Text>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
+              {isAdmin && (
+                <TouchableOpacity
+                  style={styles.drawerMenuItem}
+                  onPress={() => {
+                    setDrawerVisible(false);
+                    navigation.navigate("UsersList");
+                  }}
+                >
+                  <View style={[styles.menuIconContainer, { backgroundColor: colors.background }]}>
+                    <User size={18} color="#0059AB" />
+                  </View>
+                  <Text style={[styles.menuItemText, { color: colors.text }]}>{t("kelola_pengguna")}</Text>
+                  <ChevronRight size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={styles.drawerMenuItem}

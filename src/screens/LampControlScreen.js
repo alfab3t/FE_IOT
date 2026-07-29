@@ -49,11 +49,6 @@ export default function LampControlScreen({ navigation }) {
   }, []);
 
   const handleToggle = async (value) => {
-    if (isViewer) {
-      Alert.alert("Akses Ditolak", "Viewer tidak diperbolehkan mengontrol perangkat.");
-      return;
-    }
-
     setIsLampOn(value);
     const cmd = value ? "ON" : "OFF";
     const response = await iotService.controlDevice(lampDeviceId, cmd);
@@ -117,7 +112,6 @@ export default function LampControlScreen({ navigation }) {
               onValueChange={handleToggle}
               trackColor={{ false: "#dee2e6", true: "#0059AB" }}
               thumbColor={isLampOn ? "#fff" : "#f4f3f4"}
-              disabled={isViewer}
             />
           </Card>
         </ScrollView>

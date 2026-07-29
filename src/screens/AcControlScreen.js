@@ -89,11 +89,6 @@ export default function AcControlScreen({ route, navigation }) {
   };
 
   const handlePowerToggle = async (value) => {
-    if (isViewer) {
-      handleViewerBlock();
-      return;
-    }
-
     setIsPowerOn(value);
     const cmd = value ? "1" : "0";
     
@@ -113,11 +108,6 @@ export default function AcControlScreen({ route, navigation }) {
   };
 
   const changeTemperature = async (delta) => {
-    if (isViewer) {
-      handleViewerBlock();
-      return;
-    }
-
     const prevTemp = temperature;
     const nextTemp = prevTemp + delta;
     if (nextTemp < 16 || nextTemp > 30) return;
@@ -135,10 +125,6 @@ export default function AcControlScreen({ route, navigation }) {
   };
 
   const changeMode = async (mode, value) => {
-    if (isViewer) {
-      handleViewerBlock();
-      return;
-    }
     setAcMode(mode);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setModeS3" : "setMode00124";
     await iotService.controlAc(topic, String(value), acDeviceId);
@@ -146,10 +132,6 @@ export default function AcControlScreen({ route, navigation }) {
   };
 
   const changeFanSpeed = async (speed, value) => {
-    if (isViewer) {
-      handleViewerBlock();
-      return;
-    }
     setFanSpeed(speed);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setFanS3" : "setFan00123";
     await iotService.controlAc(topic, String(value), acDeviceId);
@@ -157,10 +139,6 @@ export default function AcControlScreen({ route, navigation }) {
   };
 
   const changeSwingMode = async (swing, value) => {
-    if (isViewer) {
-      handleViewerBlock();
-      return;
-    }
     setSwingMode(swing);
     const topic = tempDeviceId === "DEV_TEMP02" ? "setSwingS3" : "setSwing00125";
     await iotService.controlAc(topic, String(value), acDeviceId);
@@ -199,7 +177,6 @@ export default function AcControlScreen({ route, navigation }) {
               onValueChange={handlePowerToggle}
               trackColor={{ false: "#dee2e6", true: "#0059AB" }}
               thumbColor={isPowerOn ? "#fff" : "#f4f3f4"}
-              disabled={isViewer}
             />
           </Card>
 
@@ -208,9 +185,9 @@ export default function AcControlScreen({ route, navigation }) {
             <Text style={[styles.tempHeaderTitle, { color: colors.text }]}>Target Temperatur</Text>
             <View style={styles.tempSelectorRow}>
               <TouchableOpacity
-                style={[styles.tempBtn, isViewer && styles.disabledBtn]}
+                style={styles.tempBtn}
                 onPress={() => changeTemperature(-1)}
-                disabled={isViewer || temperature <= 16}
+                disabled={temperature <= 16}
               >
                 <Text style={styles.tempBtnText}>-</Text>
               </TouchableOpacity>
@@ -218,9 +195,9 @@ export default function AcControlScreen({ route, navigation }) {
               <Text style={[styles.tempValueText, { color: colors.text }]}>{temperature}°C</Text>
 
               <TouchableOpacity
-                style={[styles.tempBtn, isViewer && styles.disabledBtn]}
+                style={styles.tempBtn}
                 onPress={() => changeTemperature(1)}
-                disabled={isViewer || temperature >= 30}
+                disabled={temperature >= 30}
               >
                 <Text style={styles.tempBtnText}>+</Text>
               </TouchableOpacity>
@@ -241,7 +218,6 @@ export default function AcControlScreen({ route, navigation }) {
                   key={m.label}
                   style={[styles.optionItem, { backgroundColor: colors.border }, active && styles.optionItemActive]}
                   onPress={() => changeMode(m.label, m.val)}
-                  disabled={isViewer}
                 >
                   <Snowflake size={20} color={active ? "#fff" : "#0059AB"} />
                   <Text style={[styles.optionText, active ? styles.optionTextActive : { color: colors.text }]}>
@@ -268,7 +244,6 @@ export default function AcControlScreen({ route, navigation }) {
                   key={f.label}
                   style={[styles.optionItem, { backgroundColor: colors.border }, active && styles.optionItemActive]}
                   onPress={() => changeFanSpeed(f.label, f.val)}
-                  disabled={isViewer}
                 >
                   <Wind size={20} color={active ? "#fff" : "#0059AB"} />
                   <Text style={[styles.optionText, active ? styles.optionTextActive : { color: colors.text }]}>
@@ -295,7 +270,6 @@ export default function AcControlScreen({ route, navigation }) {
                   key={s.label}
                   style={[styles.optionItem, { backgroundColor: colors.border }, active && styles.optionItemActive]}
                   onPress={() => changeSwingMode(s.label, s.val)}
-                  disabled={isViewer}
                 >
                   <Compass size={20} color={active ? "#fff" : "#0059AB"} />
                   <Text style={[styles.optionText, active ? styles.optionTextActive : { color: colors.text }]}>
