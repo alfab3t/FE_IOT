@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -34,6 +34,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   const [humiPoints, setHumiPoints] = useState([]);
   const [powerPoints, setPowerPoints] = useState([]);
   const [graphLabels, setGraphLabels] = useState([]);
+  const lastDeviceIdRef = useRef(null);
   // Tab switch simply changes the active tab filter without overriding the user's selected device
   const handleTabSwitch = (tab) => {
     setActiveTab(tab);
@@ -62,11 +63,14 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   const loadGraphs = async (deviceId, category) => {
     if (!deviceId) return;
 
-    // Reset previous states to prevent cache leakage between different devices
-    setGraphLabels([]);
-    setTempPoints([]);
-    setHumiPoints([]);
-    setPowerPoints([]);
+    // Reset previous states ONLY when switching to a different device to avoid flashing/flickering
+    if (lastDeviceIdRef.current !== deviceId) {
+      lastDeviceIdRef.current = deviceId;
+      setGraphLabels([]);
+      setTempPoints([]);
+      setHumiPoints([]);
+      setPowerPoints([]);
+    }
 
     let period = "Monthly";
     if (timePeriod === "Hari Ini") {
@@ -138,7 +142,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   // Generate dynamic historical log values for the table data based on active telemetry
   const latestTemp = (activeDevice?.category === "Temperatur & Kelembaban" || activeDevice?.category === "AC") && activeDevice?.limitMin ? Number.parseFloat(activeDevice.limitMin) : 21.8;
   const latestHumi = (activeDevice?.category === "Temperatur & Kelembaban" || activeDevice?.category === "AC") && activeDevice?.limitMax ? Number.parseFloat(activeDevice.limitMax) : 50.0;
-  const latestPower = activeDevice?.category === "Listrik" && activeDevice?.limitMin ? Number.parseFloat(activeDevice.limitMin) : 36.4;
+  const latestPower = activeDevice?.category === "Listrik" && activeDevice?.limitMin ? Number.parseFloat(activeDevice.limitMin) / 1000.0 : 36.4;
 
   const tableLogs = graphLabels.length > 0 ? graphLabels.map((lbl, idx) => ({
     time: lbl,
@@ -185,16 +189,6 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
         <View style={styles.tableHeaderRow}>
           <Text style={[styles.tableTitle, { color: colors.text }]}>
             {tableTitleText}
-          </Text>
-          <Text style={[styles.unitSubtitle, { color: colors.textMuted }]}>
-            {/* Satuan unit berdasarkan tab aktif */}
-            {(() => {
-              let unit = t("semua");
-              if (activeTab === "Suhu") unit = "°C";
-              else if (activeTab === "Kelembapan") unit = "%";
-              else if (activeTab === "Listrik") unit = "kWh";
-              return `${t("satuan")}: ${unit}`;
-            })()}
           </Text>
         </View>
   
@@ -243,31 +237,31 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
           <>
             <Card style={[styles.tableCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
               {/* Header */}
-              <View style={[styles.tableHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.thText, { flex: 0.8, color: colors.textMuted }]}>{t("waktu")}</Text>
+              <View style={[styles.tableHead, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.thText, { flex: 1.1, color: colors.textMuted }]}>{t("waktu")}</Text>
                 {activeTab === "Semua" ? (
                   <>
-                    <Text style={[styles.thText, { color: colors.textMuted }]}>{t("suhu")}</Text>
-                    <Text style={[styles.thText, { color: colors.textMuted }]}>{t("kelembapan")}</Text>
-                    <Text style={[styles.thText, { color: colors.textMuted }]}>{t("listrik")}</Text>
+                    <Text style={[styles.thText, { flex: 1, color: colors.textMuted }]}>{t("suhu")}</Text>
+                    <Text style={[styles.thText, { flex: 1.6, color: colors.textMuted }]}>{t("kelembapan")}</Text>
+                    <Text style={[styles.thText, { flex: 1.1, color: colors.textMuted }]}>{t("listrik")}</Text>
                   </>
                 ) : (
-                  <Text style={[styles.thText, { flex: 2, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>
+                  <Text style={[styles.thText, { flex: 3.7, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>
                 )}
-                <Text style={[styles.thText, { flex: 1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
+                <Text style={[styles.thText, { flex: 1.1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
               </View>
-  
+
               {tableLogs.map((log) => (
                 <View key={log.time} style={[styles.tableRow, tableLogs.indexOf(log) === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.tdText, { flex: 0.8, color: colors.textMuted }]}>{log.time}</Text>
+                  <Text style={[styles.tdText, { flex: 1.1, color: colors.textMuted }]}>{log.time}</Text>
                   {activeTab === "Semua" ? (
                     <>
-                      <Text style={[styles.tdText, { color: colors.text }]}>{log.temp}°</Text>
-                      <Text style={[styles.tdText, { color: colors.text }]}>{log.hum}%</Text>
-                      <Text style={[styles.tdText, { color: colors.text }]}>{log.power}</Text>
+                      <Text style={[styles.tdText, { flex: 1, color: colors.text }]}>{log.temp}°</Text>
+                      <Text style={[styles.tdText, { flex: 1.6, color: colors.text }]}>{log.hum}%</Text>
+                      <Text style={[styles.tdText, { flex: 1.1, color: colors.text }]}>{log.power}</Text>
                     </>
                   ) : (
-                    <Text style={[styles.tdText, { flex: 2, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>
+                    <Text style={[styles.tdText, { flex: 3.7, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>
                       {(() => {
                         if (activeTab === "Suhu") return `${log.temp} °C`;
                         if (activeTab === "Kelembapan") return `${log.hum} %`;
@@ -275,9 +269,9 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
                       })()}
                     </Text>
                   )}
-                  <View style={[styles.tdText, { flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }]}>
+                  <View style={{ flex: 1.1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
                     <View style={styles.normalDot} />
-                    <Text style={[styles.tdText, { color: "#10b981", fontWeight: "700" }]}>{log.status}</Text>
+                    <Text style={{ color: "#10b981", fontWeight: "700", fontSize: 10 }}>{log.status}</Text>
                   </View>
                 </View>
               ))}
