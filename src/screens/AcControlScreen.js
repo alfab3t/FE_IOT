@@ -47,7 +47,6 @@ export default function AcControlScreen({ route, navigation }) {
       currentDevice = response.find(dev => dev.id === selectedDeviceId);
     }
     
-    // Fallback: find first AC category device, or first overall device
     if (!currentDevice) {
       currentDevice = response.find(dev => dev.category === "AC") || response[0];
     }
@@ -68,7 +67,6 @@ export default function AcControlScreen({ route, navigation }) {
         setTempDeviceId(currentDevice.id === "DEV_AC01" ? "DEV_TEMP02" : "DEV_TEMP01");
       }
 
-      // Load persisted AC settings from database
       const savedSettings = await iotService.getAcSettings(currentDevice.id);
       if (!savedSettings.error && savedSettings) {
         setTemperature(savedSettings.temperature ?? 22);

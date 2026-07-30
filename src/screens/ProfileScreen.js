@@ -133,6 +133,7 @@ export default function ProfileScreen({ navigation }) {
       username: nextVal,
       nama: nextVal,
       nickname: nextVal,
+      email: `${nextVal.toLowerCase()}@astratech.ac.id`,
     }));
 
     try {
@@ -412,7 +413,7 @@ function TimezoneModal({
           <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={[styles.searchBarInput, { color: colors.text }]}
-            placeholder={language === "Indonesia" ? "Cari kota..." : "Search city..."}
+            placeholder={language === "Indonesia" ? "Cari kota" : "Search city"}
             placeholderTextColor={colors.textMuted}
             value={searchTz}
             onChangeText={setSearchTz}

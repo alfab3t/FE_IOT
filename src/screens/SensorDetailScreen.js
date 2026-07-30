@@ -62,10 +62,12 @@ export default function SensorDetailScreen({ navigation, route }) {
   const loadChartData = useCallback(async (period, mode = chartMode) => {
     setIsChartLoading(true);
     let response;
-    if (mode === "humi") {
-      response = await iotService.getGraphAverage("Kelembaban", period);
-    } else {
-      response = await iotService.getGraphData(deviceId, period);
+    const category = mode === "humi" ? "Kelembaban" : "Suhu";
+    if (deviceId) {
+      response = await iotService.getDashboardGraph(deviceId, period);
+    }
+    if (!response || response.error || !Array.isArray(response) || response.length === 0) {
+      response = await iotService.getGraphAverage(category, period);
     }
     setIsChartLoading(false);
     if (!response?.error && Array.isArray(response) && response.length > 0) {

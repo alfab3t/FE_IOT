@@ -12,6 +12,7 @@ import {
   Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import {
@@ -53,15 +54,32 @@ export default function UsersListScreen({ navigation }) {
       const rawUsers = response.users || response.Users || (Array.isArray(response) ? response : response.data || []);
       const rawRoles = response.roles || response.Roles || [];
 
-      const mappedUsers = (Array.isArray(rawUsers) ? rawUsers : []).map((u) => ({
-        ...u,
-        username: u.username || u.Username || u.use_id || "",
-        fullName: u.fullName || u.FullName || u.username || u.Username || u.use_id || "",
-        email: u.email || u.Email || "",
-        status: u.status || u.Status || u.use_status || "Aktif",
-        roleName: u.roleName || u.RoleName || u.rol_deskripsi || "User",
-        roleId: u.roleId || u.RoleId || u.rol_id || "ROL01",
-      }));
+      const mappedUsers = await Promise.all(
+        (Array.isArray(rawUsers) ? rawUsers : []).map(async (u) => {
+          const uName = u.username || u.Username || u.use_id || "";
+          let uPhoto = u.photo || u.Photo || "";
+          if (!uPhoto) {
+            if (user?.username && uName.toLowerCase() === user.username.toLowerCase() && user.foto) {
+              uPhoto = user.foto;
+            } else {
+              try {
+                const saved = await AsyncStorage.getItem(`avatar_${uName.toLowerCase()}`);
+                if (saved) uPhoto = saved;
+              } catch (e) {}
+            }
+          }
+          return {
+            ...u,
+            username: uName,
+            fullName: u.fullName || u.FullName || uName,
+            email: u.email || u.Email || "",
+            status: u.status || u.Status || u.use_status || "Aktif",
+            roleName: u.roleName || u.RoleName || u.rol_deskripsi || "User",
+            roleId: u.roleId || u.RoleId || u.rol_id || "ROL01",
+            photo: uPhoto,
+          };
+        })
+      );
 
       const mappedRoles = (Array.isArray(rawRoles) ? rawRoles : []).map((r) => ({
         roleId: r.roleId || r.RoleId || "",
@@ -72,7 +90,7 @@ export default function UsersListScreen({ navigation }) {
       setAllUsers(mappedUsers);
       setDbRoles(mappedRoles);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     // Jalankan pertama kali saat mount

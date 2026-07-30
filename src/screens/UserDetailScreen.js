@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
@@ -22,7 +23,7 @@ import {
 
 export default function UserDetailScreen({ route, navigation }) {
   const { username } = route.params;
-  const { deleteUser, colors, t, language } = useUser();
+  const { user, deleteUser, colors, t, language } = useUser();
   const [selectedUserObj, setSelectedUserObj] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,25 +46,37 @@ export default function UserDetailScreen({ route, navigation }) {
       setIsLoading(false);
       if (response && !response.error) {
         const uName = response.username || response.Username || username;
+        let uPhoto = response.photo || response.Photo || "";
+        if (!uPhoto) {
+          if (user?.username && uName.toLowerCase() === user.username.toLowerCase() && user.foto) {
+            uPhoto = user.foto;
+          } else {
+            try {
+              const saved = await AsyncStorage.getItem(`avatar_${uName.toLowerCase()}`);
+              if (saved) uPhoto = saved;
+            } catch (e) {}
+          }
+        }
+
         const rawPhone = response.phone || response.Phone;
         const phoneVal = (rawPhone && String(rawPhone).trim() !== "") ? String(rawPhone).trim() : "—";
         setSelectedUserObj({
           id: uName,
           name: response.fullName || response.FullName || uName,
-          email: response.email || response.Email || `${uName}@astratech.ac.id`,
+          email: (response.email || response.Email || `${uName}@astratech.ac.id`).toLowerCase(),
           role: response.roleName || response.RoleName || "User",
           roleId: response.roleId || response.RoleId || "ROL01",
           phone: phoneVal,
           status: response.status || response.Status || "Aktif",
           registeredSince: response.registeredSince || response.RegisteredSince || "09 Jul 2026",
           lastLogin: response.lastLogin || response.LastLogin || "09 Jul 2026, 02:01",
-          photo: response.photo || response.Photo,
+          photo: uPhoto,
           canManage: response.canManage ?? response.CanManage ?? true,
         });
       }
     };
     fetchDetail();
-  }, [username]);
+  }, [username, user]);
 
   if (isLoading) {
     return (

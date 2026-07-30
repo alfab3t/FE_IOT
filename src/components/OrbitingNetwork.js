@@ -6,7 +6,6 @@ export default function OrbitingNetwork({ children, radius = 100, duration = 120
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Start orbit loop
     const orbit = Animated.loop(
       Animated.timing(spinValue, {
         toValue: 1,
@@ -17,7 +16,6 @@ export default function OrbitingNetwork({ children, radius = 100, duration = 120
     );
     orbit.start();
 
-    // Gracefully fade in after layout measurements settle down
     Animated.sequence([
       Animated.delay(350),
       Animated.timing(opacityAnim, {
@@ -42,7 +40,6 @@ export default function OrbitingNetwork({ children, radius = 100, duration = 120
     outputRange: ["0deg", "-360deg"],
   });
 
-  // 6 badges spaced equally in a circle (60 degrees apart)
   const angles = [0, 60, 120, 180, 240, 300];
 
   return (

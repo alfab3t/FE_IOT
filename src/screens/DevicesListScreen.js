@@ -400,10 +400,10 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     const cat = dev.category || "";
     const name = dev.name || "";
     if (cat === "Lampu" || name.toLowerCase().includes("lamp")) {
-      return dev.status || "OFF";
+      return "";
     }
     if (cat === "AC" || name.toLowerCase().includes("ac")) {
-      return dev.status === "ON" ? "ON" : "OFF";
+      return "";
     }
     if (cat === "Debit Air" || name.toLowerCase().includes("debit") || (name.toLowerCase().includes("air") && !name.toLowerCase().includes("pair"))) {
       if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
@@ -441,6 +441,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       >
         <TouchableOpacity
           style={[styles.deviceClickArea, !isActive && { opacity: 0.45 }]}
+          disabled={!isActive}
           onPress={() => {
             if (!isActive) return;
             const cat = item.category || "";
@@ -487,7 +488,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             <View style={styles.statusDotRow}>
               <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
               <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                {isOnline ? "Online" : "Offline"}
+                {isOnline ? "ON" : "OFF"}
               </Text>
             </View>
           </View>
@@ -510,7 +511,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             )}
           </View>
 
-          {canCrud && (
+          {canCrud ? (
             <Switch
               value={isActive}
               onValueChange={() => handleToggleActive(item.id, isActive)}
@@ -518,7 +519,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               thumbColor="#ffffff"
               style={styles.toggleSwitch}
             />
-          )}
+          ) : null}
         </View>
       </Card>
     );
@@ -832,7 +833,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       {/* Tabs */}
       <View style={[styles.segmentTabBar, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
         {[
-          { label: "Semua", count: countAll, val: "Semua" },
+          { label: t("semua"), count: countAll, val: "Semua" },
           { label: "Online", count: countOnline, val: "Online" },
           { label: "Offline", count: countOffline, val: "Offline" },
         ].map((tab) => {
@@ -844,7 +845,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               onPress={() => setStatusTab(tab.val)}
             >
               <Text style={[styles.segmentTabLabel, active ? styles.segmentTabLabelActive : { color: colors.textMuted }]}>
-                {tab.val === "Semua" ? t("semua") : tab.val}({tab.count})
+                {tab.label} ({tab.count})
               </Text>
             </TouchableOpacity>
           );

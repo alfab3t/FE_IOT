@@ -132,7 +132,7 @@ export default function LocationsScreen({ route, navigation }) {
         <Search size={18} color="#aaa" style={styles.searchIcon} />
         <TextInput
           style={styles.searchBarInput}
-          placeholder="Cari nama ruangan..."
+          placeholder="Cari nama ruangan"
           placeholderTextColor="#94a3b8"
           value={search}
           onChangeText={setSearch}
