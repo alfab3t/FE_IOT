@@ -12,45 +12,7 @@ export function UserProvider({ children }) {
   const [ssoData, setSsoData] = useState(null);
   const [rolePermissions, setRolePermissions] = useState([]);
 
-  // Mock User Database matching Figma screen
-  const [managedUsers] = useState([
-    {
-      id: "usr001",
-      name: "Admin ASTRATech",
-      email: "admin@astratech.co.id",
-      role: "Admin",
-      roleId: "ROL001",
-      phone: "0812 3456 7890",
-      status: "Aktif",
-      registeredSince: "02 Juli 2025",
-      lastLogin: "03 Juli 2025 08.34 WIB",
-      photo: null,
-    },
-    {
-      id: "usr002",
-      name: "Pak Budi",
-      email: "budi@astratech.co.id",
-      role: "Owner/Controller",
-      roleId: "ROL002",
-      phone: "0812 8765 4321",
-      status: "Aktif",
-      registeredSince: "01 Juli 2025",
-      lastLogin: "04 Juli 2025 09.12 WIB",
-      photo: null,
-    },
-    {
-      id: "usr003",
-      name: "Bu Maya",
-      email: "maya@astratech.co.id",
-      role: "Viewer",
-      roleId: "ROL003",
-      phone: "0857 1122 3344",
-      status: "Aktif",
-      registeredSince: "03 Juli 2025",
-      lastLogin: "05 Juli 2025 10.45 WIB",
-      photo: null,
-    },
-  ]);
+
 
   // Global System Settings Config States
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -427,7 +389,6 @@ export function UserProvider({ children }) {
     selectRole,
     logout,
     setUser,
-    managedUsers,
     addUser,
     updateUser,
     deleteUser,
@@ -447,7 +408,6 @@ export function UserProvider({ children }) {
     user,
     ssoData,
     rolePermissions,
-    managedUsers,
     notificationsEnabled,
     refreshInterval,
     language,
