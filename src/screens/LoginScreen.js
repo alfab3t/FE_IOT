@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   StyleSheet,
   Text,
@@ -122,7 +123,7 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    if (captchaInput !== captchaCode) {
+    if (captchaInput.trim().toUpperCase() !== captchaCode.trim().toUpperCase()) {
       showToast("Kode captcha salah.", "error");
       generateCaptcha();
       return;

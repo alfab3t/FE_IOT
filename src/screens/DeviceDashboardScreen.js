@@ -183,8 +183,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
     const targetTime = new Date(date.getTime() + offsetHours * 3600 * 1000);
     const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
-    const isId = t("bahasa") === "Indonesia";
-    const dateStr = targetTime.toLocaleDateString(isId ? "id-ID" : "en-US", options);
+    const dateStr = targetTime.toLocaleDateString("id-ID", options);
     const hours = String(targetTime.getHours()).padStart(2, "0");
     const minutes = String(targetTime.getMinutes()).padStart(2, "0");
     return `${dateStr} • ${hours}:${minutes} ${tzLabel}`;
@@ -276,7 +275,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         <View style={styles.summaryRow}>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#0059AB" />
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Devices</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Perangkat</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{totalDevices || 54}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
@@ -375,7 +374,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         </Card>
 
         {/* Stack Lists for Mobile: Recent Devices and System Timeline */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Latest Device Status</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Status Perangkat Terbaru</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {devices.slice(0, 5).map((dev, idx) => {
             const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");

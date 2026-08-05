@@ -150,9 +150,9 @@ export function UserProvider({ children }) {
       profil: "Profil",
       selamat_datang: "Selamat Datang,",
       status_sistem: "Status Sistem",
-      device_online: "Device Online",
-      device_offline: "Device Offline",
-      total_user: "Total User",
+      device_online: "Perangkat Aktif",
+      device_offline: "Perangkat Tidak Aktif",
+      total_user: "Total Pengguna",
       monitoring_sistem: "Monitoring Sistem",
       aktivitas_terakhir: "Aktivitas Terakhir",
       lihat_semua: "Lihat Semua",
@@ -362,17 +362,25 @@ export function UserProvider({ children }) {
 
     setAuthToken(response.token);
 
+    try {
+      if (username) {
+        await AsyncStorage.setItem("username", username.trim());
+      }
+    } catch (e) {
+      console.warn("AsyncStorage save username failed:", e);
+    }
+
     setSsoData({
       username: username,
-      nama: response.nama,
+      nama: username,
       listAplikasi: response.listAplikasi,
     });
 
-    // Set user immediately so UI responds instantly without any delay!
+    // Set user immediately so UI responds instantly with the exact login username!
     setUser({
       username: username,
-      nama: response.nama,
-      nickname: response.nama || username,
+      nama: username,
+      nickname: username,
       foto: response.foto || null,
     });
 

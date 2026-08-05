@@ -62,15 +62,24 @@ export default function ProfileScreen({ navigation }) {
     const loadProfileData = async () => {
       try {
         const uKey = (user?.username || "admin").toLowerCase();
+        const globalPhoto = await AsyncStorage.getItem("user_avatar");
+        if (globalPhoto) {
+          setAvatarBase64(globalPhoto);
+          setUser((prev) => ({ ...prev, foto: globalPhoto, photo: globalPhoto }));
+          return;
+        }
+
         const savedPhoto = await AsyncStorage.getItem(`avatar_${uKey}`);
         if (savedPhoto) {
           setAvatarBase64(savedPhoto);
           setUser((prev) => ({ ...prev, foto: savedPhoto, photo: savedPhoto }));
+          await AsyncStorage.setItem("user_avatar", savedPhoto);
         } else {
           const response = await authService.getProfilePhoto();
           if (!response?.error && response?.photo) {
             setAvatarBase64(response.photo);
             setUser((prev) => ({ ...prev, foto: response.photo, photo: response.photo }));
+            await AsyncStorage.setItem("user_avatar", response.photo);
             await AsyncStorage.setItem(`avatar_${uKey}`, response.photo);
           }
         }
@@ -91,9 +100,10 @@ export default function ProfileScreen({ navigation }) {
       setAvatarBase64(b64);
       // Save profile photo to global context
       setUser((prev) => ({ ...prev, foto: b64, photo: b64 }));
-      // Save profile photo strictly for this username
+      // Save profile photo globally and for current username
       try {
         const uKey = (user?.username || "admin").toLowerCase();
+        await AsyncStorage.setItem("user_avatar", b64);
         await AsyncStorage.setItem(`avatar_${uKey}`, b64);
       } catch (e) {
         console.warn("AsyncStorage save photo failed:", e);
@@ -125,6 +135,7 @@ export default function ProfileScreen({ navigation }) {
     const nextVal = editUsernameValue.trim();
     const oldVal = user?.username || "admin";
     const currentPhoto = avatarBase64 || user?.foto || user?.photo;
+    const currentEmail = user?.email || "danishazlf@astratech.ac.id";
 
     // 1. Update global user context & local storage immediately (keep email & photo intact!)
     setUser((prev) => ({
@@ -132,6 +143,7 @@ export default function ProfileScreen({ navigation }) {
       username: nextVal,
       nama: nextVal,
       nickname: nextVal,
+      email: currentEmail,
       foto: currentPhoto || prev?.foto || prev?.photo || null,
       photo: currentPhoto || prev?.foto || prev?.photo || null,
     }));
@@ -140,7 +152,9 @@ export default function ProfileScreen({ navigation }) {
       await AsyncStorage.setItem("username", nextVal);
       await AsyncStorage.setItem(`nickname_${nextVal.toLowerCase()}`, nextVal);
       if (currentPhoto) {
+        await AsyncStorage.setItem("user_avatar", currentPhoto);
         await AsyncStorage.setItem(`avatar_${nextVal.toLowerCase()}`, currentPhoto);
+        await AsyncStorage.setItem(`avatar_${oldVal.toLowerCase()}`, currentPhoto);
       }
     } catch (e) {
       console.warn("AsyncStorage write username failed:", e);
@@ -149,11 +163,11 @@ export default function ProfileScreen({ navigation }) {
     setUsernameModalVisible(false);
 
     // 2. Call backend API in background to sync SQL Server database
-    authService.updateUsername(nextVal, oldVal).then((res) => {
-      if (res?.error) {
-        console.warn("Backend username sync warning:", res?.message);
-      }
-    }).catch(() => {});
+    try {
+      await authService.updateUsername(nextVal, oldVal);
+    } catch (e) {
+      console.warn("Backend username sync failed:", e);
+    }
 
     showToast(
       language === "Indonesia" ? "Username berhasil diperbarui!" : "Username successfully updated!",
@@ -166,7 +180,7 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const roleName = user?.selectedRole?.roleName || "Admin";
-  const userEmail = user?.email || `${user?.username?.toLowerCase() || "admin"}@astratech.ac.id`;
+  const userEmail = user?.email || "danishazlf@astratech.ac.id";
   const selectedRoleLower = (user?.selectedRole?.roleName || "").toLowerCase();
   const roleId = user?.selectedRole?.roleId || "";
 
@@ -219,7 +233,7 @@ export default function ProfileScreen({ navigation }) {
             <Text style={[styles.infoLabel, { color: colors.textMuted }]}>
               {language === "Indonesia" ? "Nama" : "Name"}
             </Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.nama || user?.username || "Pengguna"}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.username || user?.nama || "Pengguna"}</Text>
           </View>
           <View style={[styles.infoDivider, { backgroundColor: colors.border }]} />
 
