@@ -65,15 +65,13 @@ export default function ProfileScreen({ navigation }) {
         const savedPhoto = await AsyncStorage.getItem(`avatar_${uKey}`);
         if (savedPhoto) {
           setAvatarBase64(savedPhoto);
-          setUser((prev) => ({ ...prev, foto: savedPhoto }));
+          setUser((prev) => ({ ...prev, foto: savedPhoto, photo: savedPhoto }));
         } else {
           const response = await authService.getProfilePhoto();
           if (!response?.error && response?.photo) {
             setAvatarBase64(response.photo);
-            setUser((prev) => ({ ...prev, foto: response.photo }));
-          } else {
-            setAvatarBase64(null);
-            setUser((prev) => ({ ...prev, foto: null }));
+            setUser((prev) => ({ ...prev, foto: response.photo, photo: response.photo }));
+            await AsyncStorage.setItem(`avatar_${uKey}`, response.photo);
           }
         }
       } catch (e) {
@@ -92,7 +90,7 @@ export default function ProfileScreen({ navigation }) {
       const b64 = result.assets[0].base64;
       setAvatarBase64(b64);
       // Save profile photo to global context
-      setUser((prev) => ({ ...prev, foto: b64 }));
+      setUser((prev) => ({ ...prev, foto: b64, photo: b64 }));
       // Save profile photo strictly for this username
       try {
         const uKey = (user?.username || "admin").toLowerCase();
@@ -126,21 +124,23 @@ export default function ProfileScreen({ navigation }) {
     }
     const nextVal = editUsernameValue.trim();
     const oldVal = user?.username || "admin";
+    const currentPhoto = avatarBase64 || user?.foto || user?.photo;
 
-    // 1. Update global user context & local storage immediately
+    // 1. Update global user context & local storage immediately (keep email & photo intact!)
     setUser((prev) => ({
       ...(prev || {}),
       username: nextVal,
       nama: nextVal,
       nickname: nextVal,
-      email: `${nextVal.toLowerCase()}@astratech.ac.id`,
+      foto: currentPhoto || prev?.foto || prev?.photo || null,
+      photo: currentPhoto || prev?.foto || prev?.photo || null,
     }));
 
     try {
       await AsyncStorage.setItem("username", nextVal);
       await AsyncStorage.setItem(`nickname_${nextVal.toLowerCase()}`, nextVal);
-      if (user?.foto) {
-        await AsyncStorage.setItem(`avatar_${nextVal.toLowerCase()}`, user.foto);
+      if (currentPhoto) {
+        await AsyncStorage.setItem(`avatar_${nextVal.toLowerCase()}`, currentPhoto);
       }
     } catch (e) {
       console.warn("AsyncStorage write username failed:", e);
@@ -260,16 +260,6 @@ export default function ProfileScreen({ navigation }) {
             </View>
             <Edit2 size={16} color="#0059AB" />
           </TouchableOpacity>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <TouchableOpacity style={styles.settingRow} onPress={() => setTimezoneModalVisible(true)}>
-            <View style={styles.rowInfo}>
-              <Text style={[styles.rowLabel, { color: colors.text }]}>
-                {language === "Indonesia" ? "Zona Waktu" : "Time Zone"}
-              </Text>
-              <Text style={[styles.rowValue, { color: colors.textMuted }]}>{timezone}</Text>
-            </View>
-            <Globe size={16} color="#0059AB" />
-          </TouchableOpacity>
         </Card>
 
         {/* Premium Logout Button (Figma Style: white background, red border) */}
@@ -288,17 +278,6 @@ export default function ProfileScreen({ navigation }) {
         colors={colors}
         t={t}
         language={language}
-      />
-
-      <TimezoneModal
-        visible={timezoneModalVisible}
-        onClose={() => setTimezoneModalVisible(false)}
-        colors={colors}
-        language={language}
-        searchTz={searchTz}
-        setSearchTz={setSearchTz}
-        timezones={timezones}
-        setTimezone={setTimezone}
       />
 
       <NotificationPopup
@@ -378,70 +357,6 @@ function UsernameModal({
           </View>
         </View>
       </View>
-    </Modal>
-  );
-}
-
-function TimezoneModal({
-  visible,
-  onClose,
-  colors,
-  language,
-  searchTz,
-  setSearchTz,
-  timezones,
-  setTimezone,
-}) {
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <SafeAreaView style={[styles.tzModalContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={onClose}>
-            <ArrowLeft size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.navTitle, { color: colors.text }]}>
-            {language === "Indonesia" ? "Pilih Zona Waktu" : "Select Time Zone"}
-          </Text>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
-          <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchBarInput, { color: colors.text }]}
-            placeholder={language === "Indonesia" ? "Cari kota" : "Search city"}
-            placeholderTextColor={colors.textMuted}
-            value={searchTz}
-            onChangeText={setSearchTz}
-          />
-        </View>
-
-        <FlatList
-          data={timezones.filter((tz) => tz.city.toLowerCase().includes(searchTz.toLowerCase()))}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.tzItem, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}
-              onPress={() => {
-                setTimezone(item.id);
-                onClose();
-              }}
-            >
-              <Text style={[styles.tzItemText, { color: colors.text }]}>{item.city}</Text>
-              <Text style={styles.tzItemSubText}>{item.id}</Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              {language === "Indonesia" ? "Zona waktu tidak ditemukan" : "Time zone not found"}
-            </Text>
-          }
-        />
-      </SafeAreaView>
     </Modal>
   );
 }

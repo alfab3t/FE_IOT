@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Zap, TrendingUp, MapPin, Wifi } from "lucide-react-native";
+import { ArrowLeft, Zap, TrendingUp, MapPin, Wifi, Clock } from "lucide-react-native";
 import { LineChart } from "react-native-chart-kit";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -89,11 +89,29 @@ export default function PowerMeterScreen({ navigation, route }) {
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
     const len = labels.length;
-    let n;
-    if (len <= 6) { n = 1; }
-    else if (len <= 12) { n = 2; }
-    else { n = 3; }
-    return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
+    const n = Math.max(1, Math.ceil(len / 5));
+
+    return labels.map((lbl, i) => {
+      if (!lbl || (i !== 0 && i !== len - 1 && i % n !== 0)) return "";
+      let s = lbl.trim();
+
+      // Formating horizontal ringkas (e.g. "26/07" atau "M1 Jul")
+      if (s.includes("(") && s.includes(")")) {
+        const matchParen = s.match(/\(([^)]+)\)/);
+        if (matchParen && matchParen[1]) {
+          const inside = matchParen[1].trim();
+          if (/^Minggu\s+\d+/i.test(s) || /^Mgg\s+\d+/i.test(s)) {
+            const mggNum = s.split("(")[0].replace("Minggu", "M").replace("Mgg", "M").trim();
+            const monthParts = inside.split(" ");
+            const monthShort = monthParts[0] ? monthParts[0].substring(0, 3) : "";
+            return `${mggNum} ${monthShort}`; // e.g. "M1 Jul"
+          }
+          return inside; // e.g. "26/07", "17/07"
+        }
+      }
+
+      return s;
+    });
   };
 
   const chartConfig = {
@@ -134,9 +152,11 @@ export default function PowerMeterScreen({ navigation, route }) {
       <LineChart
         data={{ labels, datasets: [{ data: values }] }}
         width={CHART_WIDTH + 32}
-        height={CHART_HEIGHT + 40}
+        height={CHART_HEIGHT + 35}
         chartConfig={chartConfig}
         bezier
+        verticalLabelRotation={0}
+        xLabelsOffset={2}
         style={{ borderRadius: 10, marginLeft: -16 }}
         withHorizontalLabels={true}
         fromZero={false}

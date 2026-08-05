@@ -9,10 +9,11 @@ import {
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Droplets, MapPin, Wifi, TrendingUp } from "lucide-react-native";
+import { ArrowLeft, Droplets, MapPin, Wifi, TrendingUp, Clock, History, Calendar } from "lucide-react-native";
 import { LineChart } from "react-native-chart-kit";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -36,12 +37,20 @@ export default function WaterMeterScreen({ navigation, route }) {
   const [deviceStatus, setDeviceStatus] = useState("Online");
   const [graphData, setGraphData] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
+  const [locationHistory, setLocationHistory] = useState([]);
 
-  const loadLatestData = useCallback(async () => {
-    setIsLoading(true);
+  const loadLatestData = useCallback(async (isInitial = true) => {
+    if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
-    setIsLoading(false);
-    if (!response.error && Array.isArray(response)) {
+    if (deviceId) {
+      const devDetail = await iotService.getDeviceById(deviceId);
+      const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+      if (Array.isArray(historyList)) {
+        setLocationHistory(historyList);
+      }
+    }
+    if (isInitial) setIsLoading(false);
+    if (!response?.error && Array.isArray(response)) {
       const dev = response.find((d) => d.id === deviceId);
       if (dev) {
         setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
@@ -56,15 +65,29 @@ export default function WaterMeterScreen({ navigation, route }) {
     setIsChartLoading(true);
     const response = await iotService.getGraphData(deviceId, period);
     setIsChartLoading(false);
-    if (!response.error && Array.isArray(response) && response.length > 0) {
+    if (!response?.error && Array.isArray(response) && response.length > 0) {
       setGraphData(response);
     } else {
       setGraphData([]);
     }
   }, [deviceId]);
 
-  useEffect(() => { loadLatestData(); }, [loadLatestData]);
-  useEffect(() => { loadChartData(selectedPeriod); }, [selectedPeriod, loadChartData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadLatestData(true);
+      loadChartData(selectedPeriod);
+    }, [loadLatestData, loadChartData, selectedPeriod])
+  );
+
+  useEffect(() => {
+    loadLatestData(true);
+    loadChartData(selectedPeriod);
+    const timer = setInterval(() => {
+      loadLatestData(false);
+      loadChartData(selectedPeriod);
+    }, 5000); // 5s REAL-TIME live telemetry and location updates
+    return () => clearInterval(timer);
+  }, [loadLatestData, loadChartData, selectedPeriod]);
 
   // ── Line Chart ────────────────────────────────────────────────────────────
   const thinLabels = (labels) => {
@@ -193,6 +216,9 @@ export default function WaterMeterScreen({ navigation, route }) {
             </View>
           </Card>
 
+          {/* Location History */}
+          <LocationHistoryCard locationHistory={locationHistory} colors={colors} />
+
           {/* Stats */}
           <View style={styles.statsRow}>
             {[
@@ -238,6 +264,65 @@ export default function WaterMeterScreen({ navigation, route }) {
   );
 }
 
+function LocationHistoryCard({ locationHistory, colors }) {
+  const items = Array.isArray(locationHistory) ? locationHistory : [];
+
+  return (
+    <Card style={[styles.historyCard, { backgroundColor: colors.cardBackground }]}>
+      <View style={styles.historyHeaderRow}>
+        <View style={[styles.historyIconCircle, { backgroundColor: "#e0f2fe" }]}>
+          <History size={18} color="#0284c7" />
+        </View>
+        <Text style={[styles.historyTitle, { color: colors.text }]}>Riwayat Perpindahan Lokasi</Text>
+      </View>
+
+      {items.length === 0 ? (
+        <View style={{ paddingVertical: 12, alignItems: "center" }}>
+          <Text style={{ fontSize: 13, color: colors.textMuted, fontStyle: "italic" }}>
+            Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.timelineContainer}>
+          {items.map((item, index) => {
+            const isLast = index === items.length - 1;
+            const period = item.periodText || item.PeriodText;
+            const rua = item.ruangan || item.Ruangan;
+            const gdg = item.gedung || item.Gedung;
+
+            return (
+              <View key={index} style={styles.timelineItemRow}>
+                <View style={styles.timelineLeftColumn}>
+                  <View style={[styles.timelineDot, isLast ? styles.timelineDotActive : styles.timelineDotInactive]} />
+                  {!isLast && <View style={styles.timelineLine} />}
+                </View>
+                <View style={[styles.timelineContentBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={styles.timelineHeaderRow}>
+                    <View style={styles.dateBadge}>
+                      <Calendar size={12} color="#0284c7" />
+                      <Text style={styles.dateBadgeText}>{period}</Text>
+                    </View>
+                    {isLast && (
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText}>Lokasi Terbaru</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.locationName, { color: colors.text }]}>{rua}</Text>
+                  <View style={styles.locationMetaRow}>
+                    <MapPin size={12} color={colors.textMuted} />
+                    <Text style={[styles.locationMetaText, { color: colors.textMuted }]}>{gdg}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   navbar: {
@@ -274,4 +359,27 @@ const styles = StyleSheet.create({
   periodBtnText: { fontSize: 12, fontWeight: "700" },
   chartPlaceholder: { height: CHART_HEIGHT, justifyContent: "center", alignItems: "center", gap: 8 },
   placeholderText: { fontSize: 13, fontWeight: "600" },
+
+  // Location History Card
+  historyCard: { padding: 16 },
+  historyHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  historyIconCircle: { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center" },
+  historyTitle: { fontSize: 15, fontWeight: "800" },
+  timelineContainer: { paddingLeft: 4 },
+  timelineItemRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  timelineLeftColumn: { alignItems: "center", width: 16 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
+  timelineDotActive: { backgroundColor: "#0284c7", borderWidth: 2, borderColor: "#93c5fd" },
+  timelineDotInactive: { backgroundColor: "#cbd5e1" },
+  timelineLine: { width: 2, flex: 1, backgroundColor: "#e2e8f0", marginTop: 4 },
+  timelineContentBox: { flex: 1, padding: 12, borderRadius: 12, borderWidth: 1, gap: 4 },
+  timelineHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
+  dateBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#eff6ff", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  dateBadgeText: { fontSize: 11, fontWeight: "700", color: "#0284c7" },
+  activeBadge: { backgroundColor: "#dcfce7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  activeBadgeText: { fontSize: 10, fontWeight: "800", color: "#16a34a" },
+  locationName: { fontSize: 14, fontWeight: "800", marginTop: 2 },
+  locationMetaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  locationMetaText: { fontSize: 12, fontWeight: "600" },
 });
+

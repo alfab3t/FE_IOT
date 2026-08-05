@@ -5,7 +5,6 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
@@ -15,7 +14,6 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  Trash2,
   Bell,
   FileText,
   Home,
@@ -24,7 +22,7 @@ import {
 
 export default function NotificationDetailScreen({ route, navigation }) {
   const { notification } = route.params;
-  const { colors, showToast, t, language, translateNotification } = useUser();
+  const { colors, language, t, translateNotification } = useUser();
 
   const time = notification.triggeredDate
     ? notification.triggeredDate.substring(11, 16)
@@ -43,35 +41,6 @@ export default function NotificationDetailScreen({ route, navigation }) {
       });
     }
   }, [notification]);
-
-  const handleDelete = () => {
-    Alert.alert(
-      language === "Indonesia" ? "Hapus Notifikasi" : "Delete Notification",
-      language === "Indonesia" ? "Apakah Anda yakin ingin menghapus notifikasi ini?" : "Are you sure you want to delete this notification?",
-      [
-        { text: t("batal"), style: "cancel" },
-        {
-          text: language === "Indonesia" ? "Hapus" : "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const response = await iotService.deleteNotificationsBulk([notification.id]);
-            if (response.error) {
-              showToast(
-                language === "Indonesia" ? "Gagal menghapus notifikasi." : "Failed to delete notification.",
-                "error"
-              );
-            } else {
-              showToast(
-                language === "Indonesia" ? "Notifikasi berhasil dihapus." : "Notification successfully deleted.",
-                "success"
-              );
-              navigation.goBack();
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const getNotificationTitle = (msg = "") => {
     const lower = msg.toLowerCase();
@@ -108,9 +77,7 @@ export default function NotificationDetailScreen({ route, navigation }) {
         <Text style={[styles.navTitle, { color: colors.text }]}>
           {language === "Indonesia" ? "Detail Notifikasi" : "Notification Detail"}
         </Text>
-        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-          <Trash2 size={22} color="#ef4444" />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

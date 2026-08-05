@@ -182,6 +182,9 @@ export default function NotificationsScreen({ navigation }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
+  // Filter category state: "Semua", "Telah Dibaca", "Belum Dibaca"
+  const [filterCategory, setFilterCategory] = useState("Semua");
+
   const loadNotifications = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
     const response = await iotService.getNotifications();
@@ -201,8 +204,14 @@ export default function NotificationsScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    setFilteredNotifications(notifications);
-  }, [notifications]);
+    let result = notifications;
+    if (filterCategory === "Telah Dibaca") {
+      result = notifications.filter((n) => n.status === "Read" || n.status === "Dibaca");
+    } else if (filterCategory === "Belum Dibaca") {
+      result = notifications.filter((n) => n.status !== "Read" && n.status !== "Dibaca");
+    }
+    setFilteredNotifications(result);
+  }, [notifications, filterCategory]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -377,6 +386,30 @@ export default function NotificationsScreen({ navigation }) {
         )}
       </View>
 
+      {/* 3 Kategori Filter Notifikasi */}
+      <View style={[styles.filterBar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
+        {["Semua", "Telah Dibaca", "Belum Dibaca"].map((cat) => {
+          const isActive = filterCategory === cat;
+          return (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.filterPill,
+                {
+                  backgroundColor: isActive ? "#0059AB" : (theme === "Dark Mode" ? "#1e293b" : "#f1f5f9"),
+                  borderColor: isActive ? "#0059AB" : colors.border,
+                },
+              ]}
+              onPress={() => setFilterCategory(cat)}
+            >
+              <Text style={[styles.filterPillText, { color: isActive ? "#ffffff" : colors.textMuted }]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
@@ -440,6 +473,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+  },
+  filterBar: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   navTitle: {
     fontSize: 16,

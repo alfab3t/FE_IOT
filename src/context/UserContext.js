@@ -424,11 +424,11 @@ export function UserProvider({ children }) {
 
   // User Management Actions
   const addUser = async (userData) => {
-    return await iotService.createUser(userData.username, userData.roleId, userData.status);
+    return await iotService.createUser(userData.username, userData.roleId, userData.status, userData.email, userData.password);
   };
 
   const updateUser = async (userId, userData) => {
-    return await iotService.updateUser(userId, userData.roleId, userData.status);
+    return await iotService.updateUser(userId, userData.roleId, userData.status, userData.email, userData.password);
   };
 
   const deleteUser = async (username) => {

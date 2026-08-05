@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Wind, Snowflake, Compass } from "lucide-react-native";
+import { ArrowLeft, Wind, Snowflake, Compass, Clock } from "lucide-react-native";
 
 export default function AcControlScreen({ route, navigation }) {
   const { user, colors } = useUser();
@@ -27,18 +28,18 @@ export default function AcControlScreen({ route, navigation }) {
   const [fanSpeed, setFanSpeed] = useState("Auto");
   const [swingMode, setSwingMode] = useState("Auto");
   const [isLoading, setIsLoading] = useState(false);
+  const [locationHistory, setLocationHistory] = useState([]);
 
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
   const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
-  const loadAcStatus = async () => {
-    setIsLoading(true);
+  const loadAcStatus = useCallback(async (isInitial = true) => {
+    if (isInitial) setIsLoading(true);
     const selectedDeviceId = route.params?.deviceId;
     
     const response = await iotService.getDashboardLatest();
-    if (response.error) {
-      Alert.alert("Gagal", response.message || "Gagal mengambil status AC.");
-      setIsLoading(false);
+    if (response?.error) {
+      if (isInitial) setIsLoading(false);
       return;
     }
 
@@ -56,6 +57,12 @@ export default function AcControlScreen({ route, navigation }) {
       setActiveBuilding(locText || "Gedung Utama");
       setAcDeviceId(currentDevice.id);
       setIsPowerOn(currentDevice.status === "ON");
+
+      const devDetail = await iotService.getDeviceById(currentDevice.id);
+      const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+      if (Array.isArray(historyList)) {
+        setLocationHistory(historyList);
+      }
 
       const buildingName = currentDevice.gedung || "";
       const tempDevInBuilding = response.find(
@@ -76,12 +83,22 @@ export default function AcControlScreen({ route, navigation }) {
       }
     }
 
-    setIsLoading(false);
-  };
+    if (isInitial) setIsLoading(false);
+  }, [route.params?.deviceId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAcStatus(true);
+    }, [loadAcStatus])
+  );
 
   useEffect(() => {
-    loadAcStatus();
-  }, []);
+    loadAcStatus(true);
+    const timer = setInterval(() => {
+      loadAcStatus(false);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [loadAcStatus]);
 
   const handleViewerBlock = () => {
     Alert.alert("Akses Ditolak", "Anda tidak memiliki akses untuk mengendalikan perangkat (Viewer).");
@@ -312,6 +329,37 @@ export default function AcControlScreen({ route, navigation }) {
                 </TouchableOpacity>
               );
             })}
+          </Card>
+
+          {/* Riwayat Perpindahan Lokasi Timeline */}
+          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Riwayat Perpindahan Lokasi</Text>
+          <Card style={{ backgroundColor: colors.cardBackground, padding: 16, borderRadius: 16, marginVertical: 8 }}>
+            {Array.isArray(locationHistory) && locationHistory.length > 0 ? (
+              locationHistory.map((h, idx) => {
+                const period = h.periodText || h.PeriodText || h.timestampText || h.TimestampText || "-";
+                const room = h.ruangan || h.Ruangan || h.locationName || h.roomName || h.Gedung || "-";
+                return (
+                  <View key={idx} style={{ flexDirection: "row", marginBottom: idx === locationHistory.length - 1 ? 0 : 14 }}>
+                    <View style={{ alignItems: "center", width: 16, marginRight: 12 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 4 }} />
+                      {idx < locationHistory.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 4 }} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB", marginBottom: 2 }}>
+                        {period}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text || "#0f172a" }}>
+                        {room}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
+                Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+              </Text>
+            )}
           </Card>
         </ScrollView>
       )}

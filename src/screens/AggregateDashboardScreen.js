@@ -97,7 +97,13 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
             setPowerPoints(values.map((v) => (v > 100 ? v / 1000.0 : v)));
           } else {
             setTempPoints(values);
-            setHumiPoints(values.map((v) => Math.min(100, Math.max(20, v * 1.2))));
+            // Ambil data kelembapan asli dari API jika sensor
+            let humiRes = await iotService.getGraphAverage("Kelembapan", period);
+            if (!humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
+              setHumiPoints(humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
+            } else {
+              setHumiPoints([]);
+            }
             setPowerPoints([]);
           }
         } else {
@@ -110,7 +116,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
         // Fallback: Fetch category average
         let [suhuRes, humiRes, pwrRes] = await Promise.all([
           iotService.getGraphAverage("Suhu", period),
-          iotService.getGraphAverage("Kelembaban", period),
+          iotService.getGraphAverage("Kelembapan", period),
           iotService.getGraphAverage("Listrik", period),
         ]);
 
@@ -185,9 +191,9 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     propsForLabels: { fontSize: 9 },
   };
 
-  const latestTemp = tempPoints.length > 0 ? tempPoints[tempPoints.length - 1] : 23.5;
-  const latestHumi = humiPoints.length > 0 ? humiPoints[humiPoints.length - 1] : 45.0;
-  const latestPower = powerPoints.length > 0 ? powerPoints[powerPoints.length - 1] : 98.5;
+  const latestTemp = tempPoints.length > 0 ? tempPoints[tempPoints.length - 1] : 0;
+  const latestHumi = humiPoints.length > 0 ? humiPoints[humiPoints.length - 1] : 0;
+  const latestPower = powerPoints.length > 0 ? powerPoints[powerPoints.length - 1] : 0;
 
   const tableLogs = graphLabels.length > 0
     ? graphLabels.map((lbl, idx) => ({
@@ -425,9 +431,6 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
           </TouchableOpacity>
         )}
         <Text style={[styles.navTitle, { color: colors.text }]}>{t("monitoring")}</Text>
-        <TouchableOpacity onPress={() => setDevicePickerVisible(true)} style={{ padding: 8 }}>
-          <SlidersHorizontal size={20} color={colors.textMuted} />
-        </TouchableOpacity>
       </View>
 
       {/* Tabs list */}
@@ -450,21 +453,6 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Device Header Selector Card */}
-        <Card style={[styles.deviceHeaderCard, { backgroundColor: colors.cardBackground }]}>
-          <View>
-            <Text style={[styles.deviceCardName, { color: colors.text }]}>
-              {activeDevice ? activeDevice.name : (language === "Indonesia" ? "Semua Perangkat" : "All Devices")}
-            </Text>
-            <Text style={[styles.deviceCardSub, { color: colors.textMuted }]}>
-              {activeDevice ? (activeDevice.ruangan || "Ruang Meeting") : (language === "Indonesia" ? "Menampilkan rata-rata seluruh sensor" : "Showing all sensor averages")}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => setDevicePickerVisible(true)} style={styles.onlineBadge}>
-            <Text style={styles.onlineBadgeText}>{activeDevice ? "ONLINE" : "SISTEM AKTIF"}</Text>
-          </TouchableOpacity>
-        </Card>
-
         {/* Toggle Mode Buttons: Grafik / Data */}
         <View style={[styles.modeToggleContainer, { backgroundColor: colors.cardBackground }]}>
           <TouchableOpacity
@@ -486,84 +474,6 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
         </View>
         {renderMainContent()}
       </ScrollView>
-
-      {/* Custom Device Selection Modal */}
-      <Modal
-        visible={devicePickerVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setDevicePickerVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.background }]}>
-              <SlidersHorizontal size={32} color="#0059AB" />
-            </View>
-            <Text style={[styles.dialogTitle, { color: colors.text, textAlign: "center", marginBottom: 8 }]}>{t("pilih_perangkat")}</Text>
-
-            <Text style={[styles.dialogMessage, { color: colors.textMuted }]}>
-              {t("pilih_perangkat_desc")}
-            </Text>
-
-            <ScrollView style={{ maxHeight: 200, width: "100%" }} contentContainerStyle={{ paddingBottom: 10 }}>
-              {/* Option 1: Semua Perangkat */}
-              <TouchableOpacity
-                style={[
-                  styles.optionRowBtn,
-                  {
-                    borderColor: !activeDevice ? "#0059AB" : colors.border,
-                    backgroundColor: !activeDevice ? (theme === "Dark Mode" ? "#1e293b" : "#f0f9ff") : "transparent",
-                    marginTop: 8
-                  }
-                ]}
-                onPress={() => {
-                  setActiveDevice(null);
-                  setDevicePickerVisible(false);
-                }}
-              >
-                <Text style={[styles.optionRowText, { color: !activeDevice ? "#0059AB" : colors.text, fontWeight: "700" }]}>
-                  {language === "Indonesia" ? "Semua Perangkat" : "All Devices"}
-                </Text>
-              </TouchableOpacity>
-
-              {devices.map((dev) => {
-                const isSelected = activeDevice?.id === dev.id;
-                return (
-                  <TouchableOpacity
-                    key={dev.id}
-                    style={[
-                      styles.optionRowBtn,
-                      {
-                        borderColor: isSelected ? "#0059AB" : colors.border,
-                        backgroundColor: (() => {
-                          if (!isSelected) return "transparent";
-                          return theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
-                        })(),
-                        marginTop: 8
-                      }
-                    ]}
-                    onPress={() => {
-                      setActiveDevice(dev);
-                      setDevicePickerVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : colors.text }]}>
-                      {dev.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.cancelBtnTextBox, { marginTop: 16 }]}
-              onPress={() => setDevicePickerVisible(false)}
-            >
-              <Text style={[styles.cancelBtnText, { color: colors.textMuted }]}>{t("batal")}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -572,13 +482,31 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
 const thinLabels = (labels) => {
   if (!labels || labels.length === 0) return [];
   const len = labels.length;
-  let n = 3;
-  if (len <= 6) {
-    n = 1;
-  } else if (len <= 12) {
-    n = 2;
-  }
-  return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
+  const n = Math.max(1, Math.ceil(len / 5));
+
+  return labels.map((lbl, i) => {
+    if (!lbl || (i !== 0 && i !== len - 1 && i % n !== 0)) return "";
+    let s = lbl.trim();
+
+    // Membedakan antara Hari Minggu (e.g. "Minggu (26/07)") vs Minggu ke-N (e.g. "Minggu 1 (Agustus 2026)")
+    if (s.includes("(") && s.includes(")")) {
+      const matchParen = s.match(/\(([^)]+)\)/);
+      if (matchParen && matchParen[1]) {
+        const inside = matchParen[1].trim(); // e.g. "26/07" atau "Agustus 2026"
+        // Hanya anggap Minggu ke-N jika diikuti angka (misal: "Minggu 1", "Minggu 2")
+        if (/^Minggu\s+\d+/i.test(s) || /^Mgg\s+\d+/i.test(s)) {
+          const mggNum = s.split("(")[0].replace("Minggu", "M").replace("Mgg", "M").trim();
+          const monthParts = inside.split(" ");
+          const monthShort = monthParts[0] ? monthParts[0].substring(0, 3) : "";
+          return `${mggNum} ${monthShort}`; // e.g. "M1 Jul"
+        }
+        // Jika Hari (termasuk Hari Minggu: "Minggu (26/07)", "Jumat (17/07)", dll.)
+        return inside; // e.g. "26/07", "17/07", "22/07"
+      }
+    }
+
+    return s;
+  });
 };
 
 function TelemetryEmptyState({ hasTelemetry, colors, language }) {
@@ -632,9 +560,11 @@ function SuhuChart({ showSuhu, tempPoints, latestTemp, colors, theme, language, 
           datasets: [{ data: tempPoints }],
         }}
         width={chartWidth - 24}
-        height={180}
+        height={190}
         chartConfig={chartConfig}
         bezier
+        verticalLabelRotation={0}
+        xLabelsOffset={2}
         style={styles.chart}
         withHorizontalLabels={true}
         fromZero={false}
@@ -678,9 +608,11 @@ function HumiChart({ showHumi, humiPoints, latestHumi, colors, theme, language, 
           datasets: [{ data: humiPoints }],
         }}
         width={chartWidth - 24}
-        height={180}
+        height={190}
         chartConfig={chartConfig}
         bezier
+        verticalLabelRotation={0}
+        xLabelsOffset={2}
         style={styles.chart}
         withHorizontalLabels={true}
         fromZero={false}
@@ -724,9 +656,11 @@ function PowerChart({ showPower, powerPoints, latestPower, colors, theme, langua
           datasets: [{ data: powerPoints }],
         }}
         width={chartWidth - 24}
-        height={180}
+        height={190}
         chartConfig={chartConfig}
         bezier
+        verticalLabelRotation={0}
+        xLabelsOffset={2}
         style={styles.chart}
         withHorizontalLabels={true}
         fromZero={false}

@@ -21,6 +21,8 @@ export default function AddUserScreen({ navigation }) {
 
   // Form States
   const [usernameInput, setUsernameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
   const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -35,17 +37,43 @@ export default function AddUserScreen({ navigation }) {
 
   // Validation Error States
   const [usernameError, setUsernameError] = useState("");
-
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const handleSave = async () => {
+    let hasError = false;
+
     if (!usernameInput.trim()) {
-      setUsernameError(language === "Indonesia" ? "Username SIA wajib diisi." : "SSO Username is required.");
-      return;
+      setUsernameError(language === "Indonesia" ? "Username wajib diisi." : "Username is required.");
+      hasError = true;
+    } else {
+      setUsernameError("");
     }
+
+    if (!emailInput.trim()) {
+      setEmailError(language === "Indonesia" ? "Email wajib diisi." : "Email is required.");
+      hasError = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
+      setEmailError(language === "Indonesia" ? "Format email tidak valid." : "Invalid email format.");
+      hasError = true;
+    } else {
+      setEmailError("");
+    }
+
+    if (!passwordInput.trim()) {
+      setPasswordError(language === "Indonesia" ? "Password wajib diisi." : "Password is required.");
+      hasError = true;
+    } else {
+      setPasswordError("");
+    }
+
+    if (hasError) return;
 
     const userData = {
       username: usernameInput.trim(),
-      roleId: role, // Kirim nama role langsung ("Admin", "Owner/Controller", "Viewer")
+      email: emailInput.trim(),
+      password: passwordInput,
+      roleId: role,
       status: status,
     };
 
@@ -54,8 +82,8 @@ export default function AddUserScreen({ navigation }) {
       setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
       setPopupMessage(
         language === "Indonesia" 
-          ? response.message || "Gagal menambahkan pengguna. Pastikan username terdaftar di master SIA." 
-          : "Failed to add new user. Ensure username exists in SSO master."
+          ? response.message || "Gagal menambahkan pengguna." 
+          : "Failed to add new user."
       );
       setPopupType("error");
       setOnConfirmAction(null);
@@ -116,10 +144,10 @@ export default function AddUserScreen({ navigation }) {
         {/* Inputs */}
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
-            {language === "Indonesia" ? "Username SIA" : "SSO Username"}<Text style={styles.redAsterisk}>*</Text>
+            Username<Text style={styles.redAsterisk}>*</Text>
           </Text>
           <Input
-            placeholder={language === "Indonesia" ? "Masukkan Username SIA (Contoh: jeki)" : "Enter SSO Username"}
+            placeholder="Masukkan Username (Contoh: user123)"
             value={usernameInput}
             onChangeText={(val) => {
               setUsernameInput(val);
@@ -131,6 +159,51 @@ export default function AddUserScreen({ navigation }) {
             }}
             autoCapitalize="none"
             error={usernameError}
+          />
+        </View>
+
+        {/* Email Input */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            Email Pengguna<Text style={styles.redAsterisk}>*</Text>
+          </Text>
+          <Input
+            placeholder="Masukkan Email (Contoh: user@gmail.com)"
+            value={emailInput}
+            onChangeText={(val) => {
+              setEmailInput(val);
+              if (!val.trim()) {
+                setEmailError(language === "Indonesia" ? "Email wajib diisi." : "Email is required.");
+              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+                setEmailError(language === "Indonesia" ? "Format email tidak valid." : "Invalid email format.");
+              } else {
+                setEmailError("");
+              }
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            error={emailError}
+          />
+        </View>
+
+        {/* Password Input */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            Password<Text style={styles.redAsterisk}>*</Text>
+          </Text>
+          <Input
+            placeholder="Masukkan Password"
+            value={passwordInput}
+            onChangeText={(val) => {
+              setPasswordInput(val);
+              if (!val.trim()) {
+                setPasswordError(language === "Indonesia" ? "Password wajib diisi." : "Password is required.");
+              } else {
+                setPasswordError("");
+              }
+            }}
+            secureTextEntry={true}
+            error={passwordError}
           />
         </View>
 

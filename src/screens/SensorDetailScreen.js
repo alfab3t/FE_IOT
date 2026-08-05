@@ -9,10 +9,11 @@ import {
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Thermometer, Droplets, MapPin, Wifi, TrendingUp } from "lucide-react-native";
+import { ArrowLeft, Thermometer, Droplets, MapPin, Wifi, TrendingUp, Clock, Calendar, History } from "lucide-react-native";
 import { LineChart } from "react-native-chart-kit";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -37,17 +38,24 @@ export default function SensorDetailScreen({ navigation, route }) {
   const [graphData, setGraphData] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
   const [chartMode, setChartMode] = useState("temp"); // "temp" | "humi"
+  const [locationHistory, setLocationHistory] = useState([]);
 
-  // Load latest readings (Real-time telemetry)
+  // Load latest readings & device detail including location history
   const loadLatestData = useCallback(async (isInitial = true) => {
     if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
+    if (deviceId) {
+      const devDetail = await iotService.getDeviceById(deviceId);
+      const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+      if (Array.isArray(historyList)) {
+        setLocationHistory(historyList);
+      }
+    }
     if (isInitial) setIsLoading(false);
     if (!response.error && Array.isArray(response)) {
       const dev = response.find((d) => d.id === deviceId);
       if (dev) {
         setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
-        // limitMin = LatestValue (Temperature), limitMax = LatestHumidity
         if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
           setTemperature(Number(dev.limitMin));
         }
@@ -58,16 +66,21 @@ export default function SensorDetailScreen({ navigation, route }) {
     }
   }, [deviceId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadLatestData(true);
+      loadChartData(selectedPeriod, chartMode);
+    }, [loadLatestData, loadChartData, selectedPeriod, chartMode])
+  );
+
   // Load chart data
   const loadChartData = useCallback(async (period, mode = chartMode) => {
     setIsChartLoading(true);
     let response;
     const category = mode === "humi" ? "Kelembaban" : "Suhu";
-    if (deviceId) {
+    response = await iotService.getGraphAverage(category, period);
+    if ((!response || response.error || !Array.isArray(response) || response.length === 0) && deviceId) {
       response = await iotService.getDashboardGraph(deviceId, period);
-    }
-    if (!response || response.error || !Array.isArray(response) || response.length === 0) {
-      response = await iotService.getGraphAverage(category, period);
     }
     setIsChartLoading(false);
     if (!response?.error && Array.isArray(response) && response.length > 0) {
@@ -79,15 +92,13 @@ export default function SensorDetailScreen({ navigation, route }) {
 
   useEffect(() => {
     loadLatestData(true);
+    loadChartData(selectedPeriod, chartMode);
     const timer = setInterval(() => {
       loadLatestData(false);
-    }, 5000); // 5s REAL-TIME live telemetry updates
+      loadChartData(selectedPeriod, chartMode);
+    }, 5000); // 5s REAL-TIME live telemetry and graph updates
     return () => clearInterval(timer);
-  }, [loadLatestData]);
-
-  useEffect(() => {
-    loadChartData(selectedPeriod, chartMode);
-  }, [selectedPeriod, chartMode, loadChartData]);
+  }, [loadLatestData, loadChartData, selectedPeriod, chartMode]);
 
   if (isLoading) {
     return (
@@ -108,57 +119,7 @@ export default function SensorDetailScreen({ navigation, route }) {
         <SensorInfoCard deviceName={deviceName} deviceLocation={deviceLocation} deviceStatus={deviceStatus} colors={colors} />
         <SensorReadingsCard temperature={temperature} humidity={humidity} />
         <SensorStatusCard temperature={temperature} humidity={humidity} colors={colors} />
-
-        {/* Chart Section */}
-        <Card style={[styles.chartCard, { backgroundColor: colors.cardBackground }]}>
-          <Text style={[styles.chartTitle, { color: colors.text }]}>Grafik Historis</Text>
-
-          {/* Chart Mode Toggle */}
-          <View style={styles.chartModeRow}>
-            <TouchableOpacity
-              style={[styles.modeBtn, chartMode === "temp" && styles.modeBtnActiveRed]}
-              onPress={() => setChartMode("temp")}
-            >
-              <Thermometer size={14} color={chartMode === "temp" ? "#fff" : "#ef4444"} />
-              <Text style={[styles.modeBtnText, { color: chartMode === "temp" ? "#fff" : colors.textMuted }]}>Suhu</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeBtn, chartMode === "humi" && styles.modeBtnActiveBlue]}
-              onPress={() => setChartMode("humi")}
-            >
-              <Droplets size={14} color={chartMode === "humi" ? "#fff" : "#0284c7"} />
-              <Text style={[styles.modeBtnText, { color: chartMode === "humi" ? "#fff" : colors.textMuted }]}>Kelembaban</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Period Selector */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
-            {PERIOD_OPTIONS.map((p) => {
-              const isActive = selectedPeriod === p.value;
-              return (
-                <TouchableOpacity
-                  key={p.value}
-                  style={[styles.periodBtn, isActive && styles.periodBtnActive]}
-                  onPress={() => setSelectedPeriod(p.value)}
-                >
-                  <Text style={[styles.periodBtnText, { color: isActive ? "#fff" : colors.textMuted }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Chart */}
-          <View style={{ minHeight: CHART_HEIGHT + 20 }}>
-            <SensorChart
-              isChartLoading={isChartLoading}
-              graphData={graphData}
-              chartMode={chartMode}
-              colors={colors}
-            />
-          </View>
-        </Card>
+        <LocationHistoryCard locationHistory={locationHistory} colors={colors} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -330,6 +291,40 @@ function SensorChart({ isChartLoading, graphData, chartMode, colors }) {
   );
 }
 
+function LocationHistoryCard({ locationHistory, colors }) {
+  const items = Array.isArray(locationHistory) ? locationHistory : [];
+
+  return (
+    <Card style={{ padding: 16, marginTop: 12, backgroundColor: colors.cardBackground }}>
+      <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 12 }}>
+        Riwayat Perpindahan Lokasi
+      </Text>
+      {items.length > 0 ? (
+        items.map((h, idx) => (
+          <View key={idx} style={{ flexDirection: "row", gap: 12, marginBottom: idx === items.length - 1 ? 0 : 12 }}>
+            <View style={{ alignItems: "center", width: 14 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
+              {idx < items.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB" }}>
+                {h.periodText || h.PeriodText}
+              </Text>
+              <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>
+                {h.ruangan || h.Ruangan}
+              </Text>
+            </View>
+          </View>
+        ))
+      ) : (
+        <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
+          Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   navbar: {
@@ -374,6 +369,29 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusCardText: { fontSize: 13, fontWeight: "600", flex: 1 },
+
+  // Location History Card
+  historyCard: { padding: 16 },
+  historyHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  historyIconCircle: { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center" },
+  historyTitle: { fontSize: 15, fontWeight: "800" },
+  timelineContainer: { paddingLeft: 4 },
+  timelineItemRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  timelineLeftColumn: { alignItems: "center", width: 16 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
+  timelineDotActive: { backgroundColor: "#0059AB", borderWidth: 2, borderColor: "#93c5fd" },
+  timelineDotInactive: { backgroundColor: "#cbd5e1" },
+  timelineLine: { width: 2, flex: 1, backgroundColor: "#e2e8f0", marginTop: 4 },
+  timelineContentBox: { flex: 1, padding: 12, borderRadius: 12, borderWidth: 1, gap: 4 },
+  timelineHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
+  dateBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#eff6ff", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  dateBadgeText: { fontSize: 11, fontWeight: "700", color: "#0059AB" },
+  activeBadge: { backgroundColor: "#dcfce7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  activeBadgeText: { fontSize: 10, fontWeight: "800", color: "#16a34a" },
+  locationName: { fontSize: 14, fontWeight: "800", marginTop: 2 },
+  locationMetaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  locationMetaText: { fontSize: 12, fontWeight: "600" },
+  updatedByText: { fontSize: 10, fontWeight: "500", marginTop: 2 },
 
   // Chart
   chartCard: { padding: 16 },

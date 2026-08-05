@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Lightbulb } from "lucide-react-native";
+import { ArrowLeft, Lightbulb, Clock } from "lucide-react-native";
 
 export default function LampControlScreen({ navigation }) {
   const { user, colors } = useUser();
@@ -21,17 +22,17 @@ export default function LampControlScreen({ navigation }) {
   const [lampDeviceId, setLampDeviceId] = useState("DEV_LAMP01");
   const [isLampOn, setIsLampOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [locationHistory, setLocationHistory] = useState([]);
 
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
   const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
-  const loadLampStatus = async () => {
-    setIsLoading(true);
+  const loadLampStatus = useCallback(async (isInitial = true) => {
+    if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
-    setIsLoading(false);
 
-    if (response.error) {
-      Alert.alert("Gagal", response.message || "Gagal mengambil status lampu.");
+    if (response?.error) {
+      if (isInitial) setIsLoading(false);
       return;
     }
 
@@ -40,14 +41,30 @@ export default function LampControlScreen({ navigation }) {
       setIsLampOn(firstLamp.status === "ON" || firstLamp.status === "1");
       setLampDeviceId(firstLamp.id);
       setActiveBuilding(`${firstLamp.ruangan} (${firstLamp.gedung})`);
+      const devDetail = await iotService.getDeviceById(firstLamp.id);
+      const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+      if (Array.isArray(historyList)) {
+        setLocationHistory(historyList);
+      }
     } else {
       setActiveBuilding("Lab IoT (Gedung Utama)");
     }
-  };
+    if (isInitial) setIsLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadLampStatus(true);
+    }, [loadLampStatus])
+  );
 
   useEffect(() => {
-    loadLampStatus();
-  }, []);
+    loadLampStatus(true);
+    const timer = setInterval(() => {
+      loadLampStatus(false);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [loadLampStatus]);
 
   const handleToggle = async (value) => {
     if (isViewer) {
@@ -124,6 +141,29 @@ export default function LampControlScreen({ navigation }) {
                 trackColor={{ false: "#dee2e6", true: "#0059AB" }}
                 thumbColor={isLampOn ? "#fff" : "#f4f3f4"}
               />
+            )}
+          </Card>
+
+          {/* Riwayat Perpindahan Lokasi Timeline */}
+          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.text, marginTop: 20, marginBottom: 10 }}>Riwayat Perpindahan Lokasi</Text>
+          <Card style={[styles.controlCard, { backgroundColor: colors.cardBackground, flexDirection: "column", padding: 14 }]}>
+            {Array.isArray(locationHistory) && locationHistory.length > 0 ? (
+              locationHistory.map((h, idx) => (
+                <View key={idx} style={{ flexDirection: "row", gap: 10, marginBottom: idx === locationHistory.length - 1 ? 0 : 10 }}>
+                  <View style={{ alignItems: "center", width: 14 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
+                    {idx < locationHistory.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB" }}>{h.periodText || h.PeriodText}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>{h.ruangan || h.Ruangan}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
+                Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+              </Text>
             )}
           </Card>
         </ScrollView>

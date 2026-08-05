@@ -182,17 +182,17 @@ export const iotService = {
     });
   },
 
-  createUser: async (username, roleId, status = "Aktif") => {
+  createUser: async (username, roleId, status = "Aktif", email = null, password = null) => {
     return await apiClient("/api/Iot/users", {
       method: "POST",
-      body: JSON.stringify({ username, roleId, status }),
+      body: JSON.stringify({ username, roleId, status, email, password }),
     });
   },
 
-  updateUser: async (username, roleId, status = "Aktif") => {
+  updateUser: async (username, roleId, status = "Aktif", email = null, password = null) => {
     return await apiClient("/api/Iot/users", {
       method: "PUT",
-      body: JSON.stringify({ username, roleId, status }),
+      body: JSON.stringify({ username, roleId, status, email, password }),
     });
   },
 

@@ -40,6 +40,7 @@ import {
   User,
   Check,
   ChevronRight,
+  Clock,
 } from "lucide-react-native";
 
 export default function DevicesListScreen({ route, navigation, isTab = false }) {
@@ -270,8 +271,12 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       );
       const resLoc = editFormLocationId ? await iotService.setDeviceLocation(targetId, Number(editFormLocationId)) : { error: false };
 
-      if (resUpdate?.error || resLoc?.error) {
-        showToast(resUpdate?.message || resLoc?.message || "Gagal memperbarui perangkat.", "error");
+      const isUpdateError = resUpdate?.error === true || resUpdate?.status >= 400;
+      const isLocError = resLoc?.error === true || resLoc?.status >= 400;
+
+      if (isUpdateError || isLocError) {
+        const errorMsg = isUpdateError ? resUpdate?.message : resLoc?.message;
+        showToast(errorMsg || "Gagal memperbarui perangkat.", "error");
       } else {
         setEditModalVisible(false);
         await loadDevicesAndLocations();
@@ -350,9 +355,8 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     const cat = dev.category || "";
     const name = dev.name || "";
     if (selectedCategoryFilter === "Lampu") return cat === "Lampu" || name.toLowerCase().includes("lamp");
-    if (selectedCategoryFilter === "AC") return cat === "AC" || name.toLowerCase().includes("ac");
+    if (selectedCategoryFilter === "AC") return cat === "AC" || name.toLowerCase().includes("ac") || name.toLowerCase().includes("air conditioner");
     if (selectedCategoryFilter === "Listrik") return cat === "Listrik" || name.toLowerCase().includes("listrik");
-    if (selectedCategoryFilter === "Debit Air") return cat === "Debit Air" || name.toLowerCase().includes("air");
     if (selectedCategoryFilter === "Temperatur & Kelembaban") {
       return cat === "Temperatur & Kelembaban" || cat.toLowerCase().includes("temp") || cat.toLowerCase().includes("suhu");
     }
@@ -384,11 +388,8 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     if (catLower.includes("lamp") || nameLower.includes("lamp")) {
       return <Lightbulb size={24} color="#eab308" />;
     }
-    if (catLower.includes("ac") || nameLower.includes("ac")) {
+    if (catLower.includes("ac") || nameLower.includes("ac") || nameLower.includes("air conditioner")) {
       return <Cpu size={24} color="#0059AB" />;
-    }
-    if (catLower.includes("air") || nameLower.includes("air") || catLower.includes("debit")) {
-      return <Droplet size={24} color="#10b981" />;
     }
     if (catLower.includes("listrik") || nameLower.includes("listrik") || catLower.includes("pwr")) {
       return <Zap size={24} color="#0284c7" />;
@@ -402,13 +403,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     if (cat === "Lampu" || name.toLowerCase().includes("lamp")) {
       return "";
     }
-    if (cat === "AC" || name.toLowerCase().includes("ac")) {
-      return "";
-    }
-    if (cat === "Debit Air" || name.toLowerCase().includes("debit") || (name.toLowerCase().includes("air") && !name.toLowerCase().includes("pair"))) {
-      if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-        return `${Number(dev.limitMin).toFixed(2)} m³`;
-      }
+    if (cat === "AC" || name.toLowerCase().includes("ac") || name.toLowerCase().includes("air conditioner")) {
       return "";
     }
     if (cat === "Listrik" || name.toLowerCase().includes("listrik") || name.toLowerCase().includes("pwr")) {
@@ -449,23 +444,17 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
             if (cat === "Lampu" || name.includes("lamp")) {
               navigation.navigate("LampControl");
-            } else if (cat === "Debit Air" || name.includes("debit") || (name.includes("air") && !name.includes("pair"))) {
-              navigation.navigate("WaterMeterDetail", {
+            } else if (cat === "AC" || name.includes("ac") || name.includes("air conditioner")) {
+              navigation.navigate("AcControl", {
                 deviceId: item.id,
                 deviceName: item.name,
-                deviceLocation: [item.ruangan, item.gedung].filter(Boolean).join(" — "),
+                deviceLocation: [item.ruangan || item.loc_ruangan, item.gedung || item.loc_gedung].filter(Boolean).join(" — "),
               });
             } else if (cat === "Listrik" || name.includes("listrik") || name.includes("power meter") || name.includes("pwr")) {
               navigation.navigate("PowerMeterDetail", {
                 deviceId: item.id,
                 deviceName: item.name,
                 deviceLocation: [item.ruangan, item.gedung].filter(Boolean).join(" — "),
-              });
-            } else if (cat === "AC" || name.includes("ac")) {
-              navigation.navigate("AcControl", {
-                deviceId: item.id,
-                deviceName: item.name,
-                deviceLocation: [item.ruangan || item.loc_ruangan, item.gedung || item.loc_gedung].filter(Boolean).join(" — "),
               });
             } else {
               navigation.navigate("SensorDetail", {

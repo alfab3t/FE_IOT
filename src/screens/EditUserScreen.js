@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
+import Input from "../components/Input";
 import { ArrowLeft, User, ChevronDown } from "lucide-react-native";
 import NotificationPopup from "../components/NotificationPopup";
 
@@ -19,6 +20,8 @@ export default function EditUserScreen({ route, navigation }) {
   const { editUsername } = route.params;
 
   // Form States
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
   const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -34,7 +37,6 @@ export default function EditUserScreen({ route, navigation }) {
   const [popupConfirmText] = useState("OK");
   const [onConfirmAction, setOnConfirmAction] = useState(null);
 
-
   useEffect(() => {
     const fetchUserDetail = async () => {
       setIsLoading(true);
@@ -43,6 +45,7 @@ export default function EditUserScreen({ route, navigation }) {
       if (!response.error && response.username) {
         setRole(response.roleName || "Viewer");
         setStatus(response.status || "Aktif");
+        setEmailInput(response.email || "");
         setPhoto(response.photo);
       }
     };
@@ -52,7 +55,9 @@ export default function EditUserScreen({ route, navigation }) {
   const handleSave = async () => {
     const userData = {
       username: editUsername,
-      roleId: role, // Kirim nama role langsung ("Admin", "Owner/Controller", "Viewer")
+      email: emailInput.trim(),
+      password: passwordInput,
+      roleId: role,
       status: status,
     };
 
@@ -134,11 +139,38 @@ export default function EditUserScreen({ route, navigation }) {
         {/* Inputs */}
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
-            {language === "Indonesia" ? "Username SIA" : "SSO Username"}
+            Username
           </Text>
           <View style={[styles.rolePickerBox, { backgroundColor: colors.border, borderColor: colors.border }]}>
             <Text style={[styles.rolePickerText, { color: colors.textMuted }]}>{editUsername}</Text>
           </View>
+        </View>
+
+        {/* Email Input */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            Email Pengguna
+          </Text>
+          <Input
+            placeholder="Masukkan Email (Contoh: user@gmail.com)"
+            value={emailInput}
+            onChangeText={(val) => setEmailInput(val)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
+
+        {/* Password Input (Optional for edit) */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            Password Baru (Kosongkan jika tidak diubah)
+          </Text>
+          <Input
+            placeholder="Masukkan Password Baru (Opsional)"
+            value={passwordInput}
+            onChangeText={(val) => setPasswordInput(val)}
+            secureTextEntry={true}
+          />
         </View>
 
         {/* Custom Role Dropdown Picker */}
