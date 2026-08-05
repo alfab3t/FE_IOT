@@ -67,7 +67,8 @@ export default function PowerMeterScreen({ navigation, route }) {
     const response = await iotService.getGraphData(deviceId, period);
     setIsChartLoading(false);
     if (!response.error && Array.isArray(response) && response.length > 0) {
-      setGraphData(response);
+      const sliced = response.length > 7 ? response.slice(-7) : response;
+      setGraphData(sliced);
     } else {
       setGraphData([]);
     }
@@ -89,10 +90,10 @@ export default function PowerMeterScreen({ navigation, route }) {
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
     const len = labels.length;
-    const n = Math.max(1, Math.ceil(len / 5));
+    const n = len > 7 ? Math.max(1, Math.ceil(len / 4)) : 1;
 
     return labels.map((lbl, i) => {
-      if (!lbl || (i !== 0 && i !== len - 1 && i % n !== 0)) return "";
+      if (!lbl || (len > 7 && i !== 0 && i !== len - 1 && i % n !== 0)) return "";
       let s = lbl.trim();
 
       // Formating horizontal ringkas (e.g. "26/07" atau "M1 Jul")

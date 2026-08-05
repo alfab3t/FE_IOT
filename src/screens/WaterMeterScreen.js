@@ -66,7 +66,8 @@ export default function WaterMeterScreen({ navigation, route }) {
     const response = await iotService.getGraphData(deviceId, period);
     setIsChartLoading(false);
     if (!response?.error && Array.isArray(response) && response.length > 0) {
-      setGraphData(response);
+      const sliced = response.length > 7 ? response.slice(-7) : response;
+      setGraphData(sliced);
     } else {
       setGraphData([]);
     }
@@ -92,13 +93,9 @@ export default function WaterMeterScreen({ navigation, route }) {
   // ── Line Chart ────────────────────────────────────────────────────────────
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
-    let n = 3;
-    if (labels.length <= 6) {
-      n = 1;
-    } else if (labels.length <= 12) {
-      n = 2;
-    }
-    return labels.map((lbl, i) => (i % n === 0 ? lbl : ""));
+    const len = labels.length;
+    const n = len > 7 ? Math.max(1, Math.ceil(len / 4)) : 1;
+    return labels.map((lbl, i) => (len > 7 && i % n !== 0 && i !== 0 && i !== len - 1 ? "" : lbl));
   };
 
   const chartConfig = {

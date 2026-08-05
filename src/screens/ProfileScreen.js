@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "../context/UserContext";
 import { authService } from "../services/authService";
+import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import Input from "../components/Input";
 import NotificationPopup from "../components/NotificationPopup";
@@ -57,30 +58,48 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  // Load avatar from AsyncStorage on mount
+  // Load avatar and user detail from backend / AsyncStorage on mount
   useEffect(() => {
     const loadProfileData = async () => {
       try {
         const uKey = (user?.username || "admin").toLowerCase();
-        const globalPhoto = await AsyncStorage.getItem("user_avatar");
-        if (globalPhoto) {
-          setAvatarBase64(globalPhoto);
-          setUser((prev) => ({ ...prev, foto: globalPhoto, photo: globalPhoto }));
-          return;
+
+        // 1. Fetch user email from AsyncStorage or backend
+        const cachedEmail = await AsyncStorage.getItem(`email_${uKey}`);
+        if (cachedEmail) {
+          setUser((prev) => ({ ...(prev || {}), email: cachedEmail }));
         }
 
+        try {
+          const detailRes = await iotService.getUserDetail(user?.username || "admin");
+          if (!detailRes?.error && detailRes?.email) {
+            setUser((prev) => ({
+              ...(prev || {}),
+              email: detailRes.email,
+              fullName: detailRes.fullName || prev?.fullName,
+            }));
+            await AsyncStorage.setItem(`email_${uKey}`, detailRes.email);
+          }
+        } catch (e) {
+          console.warn("Failed to fetch user detail:", e);
+        }
+
+        // 2. Load user's profile photo strictly for this username
         const savedPhoto = await AsyncStorage.getItem(`avatar_${uKey}`);
         if (savedPhoto) {
           setAvatarBase64(savedPhoto);
           setUser((prev) => ({ ...prev, foto: savedPhoto, photo: savedPhoto }));
-          await AsyncStorage.setItem("user_avatar", savedPhoto);
         } else {
-          const response = await authService.getProfilePhoto();
-          if (!response?.error && response?.photo) {
-            setAvatarBase64(response.photo);
-            setUser((prev) => ({ ...prev, foto: response.photo, photo: response.photo }));
-            await AsyncStorage.setItem("user_avatar", response.photo);
-            await AsyncStorage.setItem(`avatar_${uKey}`, response.photo);
+          const existingPhoto = user?.foto || user?.photo || avatarBase64;
+          if (existingPhoto) {
+            await AsyncStorage.setItem(`avatar_${uKey}`, existingPhoto);
+          } else {
+            const response = await authService.getProfilePhoto();
+            if (!response?.error && response?.photo) {
+              setAvatarBase64(response.photo);
+              setUser((prev) => ({ ...prev, foto: response.photo, photo: response.photo }));
+              await AsyncStorage.setItem(`avatar_${uKey}`, response.photo);
+            }
           }
         }
       } catch (e) {
@@ -100,10 +119,9 @@ export default function ProfileScreen({ navigation }) {
       setAvatarBase64(b64);
       // Save profile photo to global context
       setUser((prev) => ({ ...prev, foto: b64, photo: b64 }));
-      // Save profile photo globally and for current username
+      // Save profile photo strictly for current username
       try {
         const uKey = (user?.username || "admin").toLowerCase();
-        await AsyncStorage.setItem("user_avatar", b64);
         await AsyncStorage.setItem(`avatar_${uKey}`, b64);
       } catch (e) {
         console.warn("AsyncStorage save photo failed:", e);
@@ -135,7 +153,7 @@ export default function ProfileScreen({ navigation }) {
     const nextVal = editUsernameValue.trim();
     const oldVal = user?.username || "admin";
     const currentPhoto = avatarBase64 || user?.foto || user?.photo;
-    const currentEmail = user?.email || "danishazlf@astratech.ac.id";
+    const currentEmail = user?.email || (user?.username ? `${user.username.toLowerCase()}@astratech.ac.id` : "");
 
     // 1. Update global user context & local storage immediately (keep email & photo intact!)
     setUser((prev) => ({
@@ -152,9 +170,12 @@ export default function ProfileScreen({ navigation }) {
       await AsyncStorage.setItem("username", nextVal);
       await AsyncStorage.setItem(`nickname_${nextVal.toLowerCase()}`, nextVal);
       if (currentPhoto) {
-        await AsyncStorage.setItem("user_avatar", currentPhoto);
         await AsyncStorage.setItem(`avatar_${nextVal.toLowerCase()}`, currentPhoto);
         await AsyncStorage.setItem(`avatar_${oldVal.toLowerCase()}`, currentPhoto);
+      }
+      if (currentEmail) {
+        await AsyncStorage.setItem(`email_${nextVal.toLowerCase()}`, currentEmail);
+        await AsyncStorage.setItem(`email_${oldVal.toLowerCase()}`, currentEmail);
       }
     } catch (e) {
       console.warn("AsyncStorage write username failed:", e);
@@ -180,7 +201,7 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const roleName = user?.selectedRole?.roleName || "Admin";
-  const userEmail = user?.email || "danishazlf@astratech.ac.id";
+  const userEmail = user?.email || (user?.username ? `${user.username.toLowerCase()}@astratech.ac.id` : "");
   const selectedRoleLower = (user?.selectedRole?.roleName || "").toLowerCase();
   const roleId = user?.selectedRole?.roleId || "";
 

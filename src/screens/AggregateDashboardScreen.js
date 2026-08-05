@@ -71,8 +71,8 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
       if (activeDevice && activeDevice.id) {
         let res = await iotService.getDashboardGraph(activeDevice.id, period);
         if (!res?.error && Array.isArray(res) && res.length > 0) {
-          if (period === "Hourly" && res.length > 8) {
-            res = res.slice(-8);
+          if (res.length > 7) {
+            res = res.slice(-7);
           }
           const values = res.map((pt) => Number.parseFloat(pt.averageValue || 0));
           const labels = res.map((pt) => pt.labelText || "");
@@ -120,32 +120,44 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
           iotService.getGraphAverage("Listrik", period),
         ]);
 
-        if (period === "Hourly") {
-          if (Array.isArray(suhuRes) && suhuRes.length > 8) suhuRes = suhuRes.slice(-8);
-          if (Array.isArray(humiRes) && humiRes.length > 8) humiRes = humiRes.slice(-8);
-          if (Array.isArray(pwrRes) && pwrRes.length > 8) pwrRes = pwrRes.slice(-8);
-        }
+        if (Array.isArray(suhuRes) && suhuRes.length > 7) suhuRes = suhuRes.slice(-7);
+        if (Array.isArray(humiRes) && humiRes.length > 7) humiRes = humiRes.slice(-7);
+        if (Array.isArray(pwrRes) && pwrRes.length > 7) pwrRes = pwrRes.slice(-7);
 
-        let labels = [];
-        if (!suhuRes?.error && Array.isArray(suhuRes) && suhuRes.length > 0) {
+        if (!suhuRes?.error && Array.isArray(suhuRes)) {
           setTempPoints(suhuRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
-          labels = suhuRes.map((pt) => pt.labelText || "");
         } else {
           setTempPoints([]);
         }
 
-        if (!humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
+        if (!humiRes?.error && Array.isArray(humiRes)) {
           setHumiPoints(humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
-          if (labels.length === 0) labels = humiRes.map((pt) => pt.labelText || "");
         } else {
           setHumiPoints([]);
         }
 
-        if (!pwrRes?.error && Array.isArray(pwrRes) && pwrRes.length > 0) {
+        if (!pwrRes?.error && Array.isArray(pwrRes)) {
           setPowerPoints(pwrRes.map((pt) => Number.parseFloat(pt.averageValue || 0) / 1000.0));
-          if (labels.length === 0) labels = pwrRes.map((pt) => pt.labelText || "");
         } else {
           setPowerPoints([]);
+        }
+
+        // Dynamically select labels based on active tab so electricity timestamps (e.g. 00:00-21:00 and dates 04/08, 05/08) are shown accurately
+        let labels = [];
+        if (activeTab === "Listrik" && !pwrRes?.error && Array.isArray(pwrRes) && pwrRes.length > 0) {
+          labels = pwrRes.map((pt) => pt.labelText || "");
+        } else if (activeTab === "Kelembapan" && !humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
+          labels = humiRes.map((pt) => pt.labelText || "");
+        } else if (activeTab === "Suhu" && !suhuRes?.error && Array.isArray(suhuRes) && suhuRes.length > 0) {
+          labels = suhuRes.map((pt) => pt.labelText || "");
+        } else {
+          if (!pwrRes?.error && Array.isArray(pwrRes) && pwrRes.length > 0) {
+            labels = pwrRes.map((pt) => pt.labelText || "");
+          } else if (!suhuRes?.error && Array.isArray(suhuRes) && suhuRes.length > 0) {
+            labels = suhuRes.map((pt) => pt.labelText || "");
+          } else if (!humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
+            labels = humiRes.map((pt) => pt.labelText || "");
+          }
         }
 
         setGraphLabels(labels);
@@ -163,7 +175,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
 
   useEffect(() => {
     loadGraphs(true);
-  }, [timePeriod, activeDevice?.id]);
+  }, [timePeriod, activeDevice?.id, activeTab]);
 
   useEffect(() => {
     let intervalMs = 30000;
@@ -177,7 +189,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshInterval, timePeriod, activeDevice?.id]);
+  }, [refreshInterval, timePeriod, activeDevice?.id, activeTab]);
 
   const chartConfig = {
     backgroundColor: colors.cardBackground,
@@ -482,10 +494,10 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
 const thinLabels = (labels) => {
   if (!labels || labels.length === 0) return [];
   const len = labels.length;
-  const n = Math.max(1, Math.ceil(len / 5));
+  const n = len > 7 ? Math.max(1, Math.ceil(len / 4)) : 1;
 
   return labels.map((lbl, i) => {
-    if (!lbl || (i !== 0 && i !== len - 1 && i % n !== 0)) return "";
+    if (!lbl || (len > 7 && i !== 0 && i !== len - 1 && i % n !== 0)) return "";
     let s = lbl.trim();
 
     // Membedakan antara Hari Minggu (e.g. "Minggu (26/07)") vs Minggu ke-N (e.g. "Minggu 1 (Agustus 2026)")

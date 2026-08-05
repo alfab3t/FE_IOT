@@ -84,7 +84,8 @@ export default function SensorDetailScreen({ navigation, route }) {
     }
     setIsChartLoading(false);
     if (!response?.error && Array.isArray(response) && response.length > 0) {
-      setGraphData(response);
+      const sliced = response.length > 7 ? response.slice(-7) : response;
+      setGraphData(sliced);
     } else {
       setGraphData([]);
     }

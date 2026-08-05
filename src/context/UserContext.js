@@ -384,7 +384,7 @@ export function UserProvider({ children }) {
       foto: response.foto || null,
     });
 
-    // Load custom nickname & avatar in background asynchronously
+    // Load custom nickname, avatar, and email in background asynchronously
     const safeUserKey = (username || "admin").toLowerCase();
     AsyncStorage.getItem(`nickname_${safeUserKey}`).then((nick) => {
       if (nick) setUser((prev) => (prev ? { ...prev, nickname: nick } : prev));
@@ -395,6 +395,26 @@ export function UserProvider({ children }) {
         setUser((prev) => (prev ? { ...prev, foto: savedPhoto } : prev));
       }
     }).catch(() => {});
+
+    AsyncStorage.getItem(`email_${safeUserKey}`).then((savedEmail) => {
+      if (savedEmail) {
+        setUser((prev) => (prev ? { ...prev, email: savedEmail } : prev));
+      }
+    }).catch(() => {});
+
+    try {
+      const { iotService: serviceInstance } = require("../services/iotService");
+      if (serviceInstance && serviceInstance.getUserDetail) {
+        serviceInstance.getUserDetail(username).then((detail) => {
+          if (detail && !detail.error && detail.email) {
+            setUser((prev) => (prev ? { ...prev, email: detail.email } : prev));
+            AsyncStorage.setItem(`email_${safeUserKey}`, detail.email).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn("AsyncStorage/getUserDetail inside login notice:", e);
+    }
 
     return response;
   };
