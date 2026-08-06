@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { AlertTriangle, CheckCircle, XCircle, Info } from "lucide-react-native";
 
-const { width } = Dimensions.get("window");
+const width = Dimensions.get("window")?.width || 360;
 const SWIPE_THRESHOLD = width * 0.35;
 
 export default function SwipeableToast({ message, type, colors, onDismiss, onPress }) {

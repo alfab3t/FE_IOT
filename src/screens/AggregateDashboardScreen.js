@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,16 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
-  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineChart } from "react-native-chart-kit";
 import { iotService } from "../services/iotService";
 import { useUser } from "../context/UserContext";
 import Card from "../components/Card";
-import { ArrowLeft, SlidersHorizontal } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 
-const chartWidth = Dimensions.get("window").width - 32;
+const chartWidth = (Dimensions.get("window")?.width || 360) - 32;
 
 export default function AggregateDashboardScreen({ route, navigation, isTab = false }) {
   const { colors, refreshInterval, theme, t, language } = useUser();
@@ -26,9 +25,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   const [toggleMode, setToggleMode] = useState("Grafik"); // Grafik, Data
   const [timePeriod, setTimePeriod] = useState("Per Jam"); // Per Jam, Per Hari, Per Minggu
 
-  const [devices, setDevices] = useState([]);
   const [activeDevice, setActiveDevice] = useState(null);
-  const [devicePickerVisible, setDevicePickerVisible] = useState(false);
 
   // Telemetry graph & table data
   const [tempPoints, setTempPoints] = useState([]);
@@ -45,122 +42,96 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     const response = await iotService.getDashboardLatest();
     if (isInitialLoad) setIsLoading(false);
 
-    if (!response.error && Array.isArray(response) && response.length > 0) {
-      setDevices(response);
+    if (!response?.error && Array.isArray(response) && response.length > 0) {
       setActiveDevice((prev) => {
-        if (!prev) return null; // Keep null as default for "Semua Perangkat" (System Overview) so graphs never flash/disappear!
+        if (!prev) return null;
         const updated = response.find((d) => d.id === prev.id);
         return updated || prev;
       });
     }
   };
 
-  const loadGraphs = async (showSpinner = false) => {
-    if (showSpinner) setIsGraphLoading(true);
+  const getPeriodKey = (tPeriod) => {
+    if (tPeriod === "Per Hari") return "Daily";
+    if (tPeriod === "Per Minggu") return "Monthly";
+    return "Hourly";
+  };
 
-    let period = "Hourly";
-    if (timePeriod === "Per Jam") {
-      period = "Hourly";
-    } else if (timePeriod === "Per Hari") {
-      period = "Daily";
-    } else if (timePeriod === "Per Minggu") {
-      period = "Monthly";
+  const parseDevCategory = (dev) => {
+    const cat = dev.category || "";
+    const nameLower = (dev.name || "").toLowerCase();
+    return cat === "AC" || cat === "Lampu" || cat === "Listrik" || cat.toLowerCase().includes("power") || nameLower.includes("ac") || nameLower.includes("lamp") || nameLower.includes("power") || nameLower.includes("listrik") || nameLower.includes("pwr");
+  };
+
+  const fetchSingleDeviceGraph = async (dev, period) => {
+    let res = await iotService.getDashboardGraph(dev.id, period);
+    if (res?.error || !Array.isArray(res) || res.length === 0) {
+      setTempPoints([]);
+      setHumiPoints([]);
+      setPowerPoints([]);
+      setGraphLabels([]);
+      return;
     }
 
+    if (res.length > 7) res = res.slice(-7);
+    const values = res.map((pt) => Number.parseFloat(pt.averageValue || 0));
+    setGraphLabels(res.map((pt) => pt.labelText || ""));
+
+    if (parseDevCategory(dev)) {
+      setTempPoints([]);
+      setHumiPoints([]);
+      setPowerPoints(values.map((v) => (v > 100 ? v / 1000.0 : v)));
+    } else {
+      setTempPoints(values);
+      const humiRes = await iotService.getGraphAverage("Kelembaban", period);
+      setHumiPoints(!humiRes?.error && Array.isArray(humiRes) ? humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)) : []);
+      setPowerPoints([]);
+    }
+  };
+
+const extractPoints = (res, divisor = 1.0) => {
+  if (!res || res.error || !Array.isArray(res)) return [];
+  return res.map((pt) => Number.parseFloat(pt.averageValue || 0) / divisor);
+};
+
+const extractLabelsFromRes = (res) => {
+  if (!res || res.error || !Array.isArray(res) || res.length === 0) return null;
+  return res.map((pt) => pt.labelText || "");
+};
+
+const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
+  if (tab === "Listrik") return extractLabelsFromRes(pwrRes) || [];
+  if (tab === "Kelembapan" || tab === "Kelembaban") return extractLabelsFromRes(humiRes) || [];
+  if (tab === "Suhu") return extractLabelsFromRes(suhuRes) || [];
+  return extractLabelsFromRes(pwrRes) || extractLabelsFromRes(suhuRes) || extractLabelsFromRes(humiRes) || [];
+};
+
+  const fetchCategoryAverageGraph = async (period) => {
+    const [suhuRaw, humiRaw, pwrRaw] = await Promise.all([
+      iotService.getGraphAverage("Suhu", period),
+      iotService.getGraphAverage("Kelembaban", period),
+      iotService.getGraphAverage("Listrik", period),
+    ]);
+
+    const suhuRes = Array.isArray(suhuRaw) && suhuRaw.length > 7 ? suhuRaw.slice(-7) : suhuRaw;
+    const humiRes = Array.isArray(humiRaw) && humiRaw.length > 7 ? humiRaw.slice(-7) : humiRaw;
+    const pwrRes = Array.isArray(pwrRaw) && pwrRaw.length > 7 ? pwrRaw.slice(-7) : pwrRaw;
+
+    setTempPoints(extractPoints(suhuRes));
+    setHumiPoints(extractPoints(humiRes));
+    setPowerPoints(extractPoints(pwrRes, 1000.0));
+    setGraphLabels(resolveCategoryLabels(activeTab, suhuRes, humiRes, pwrRes));
+  };
+
+  const loadGraphs = async (showSpinner = false) => {
+    if (showSpinner) setIsGraphLoading(true);
+    const period = getPeriodKey(timePeriod);
+
     try {
-      if (activeDevice && activeDevice.id) {
-        let res = await iotService.getDashboardGraph(activeDevice.id, period);
-        if (!res?.error && Array.isArray(res) && res.length > 0) {
-          if (res.length > 7) {
-            res = res.slice(-7);
-          }
-          const values = res.map((pt) => Number.parseFloat(pt.averageValue || 0));
-          const labels = res.map((pt) => pt.labelText || "");
-          setGraphLabels(labels);
-
-          const cat = activeDevice.category || "";
-          const nameLower = (activeDevice.name || "").toLowerCase();
-          const isAcOrLampOrPowerDev =
-            cat === "AC" ||
-            cat === "Lampu" ||
-            cat === "Listrik" ||
-            cat.toLowerCase().includes("power") ||
-            nameLower.includes("ac") ||
-            nameLower.includes("lamp") ||
-            nameLower.includes("power") ||
-            nameLower.includes("listrik") ||
-            nameLower.includes("pwr");
-
-          if (isAcOrLampOrPowerDev) {
-            setTempPoints([]);
-            setHumiPoints([]);
-            setPowerPoints(values.map((v) => (v > 100 ? v / 1000.0 : v)));
-          } else {
-            setTempPoints(values);
-            // Ambil data kelembapan asli dari API jika sensor
-            let humiRes = await iotService.getGraphAverage("Kelembapan", period);
-            if (!humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
-              setHumiPoints(humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
-            } else {
-              setHumiPoints([]);
-            }
-            setPowerPoints([]);
-          }
-        } else {
-          setTempPoints([]);
-          setHumiPoints([]);
-          setPowerPoints([]);
-          setGraphLabels([]);
-        }
+      if (activeDevice?.id) {
+        await fetchSingleDeviceGraph(activeDevice, period);
       } else {
-        // Fallback: Fetch category average
-        let [suhuRes, humiRes, pwrRes] = await Promise.all([
-          iotService.getGraphAverage("Suhu", period),
-          iotService.getGraphAverage("Kelembapan", period),
-          iotService.getGraphAverage("Listrik", period),
-        ]);
-
-        if (Array.isArray(suhuRes) && suhuRes.length > 7) suhuRes = suhuRes.slice(-7);
-        if (Array.isArray(humiRes) && humiRes.length > 7) humiRes = humiRes.slice(-7);
-        if (Array.isArray(pwrRes) && pwrRes.length > 7) pwrRes = pwrRes.slice(-7);
-
-        if (!suhuRes?.error && Array.isArray(suhuRes)) {
-          setTempPoints(suhuRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
-        } else {
-          setTempPoints([]);
-        }
-
-        if (!humiRes?.error && Array.isArray(humiRes)) {
-          setHumiPoints(humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)));
-        } else {
-          setHumiPoints([]);
-        }
-
-        if (!pwrRes?.error && Array.isArray(pwrRes)) {
-          setPowerPoints(pwrRes.map((pt) => Number.parseFloat(pt.averageValue || 0) / 1000.0));
-        } else {
-          setPowerPoints([]);
-        }
-
-        // Dynamically select labels based on active tab so electricity timestamps (e.g. 00:00-21:00 and dates 04/08, 05/08) are shown accurately
-        let labels = [];
-        if (activeTab === "Listrik" && !pwrRes?.error && Array.isArray(pwrRes) && pwrRes.length > 0) {
-          labels = pwrRes.map((pt) => pt.labelText || "");
-        } else if (activeTab === "Kelembapan" && !humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
-          labels = humiRes.map((pt) => pt.labelText || "");
-        } else if (activeTab === "Suhu" && !suhuRes?.error && Array.isArray(suhuRes) && suhuRes.length > 0) {
-          labels = suhuRes.map((pt) => pt.labelText || "");
-        } else {
-          if (!pwrRes?.error && Array.isArray(pwrRes) && pwrRes.length > 0) {
-            labels = pwrRes.map((pt) => pt.labelText || "");
-          } else if (!suhuRes?.error && Array.isArray(suhuRes) && suhuRes.length > 0) {
-            labels = suhuRes.map((pt) => pt.labelText || "");
-          } else if (!humiRes?.error && Array.isArray(humiRes) && humiRes.length > 0) {
-            labels = humiRes.map((pt) => pt.labelText || "");
-          }
-        }
-
-        setGraphLabels(labels);
+        await fetchCategoryAverageGraph(period);
       }
     } catch (err) {
       console.error("loadGraphs error:", err);
@@ -208,13 +179,36 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   const latestPower = powerPoints.length > 0 ? powerPoints[powerPoints.length - 1] : 0;
 
   const tableLogs = graphLabels.length > 0
-    ? graphLabels.map((lbl, idx) => ({
-        time: lbl,
-        temp: tempPoints[idx] !== undefined ? tempPoints[idx].toFixed(1) : latestTemp.toFixed(1),
-        hum: humiPoints[idx] !== undefined ? humiPoints[idx].toFixed(1) : latestHumi.toFixed(1),
-        power: powerPoints[idx] !== undefined ? powerPoints[idx].toFixed(1) : latestPower.toFixed(1),
-        status: "Normal"
-      })).reverse()
+    ? graphLabels.map((lbl, idx) => {
+        let tempVal = "-";
+        if (tempPoints[idx] !== undefined && tempPoints[idx] !== null) {
+          tempVal = tempPoints[idx].toFixed(1);
+        } else if (tempPoints.length > 0) {
+          tempVal = tempPoints[tempPoints.length - 1].toFixed(1);
+        }
+
+        let humVal = "-";
+        if (humiPoints[idx] !== undefined && humiPoints[idx] !== null) {
+          humVal = humiPoints[idx].toFixed(1);
+        } else if (humiPoints.length > 0) {
+          humVal = humiPoints[humiPoints.length - 1].toFixed(1);
+        }
+
+        let powerVal = "-";
+        if (powerPoints[idx] !== undefined && powerPoints[idx] !== null) {
+          powerVal = powerPoints[idx].toFixed(1);
+        } else if (powerPoints.length > 0) {
+          powerVal = powerPoints[powerPoints.length - 1].toFixed(1);
+        }
+
+        return {
+          time: lbl,
+          temp: tempVal,
+          hum: humVal,
+          power: powerVal,
+          status: "Normal"
+        };
+      }).reverse()
     : [];
 
   const deviceCategory = (activeDevice?.category || "").toLowerCase();
@@ -249,35 +243,108 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     return tempPoints.length > 0 || humiPoints.length > 0 || powerPoints.length > 0;
   })();
 
+  const renderTableHeadCells = () => {
+    if (activeTab !== "Semua") {
+      return <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>;
+    }
+    if (isAcOrLampOrPower) {
+      return <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("listrik")} (kWh)</Text>;
+    }
+    if (activeDevice) {
+      return (
+        <>
+          <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
+          <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
+        </>
+      );
+    }
+    return (
+      <>
+        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
+        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
+        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("listrik")}</Text>
+      </>
+    );
+  };
+
+  const renderTableRowCells = (log) => {
+    if (activeTab === "Suhu") {
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.temp}</Text>;
+    }
+    if (activeTab === "Kelembapan") {
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.hum}</Text>;
+    }
+    if (activeTab === "Listrik") {
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power}</Text>;
+    }
+    if (isAcOrLampOrPower) {
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power} kWh</Text>;
+    }
+    if (activeDevice) {
+      return (
+        <>
+          <Text style={[styles.tdText, { flex: 1.5, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
+          <Text style={[styles.tdText, { flex: 1.5, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
+        </>
+      );
+    }
+    return (
+      <>
+        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
+        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
+        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.power}</Text>
+      </>
+    );
+  };
+
+  const getEmptyTableNotice = () => {
+    if (activeTab === "Suhu" && isAcOrLampOrPower) return "Perangkat ini tidak mengukur data suhu.";
+    if (activeTab === "Kelembapan" && isAcOrLampOrPower) return "Perangkat ini tidak mengukur data kelembapan.";
+    if (activeTab === "Listrik" && !isAcOrLampOrPower && activeDevice) return "Perangkat ini tidak mengukur daya listrik.";
+    return language === "Indonesia" ? "Belum ada riwayat data tabel pada periode ini." : "No historical data table recorded for this period.";
+  };
+
   const renderDataTableMode = () => {
     let activeTabTranslated = t("semua");
-    if (activeTab === "Suhu") {
-      activeTabTranslated = t("suhu");
-    } else if (activeTab === "Kelembapan") {
-      activeTabTranslated = t("kelembapan");
-    } else if (activeTab === "Listrik") {
-      activeTabTranslated = t("listrik");
-    }
+    if (activeTab === "Suhu") activeTabTranslated = t("suhu");
+    else if (activeTab === "Kelembapan") activeTabTranslated = t("kelembapan");
+    else if (activeTab === "Listrik") activeTabTranslated = t("listrik");
+
     const tableTitleText = `${t("data_tab")} ${activeTabTranslated}`;
+    let unit = t("semua");
+    if (activeTab === "Suhu") unit = "°C";
+    else if (activeTab === "Kelembapan") unit = "%";
+    else if (activeTab === "Listrik") unit = "kWh";
+
+    if (isGraphLoading) {
+      return (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#0059AB" />
+          <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>Memuat data tabel...</Text>
+        </View>
+      );
+    }
+
+    if (!hasTelemetry || tableLogs.length === 0) {
+      return (
+        <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground, padding: 24, alignItems: "center" }]}>
+          <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16, textAlign: "center", marginBottom: 8 }}>
+            {language === "Indonesia" ? "Tidak Ada Data Telemetri" : "No Telemetry Data"}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
+            {getEmptyTableNotice()}
+          </Text>
+        </Card>
+      );
+    }
 
     return (
       <View>
         <View style={styles.tableHeaderRow}>
-          <Text style={[styles.tableTitle, { color: colors.text }]}>
-            {tableTitleText}
-          </Text>
-          <Text style={[styles.unitSubtitle, { color: colors.textMuted }]}>
-            {(() => {
-              let unit = t("semua");
-              if (activeTab === "Suhu") unit = "°C";
-              else if (activeTab === "Kelembapan") unit = "%";
-              else if (activeTab === "Listrik") unit = "kWh";
-              return `${t("satuan")}: ${unit}`;
-            })()}
-          </Text>
+          <Text style={[styles.tableTitle, { color: colors.text }]}>{tableTitleText}</Text>
+          <Text style={[styles.unitSubtitle, { color: colors.textMuted }]}>{`${t("satuan")}: ${unit}`}</Text>
         </View>
 
-        {/* Time Period Filter above Table */}
         <View style={[styles.timeFilterRow, { marginTop: 0, marginBottom: 16 }]}>
           {["Per Jam", "Per Hari", "Per Minggu"].map((p) => {
             const active = timePeriod === p;
@@ -291,106 +358,31 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
                 ]}
                 onPress={() => setTimePeriod(p)}
               >
-                <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>
-                  {p}
-                </Text>
+                <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>{p}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {isGraphLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#0059AB" />
-            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>Memuat data tabel...</Text>
+        <Card style={[styles.tableCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+          <View style={[styles.tableHead, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.thText, { flex: 1.2, color: colors.textMuted }]}>{t("waktu")}</Text>
+            {renderTableHeadCells()}
+            <Text style={[styles.thText, { flex: 1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
           </View>
-        ) : !hasTelemetry || tableLogs.length === 0 ? (
-          <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground, padding: 24, alignItems: "center" }]}>
-            <Text style={{ color: colors.text, fontWeight: "700", fontSize: 16, textAlign: "center", marginBottom: 8 }}>
-              {language === "Indonesia" ? "Tidak Ada Data Telemetri" : "No Telemetry Data"}
-            </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
-              {(() => {
-                if (activeTab === "Suhu" && isAcOrLampOrPower) {
-                  return "Perangkat ini tidak mengukur data suhu.";
-                }
-                if (activeTab === "Kelembapan" && isAcOrLampOrPower) {
-                  return "Perangkat ini tidak mengukur data kelembapan.";
-                }
-                if (activeTab === "Listrik" && !isAcOrLampOrPower && activeDevice) {
-                  return "Perangkat ini tidak mengukur daya listrik.";
-                }
-                return language === "Indonesia"
-                  ? "Belum ada riwayat data tabel pada periode ini."
-                  : "No historical data table recorded for this period.";
-              })()}
-            </Text>
-          </Card>
-        ) : (
-          <>
-            <Card style={[styles.tableCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
-              {/* Header */}
-              <View style={[styles.tableHead, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.thText, { flex: 1.2, color: colors.textMuted }]}>{t("waktu")}</Text>
-                {activeTab === "Semua" ? (
-                  isAcOrLampOrPower ? (
-                    <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("listrik")} (kWh)</Text>
-                  ) : activeDevice ? (
-                    <>
-                      <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
-                      <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
-                      <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
-                      <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("listrik")}</Text>
-                    </>
-                  )
-                ) : (
-                  <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>
-                )}
-                <Text style={[styles.thText, { flex: 1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
-              </View>
 
-              {/* Data Rows */}
-              {tableLogs.map((log, idx) => (
-                <View key={log.time + idx} style={[styles.tableRow, idx === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.tdText, { flex: 1.2, color: colors.textMuted }]}>{log.time}</Text>
-                  {activeTab === "Semua" ? (
-                    isAcOrLampOrPower ? (
-                      <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power} kWh</Text>
-                    ) : activeDevice ? (
-                      <>
-                        <Text style={[styles.tdText, { flex: 1.5, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
-                        <Text style={[styles.tdText, { flex: 1.5, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
-                        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
-                        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.power}</Text>
-                      </>
-                    )
-                  ) : (
-                    <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>
-                      {(() => {
-                        if (activeTab === "Suhu") return `${log.temp} °C`;
-                        if (activeTab === "Kelembapan") return `${log.hum} %`;
-                        return `${log.power} kWh`;
-                      })()}
-                    </Text>
-                  )}
-                  <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
-                    <View style={styles.normalDot} />
-                    <Text style={[styles.tdText, { flex: 0, color: "#10b981", fontWeight: "700" }]}>{log.status}</Text>
-                  </View>
-                </View>
-              ))}
-            </Card>
-            <Text style={[styles.tableFooterInfo, { color: colors.textMuted }]}>{t("tampil_data_terbaru")}</Text>
-          </>
-        )}
+          {tableLogs.map((log, idx) => (
+            <View key={log.time + idx} style={[styles.tableRow, idx === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.tdText, { flex: 1.2, color: colors.textMuted }]}>{log.time}</Text>
+              {renderTableRowCells(log)}
+              <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+                <View style={styles.normalDot} />
+                <Text style={[styles.tdText, { flex: 0, color: "#10b981", fontWeight: "700" }]}>{log.status || t("normal")}</Text>
+              </View>
+            </View>
+          ))}
+        </Card>
+        <Text style={[styles.tableFooterInfo, { color: colors.textMuted }]}>{t("tampil_data_terbaru")}</Text>
       </View>
     );
   };
@@ -501,19 +493,17 @@ const thinLabels = (labels) => {
     let s = lbl.trim();
 
     // Membedakan antara Hari Minggu (e.g. "Minggu (26/07)") vs Minggu ke-N (e.g. "Minggu 1 (Agustus 2026)")
-    if (s.includes("(") && s.includes(")")) {
-      const matchParen = s.match(/\(([^)]+)\)/);
-      if (matchParen && matchParen[1]) {
-        const inside = matchParen[1].trim(); // e.g. "26/07" atau "Agustus 2026"
-        // Hanya anggap Minggu ke-N jika diikuti angka (misal: "Minggu 1", "Minggu 2")
+    if (s.includes("(") && s.endsWith(")")) {
+      const openIdx = s.indexOf("(");
+      if (openIdx !== -1) {
+        const inside = s.slice(openIdx + 1, -1).trim();
         if (/^Minggu\s+\d+/i.test(s) || /^Mgg\s+\d+/i.test(s)) {
-          const mggNum = s.split("(")[0].replace("Minggu", "M").replace("Mgg", "M").trim();
+          const mggNum = s.slice(0, openIdx).replace("Minggu", "M").replace("Mgg", "M").trim();
           const monthParts = inside.split(" ");
           const monthShort = monthParts[0] ? monthParts[0].substring(0, 3) : "";
-          return `${mggNum} ${monthShort}`; // e.g. "M1 Jul"
+          return `${mggNum} ${monthShort}`;
         }
-        // Jika Hari (termasuk Hari Minggu: "Minggu (26/07)", "Jumat (17/07)", dll.)
-        return inside; // e.g. "26/07", "17/07", "22/07"
+        return inside;
       }
     }
 
@@ -850,134 +840,106 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
       );
     };
 
-    const renderContentForTab = () => {
-      if (activeTab === "Suhu") {
-        return renderSuhuSection();
+    const renderSemuaActiveDevice = () => {
+      if (isAcOrLampOrPowerDev) {
+        if (powerPoints.length > 0) return renderPowerSection();
+        return <TelemetryEmptyState hasTelemetry={false} colors={colors} language={language} />;
       }
-      if (activeTab === "Kelembapan") {
-        return renderHumiSection();
+      const hasTemp = tempPoints.length > 0;
+      const hasHumi = humiPoints.length > 0;
+      if (!hasTemp && !hasHumi) {
+        return <TelemetryEmptyState hasTelemetry={false} colors={colors} language={language} />;
       }
-      if (activeTab === "Listrik") {
-        return renderPowerSection();
-      }
+      return (
+        <>
+          {hasTemp && (
+            <SuhuChart
+              showSuhu={true}
+              tempPoints={tempPoints}
+              latestTemp={latestTemp}
+              colors={colors}
+              theme={theme}
+              language={language}
+              t={t}
+              graphLabels={graphLabels}
+              chartConfig={chartConfig}
+            />
+          )}
+          {hasHumi && (
+            <HumiChart
+              showHumi={true}
+              humiPoints={humiPoints}
+              latestHumi={latestHumi}
+              colors={colors}
+              theme={theme}
+              language={language}
+              t={t}
+              graphLabels={graphLabels}
+              chartConfig={chartConfig}
+            />
+          )}
+        </>
+      );
+    };
 
-      // activeTab === "Semua"
-      // Tampilkan data yang ada saja (tanpa card kosong jika perangkat hanya mendukung tipe telemetri tertentu)
-      if (activeDevice) {
-        if (isAcOrLampOrPowerDev) {
-          // Perangkat Elektronik: Hanya tampilkan Listrik (jika ada data)
-          if (powerPoints.length > 0) {
-            return renderPowerSection();
-          }
-          return (
-            <TelemetryEmptyState
-              hasTelemetry={false}
-              colors={colors}
-              language={language}
-            />
-          );
-        } else {
-          // Perangkat Suhu & Kelembapan: Tampilkan Suhu dan/atau Kelembapan
-          const hasTemp = tempPoints.length > 0;
-          const hasHumi = humiPoints.length > 0;
-          if (!hasTemp && !hasHumi) {
-            return (
-              <TelemetryEmptyState
-                hasTelemetry={false}
-                colors={colors}
-                language={language}
-              />
-            );
-          }
-          return (
-            <>
-              {hasTemp && (
-                <SuhuChart
-                  showSuhu={true}
-                  tempPoints={tempPoints}
-                  latestTemp={latestTemp}
-                  colors={colors}
-                  theme={theme}
-                  language={language}
-                  t={t}
-                  graphLabels={graphLabels}
-                  chartConfig={chartConfig}
-                />
-              )}
-              {hasHumi && (
-                <HumiChart
-                  showHumi={true}
-                  humiPoints={humiPoints}
-                  latestHumi={latestHumi}
-                  colors={colors}
-                  theme={theme}
-                  language={language}
-                  t={t}
-                  graphLabels={graphLabels}
-                  chartConfig={chartConfig}
-                />
-              )}
-            </>
-          );
-        }
-      } else {
-        // activeDevice === null ("Semua Perangkat / Ringkasan Sistem")
-        const hasTemp = tempPoints.length > 0;
-        const hasHumi = humiPoints.length > 0;
-        const hasPower = powerPoints.length > 0;
-        if (!hasTemp && !hasHumi && !hasPower) {
-          return (
-            <TelemetryEmptyState
-              hasTelemetry={false}
-              colors={colors}
-              language={language}
-            />
-          );
-        }
-        return (
-          <>
-            {hasTemp && (
-              <SuhuChart
-                showSuhu={true}
-                tempPoints={tempPoints}
-                latestTemp={latestTemp}
-                colors={colors}
-                theme={theme}
-                language={language}
-                t={t}
-                graphLabels={graphLabels}
-                chartConfig={chartConfig}
-              />
-            )}
-            {hasHumi && (
-              <HumiChart
-                showHumi={true}
-                humiPoints={humiPoints}
-                latestHumi={latestHumi}
-                colors={colors}
-                theme={theme}
-                language={language}
-                t={t}
-                graphLabels={graphLabels}
-                chartConfig={chartConfig}
-              />
-            )}
-            {hasPower && (
-              <PowerChart
-                showPower={true}
-                powerPoints={powerPoints}
-                latestPower={latestPower}
-                colors={colors}
-                theme={theme}
-                language={language}
-                t={t}
-                graphLabels={graphLabels}
-                chartConfig={chartConfig}
-              />
-            )}
-          </>
-        );
+    const renderSemuaSummary = () => {
+      const hasTemp = tempPoints.length > 0;
+      const hasHumi = humiPoints.length > 0;
+      const hasPower = powerPoints.length > 0;
+      if (!hasTemp && !hasHumi && !hasPower) {
+        return <TelemetryEmptyState hasTelemetry={false} colors={colors} language={language} />;
       }
+      return (
+        <>
+          {hasTemp && (
+            <SuhuChart
+              showSuhu={true}
+              tempPoints={tempPoints}
+              latestTemp={latestTemp}
+              colors={colors}
+              theme={theme}
+              language={language}
+              t={t}
+              graphLabels={graphLabels}
+              chartConfig={chartConfig}
+            />
+          )}
+          {hasHumi && (
+            <HumiChart
+              showHumi={true}
+              humiPoints={humiPoints}
+              latestHumi={latestHumi}
+              colors={colors}
+              theme={theme}
+              language={language}
+              t={t}
+              graphLabels={graphLabels}
+              chartConfig={chartConfig}
+            />
+          )}
+          {hasPower && (
+            <PowerChart
+              showPower={true}
+              powerPoints={powerPoints}
+              latestPower={latestPower}
+              colors={colors}
+              theme={theme}
+              language={language}
+              t={t}
+              graphLabels={graphLabels}
+              chartConfig={chartConfig}
+            />
+          )}
+        </>
+      );
+    };
+
+    const renderContentForTab = () => {
+      if (activeTab === "Suhu") return renderSuhuSection();
+      if (activeTab === "Kelembapan") return renderHumiSection();
+      if (activeTab === "Listrik") return renderPowerSection();
+      if (activeDevice) return renderSemuaActiveDevice();
+      return renderSemuaSummary();
     };
 
     return (

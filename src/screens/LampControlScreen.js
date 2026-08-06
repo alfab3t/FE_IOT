@@ -6,15 +6,37 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Lightbulb, Clock } from "lucide-react-native";
+import { ArrowLeft, Lightbulb } from "lucide-react-native";
+
+function LocationHistoryTimeline({ locationHistory, colors }) {
+  if (!Array.isArray(locationHistory) || locationHistory.length === 0) {
+    return (
+      <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
+        Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+      </Text>
+    );
+  }
+  return locationHistory.map((h, idx) => (
+    <View key={h.id || h.historyId || `loc-${idx}`} style={{ flexDirection: "row", gap: 10, marginBottom: idx === locationHistory.length - 1 ? 0 : 10 }}>
+      <View style={{ alignItems: "center", width: 14 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
+        {idx < locationHistory.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB" }}>{h.periodText || h.PeriodText}</Text>
+        <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>{h.ruangan || h.Ruangan}</Text>
+      </View>
+    </View>
+  ));
+}
 
 export default function LampControlScreen({ navigation }) {
   const { user, colors } = useUser();
@@ -27,6 +49,17 @@ export default function LampControlScreen({ navigation }) {
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
   const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
+  const processLampDevice = async (firstLamp) => {
+    setIsLampOn(firstLamp.status === "ON" || firstLamp.status === "1");
+    setLampDeviceId(firstLamp.id);
+    setActiveBuilding(`${firstLamp.ruangan} (${firstLamp.gedung})`);
+    const devDetail = await iotService.getDeviceById(firstLamp.id);
+    const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+    if (Array.isArray(historyList)) {
+      setLocationHistory(historyList);
+    }
+  };
+
   const loadLampStatus = useCallback(async (isInitial = true) => {
     if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
@@ -38,14 +71,7 @@ export default function LampControlScreen({ navigation }) {
 
     const firstLamp = response.find((d) => d.category === "Lampu" || d.name?.toLowerCase().includes("lamp"));
     if (firstLamp) {
-      setIsLampOn(firstLamp.status === "ON" || firstLamp.status === "1");
-      setLampDeviceId(firstLamp.id);
-      setActiveBuilding(`${firstLamp.ruangan} (${firstLamp.gedung})`);
-      const devDetail = await iotService.getDeviceById(firstLamp.id);
-      const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
-      if (Array.isArray(historyList)) {
-        setLocationHistory(historyList);
-      }
+      await processLampDevice(firstLamp);
     } else {
       setActiveBuilding("Lab IoT (Gedung Utama)");
     }
@@ -84,9 +110,18 @@ export default function LampControlScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Navbar */}
+      {/* Header / Navbar */}
       <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate("Home");
+            }
+          }}
+        >
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: colors.text }]}>Kontrol Lampu</Text>
@@ -96,75 +131,59 @@ export default function LampControlScreen({ navigation }) {
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Menghubungkan lampu...</Text>
+          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Memuat status lampu...</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Active Info */}
-          <Text style={[styles.activeBuildingText, { color: colors.textMuted }]}>Lokasi: {activeBuilding}</Text>
+          <Text style={[styles.activeBuildingText, { color: colors.textMuted }]}>
+            {activeBuilding || "Lab IoT (Gedung Utama)"}
+          </Text>
 
-          {/* Lamp Visual Representation */}
+          {/* Visual Lampu Glowing */}
           <View style={styles.lampVisualContainer}>
             <View
               style={[
                 styles.glowCircle,
-                isLampOn ? styles.glowCircleOn : [styles.glowCircleOff, { backgroundColor: colors.border }],
+                isLampOn ? styles.glowCircleOn : styles.glowCircleOff,
               ]}
             >
               <Lightbulb
                 size={80}
-                color={isLampOn ? "#eab308" : "#adb5bd"}
+                color={isLampOn ? "#eab308" : "#94a3b8"}
                 style={styles.lampIcon}
               />
             </View>
             <Text style={[styles.lampStatusLabel, { color: colors.text }]}>
-              Status Lampu: {isLampOn ? "MENYALA 💡" : "PADAM 😴"}
+              {isLampOn ? "Lampu Menyala (ON)" : "Lampu Mati (OFF)"}
             </Text>
           </View>
 
-          {/* Control Switch Card */}
+          {/* Saklar Utama Card */}
           <Card style={[styles.controlCard, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.controlHeader}>
-              <Text style={[styles.controlTitle, { color: colors.text }]}>Sakelar Lampu</Text>
+              <Text style={[styles.controlTitle, { color: colors.text }]}>Saklar Utama</Text>
               <Text style={[styles.controlSubtitle, { color: colors.textMuted }]}>
-                {isViewer ? "Status lampu saat ini (Mode Lihat)." : "Hidupkan atau matikan aliran listrik lampu utama."}
+                Kontrol daya lampu ruangan secara langsung
               </Text>
             </View>
             {isViewer ? (
-              <View style={[styles.readOnlyBadge, { backgroundColor: colors.border }]}>
-                <Text style={[styles.readOnlyText, { color: colors.textMuted }]}>Read Only</Text>
-              </View>
+              <Text style={{ color: colors.textMuted, fontSize: 13, fontStyle: "italic" }}>Viewer (Hanya Lihat)</Text>
             ) : (
               <Switch
                 value={isLampOn}
                 onValueChange={handleToggle}
-                trackColor={{ false: "#dee2e6", true: "#0059AB" }}
-                thumbColor={isLampOn ? "#fff" : "#f4f3f4"}
+                trackColor={{ false: "#cbd5e1", true: "#0059AB" }}
+                thumbColor={isLampOn ? "#ffffff" : "#f1f5f9"}
               />
             )}
           </Card>
 
           {/* Riwayat Perpindahan Lokasi Timeline */}
-          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.text, marginTop: 20, marginBottom: 10 }}>Riwayat Perpindahan Lokasi</Text>
-          <Card style={[styles.controlCard, { backgroundColor: colors.cardBackground, flexDirection: "column", padding: 14 }]}>
-            {Array.isArray(locationHistory) && locationHistory.length > 0 ? (
-              locationHistory.map((h, idx) => (
-                <View key={idx} style={{ flexDirection: "row", gap: 10, marginBottom: idx === locationHistory.length - 1 ? 0 : 10 }}>
-                  <View style={{ alignItems: "center", width: 14 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
-                    {idx < locationHistory.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB" }}>{h.periodText || h.PeriodText}</Text>
-                    <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>{h.ruangan || h.Ruangan}</Text>
-                  </View>
-                </View>
-              ))
-            ) : (
-              <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
-                Belum ada riwayat perpindahan lokasi untuk perangkat ini.
-              </Text>
-            )}
+          <Text style={{ fontSize: 15, fontWeight: "800", color: colors.text, marginTop: 24, marginBottom: 12 }}>
+            Riwayat Perpindahan Lokasi
+          </Text>
+          <Card style={{ backgroundColor: colors.cardBackground, borderRadius: 16, padding: 16 }}>
+            <LocationHistoryTimeline locationHistory={locationHistory} colors={colors} />
           </Card>
         </ScrollView>
       )}

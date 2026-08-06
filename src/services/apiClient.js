@@ -52,10 +52,10 @@ const apiClient = async (endpoint, options = {}, params = null) => {
     }
 
     const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      return await response.json();
+    if (contentType?.includes("application/json")) {
+      return response.json();
     }
-    return await response.text();
+    return response.text();
   } catch (err) {
     return {
       error: true,

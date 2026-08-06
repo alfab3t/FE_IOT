@@ -12,10 +12,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Zap, TrendingUp, MapPin, Wifi, Clock } from "lucide-react-native";
+import { ArrowLeft, Zap, TrendingUp, MapPin, Wifi } from "lucide-react-native";
 import { LineChart } from "react-native-chart-kit";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const SCREEN_WIDTH = Dimensions.get("window")?.width || 360;
 const CHART_WIDTH = SCREEN_WIDTH - 32 - 32; // padding horizontal
 const CHART_HEIGHT = 160;
 
@@ -36,28 +36,32 @@ export default function PowerMeterScreen({ navigation, route }) {
   const [graphData, setGraphData] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
 
+  const updateDeviceState = (dev) => {
+    if (!dev) {
+      setLatestValue(null);
+      return;
+    }
+    setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
+    if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
+      const val = Number(dev.limitMin);
+      setLatestValue(val > 100 ? val / 1000.0 : val);
+    } else {
+      setLatestValue(null);
+    }
+  };
+
   // Load latest reading from dashboard (Real-time telemetry)
   const loadLatestData = useCallback(async (isInitial = true) => {
     if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
     if (isInitial) setIsLoading(false);
-    if (!response.error && Array.isArray(response)) {
+    if (!response?.error && Array.isArray(response)) {
       const dev = response.find(
         (d) =>
           d.id === deviceId ||
           (d.name && deviceName && d.name.toLowerCase() === deviceName.toLowerCase())
       );
-      if (dev) {
-        setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
-        if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-          const val = Number(dev.limitMin);
-          setLatestValue(val > 100 ? val / 1000.0 : val);
-        } else {
-          setLatestValue(null);
-        }
-      } else {
-        setLatestValue(null);
-      }
+      updateDeviceState(dev);
     }
   }, [deviceId, deviceName]);
 
@@ -66,7 +70,7 @@ export default function PowerMeterScreen({ navigation, route }) {
     setIsChartLoading(true);
     const response = await iotService.getGraphData(deviceId, period);
     setIsChartLoading(false);
-    if (!response.error && Array.isArray(response) && response.length > 0) {
+    if (!response?.error && Array.isArray(response) && response.length > 0) {
       const sliced = response.length > 7 ? response.slice(-7) : response;
       setGraphData(sliced);
     } else {
@@ -96,18 +100,17 @@ export default function PowerMeterScreen({ navigation, route }) {
       if (!lbl || (len > 7 && i !== 0 && i !== len - 1 && i % n !== 0)) return "";
       let s = lbl.trim();
 
-      // Formating horizontal ringkas (e.g. "26/07" atau "M1 Jul")
-      if (s.includes("(") && s.includes(")")) {
-        const matchParen = s.match(/\(([^)]+)\)/);
-        if (matchParen && matchParen[1]) {
-          const inside = matchParen[1].trim();
+      if (s.includes("(") && s.endsWith(")")) {
+        const openIdx = s.indexOf("(");
+        if (openIdx !== -1) {
+          const inside = s.slice(openIdx + 1, -1).trim();
           if (/^Minggu\s+\d+/i.test(s) || /^Mgg\s+\d+/i.test(s)) {
-            const mggNum = s.split("(")[0].replace("Minggu", "M").replace("Mgg", "M").trim();
+            const mggNum = s.slice(0, openIdx).replace("Minggu", "M").replace("Mgg", "M").trim();
             const monthParts = inside.split(" ");
             const monthShort = monthParts[0] ? monthParts[0].substring(0, 3) : "";
-            return `${mggNum} ${monthShort}`; // e.g. "M1 Jul"
+            return `${mggNum} ${monthShort}`;
           }
-          return inside; // e.g. "26/07", "17/07"
+          return inside;
         }
       }
 

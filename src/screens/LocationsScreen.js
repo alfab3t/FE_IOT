@@ -3,13 +3,13 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TouchableOpacity,
   FlatList,
   Modal,
-  Alert,
   ActivityIndicator,
   TextInput,
+  ScrollView,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
@@ -17,10 +17,10 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import Input from "../components/Input";
 import Button from "../components/Button";
-import { ArrowLeft, Search, Plus, MapPin } from "lucide-react-native";
+import { Search, Plus, MapPin, ArrowLeft } from "lucide-react-native";
 
 export default function LocationsScreen({ route, navigation }) {
-  const { user } = useUser();
+  const { user, t, theme } = useUser();
   const [locations, setLocations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");

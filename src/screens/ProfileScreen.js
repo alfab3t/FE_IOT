@@ -9,10 +9,7 @@ import {
   Image,
   Alert,
   Modal,
-  FlatList,
-  TextInput,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "../context/UserContext";
 import { authService } from "../services/authService";
@@ -21,42 +18,22 @@ import Card from "../components/Card";
 import Input from "../components/Input";
 import NotificationPopup from "../components/NotificationPopup";
 import {
-  ArrowLeft,
   User,
   Camera,
   Edit2,
-  Globe,
   LogOut,
-  Search,
 } from "lucide-react-native";
 
 export default function ProfileScreen({ navigation }) {
-  const { user, setUser, logout, colors, showToast, t, language, timezone, setTimezone } = useUser();
+  const { user, setUser, logout, colors, showToast, t, language } = useUser();
   const [avatarBase64, setAvatarBase64] = useState(user?.foto || null);
 
   // Modals and Previews
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [usernameModalVisible, setUsernameModalVisible] = useState(false);
-  const [timezoneModalVisible, setTimezoneModalVisible] = useState(false);
   const [editUsernameValue, setEditUsernameValue] = useState("");
-  const [searchTz, setSearchTz] = useState("");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
-
-  const timezones = [
-    { id: "WIB", city: "Asia/Jakarta (WIB)" },
-    { id: "WITA", city: "Asia/Makassar (WITA)" },
-    { id: "WIT", city: "Asia/Jayapura (WIT)" },
-  ];
-
-  // Fetch initial profile
-  const fetchProfile = async () => {
-    const response = await authService.getProfilePhoto();
-    if (!response.error && response.photo) {
-      setAvatarBase64(response.photo);
-      setUser((prev) => ({ ...prev, photo: response.photo }));
-    }
-  };
 
   // Load avatar and user detail from backend / AsyncStorage on mount
   useEffect(() => {
@@ -67,17 +44,17 @@ export default function ProfileScreen({ navigation }) {
         // 1. Fetch user email from AsyncStorage or backend
         const cachedEmail = await AsyncStorage.getItem(`email_${uKey}`);
         if (cachedEmail) {
-          setUser((prev) => ({ ...(prev || {}), email: cachedEmail }));
+          setUser((prev) => (prev ? { ...prev, email: cachedEmail } : { email: cachedEmail }));
         }
 
         try {
           const detailRes = await iotService.getUserDetail(user?.username || "admin");
           if (!detailRes?.error && detailRes?.email) {
-            setUser((prev) => ({
-              ...(prev || {}),
+            setUser((prev) => (prev ? {
+              ...prev,
               email: detailRes.email,
               fullName: detailRes.fullName || prev?.fullName,
-            }));
+            } : { email: detailRes.email, fullName: detailRes.fullName }));
             await AsyncStorage.setItem(`email_${uKey}`, detailRes.email);
           }
         } catch (e) {
@@ -157,7 +134,7 @@ export default function ProfileScreen({ navigation }) {
 
     // 1. Update global user context & local storage immediately (keep email & photo intact!)
     setUser((prev) => ({
-      ...(prev || {}),
+      ...prev,
       username: nextVal,
       nama: nextVal,
       nickname: nextVal,

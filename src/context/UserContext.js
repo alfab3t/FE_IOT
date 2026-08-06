@@ -14,7 +14,7 @@ export function UserProvider({ children }) {
   const [rolePermissions, setRolePermissions] = useState([]);
 
   // Mock User Database matching Figma screen
-  const [managedUsers] = useState([
+  const [managedUsers, setManagedUsers] = useState([
     {
       id: "usr001",
       name: "Admin ASTRATech",
@@ -404,7 +404,7 @@ export function UserProvider({ children }) {
 
     try {
       const { iotService: serviceInstance } = require("../services/iotService");
-      if (serviceInstance && serviceInstance.getUserDetail) {
+      if (serviceInstance?.getUserDetail) {
         serviceInstance.getUserDetail(username).then((detail) => {
           if (detail && !detail.error && detail.email) {
             setUser((prev) => (prev ? { ...prev, email: detail.email } : prev));
@@ -456,11 +456,25 @@ export function UserProvider({ children }) {
   };
 
   const updateUser = async (userId, userData) => {
-    return await iotService.updateUser(userId, userData.roleId, userData.status, userData.email, userData.password);
+    const res = await iotService.updateUser(userId, userData.roleId, userData.status, userData.email, userData.password);
+    if (!res?.error) {
+      setManagedUsers((prev) =>
+        prev.map((u) =>
+          (u.id === userId || u.name === userId || u.username === userId)
+            ? { ...u, status: userData.status || u.status, email: userData.email || u.email, roleId: userData.roleId || u.roleId }
+            : u
+        )
+      );
+    }
+    return res;
   };
 
   const deleteUser = async (username) => {
-    return await iotService.deleteUser(username);
+    const res = await iotService.deleteUser(username);
+    if (!res?.error) {
+      setManagedUsers((prev) => prev.filter((u) => u.id !== username && u.name !== username && u.username !== username));
+    }
+    return res;
   };
 
   const contextValue = useMemo(() => ({

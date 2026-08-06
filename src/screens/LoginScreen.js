@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   StyleSheet,
   Text,
@@ -29,10 +28,10 @@ import {
   Eye,
   EyeOff,
   RotateCw,
-  Radio,
 } from "lucide-react-native";
 
-const { width, height } = Dimensions.get("window");
+const width = Dimensions.get("window")?.width || 360;
+const height = Dimensions.get("window")?.height || 640;
 
 export default function LoginScreen({ navigation }) {
   const { login, showToast, colors } = useUser();

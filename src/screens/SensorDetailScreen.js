@@ -6,39 +6,34 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Thermometer, Droplets, MapPin, Wifi, TrendingUp, Clock, Calendar, History } from "lucide-react-native";
-import { LineChart } from "react-native-chart-kit";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CHART_WIDTH = SCREEN_WIDTH - 32 - 48;
-const CHART_HEIGHT = 130;
-
-const PERIOD_OPTIONS = [
-  { label: "Per Jam", value: "Hourly" },
-  { label: "Harian", value: "Daily" },
-  { label: "Mingguan", value: "Weekly" },
-];
+import { ArrowLeft, Thermometer, Droplets, MapPin, Wifi } from "lucide-react-native";
 
 export default function SensorDetailScreen({ navigation, route }) {
   const { colors } = useUser();
   const { deviceId, deviceName, deviceLocation } = route.params || {};
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isChartLoading, setIsChartLoading] = useState(false);
   const [temperature, setTemperature] = useState(null);
   const [humidity, setHumidity] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState("Online");
-  const [graphData, setGraphData] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
-  const [chartMode, setChartMode] = useState("temp"); // "temp" | "humi"
   const [locationHistory, setLocationHistory] = useState([]);
+
+  const processSensorDevice = (dev) => {
+    if (!dev) return;
+    setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
+    if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
+      setTemperature(Number(dev.limitMin));
+    }
+    if (dev.limitMax != null && !Number.isNaN(Number(dev.limitMax))) {
+      setHumidity(Number(dev.limitMax));
+    }
+  };
 
   // Load latest readings & device detail including location history
   const loadLatestData = useCallback(async (isInitial = true) => {
@@ -52,54 +47,25 @@ export default function SensorDetailScreen({ navigation, route }) {
       }
     }
     if (isInitial) setIsLoading(false);
-    if (!response.error && Array.isArray(response)) {
+    if (!response?.error && Array.isArray(response)) {
       const dev = response.find((d) => d.id === deviceId);
-      if (dev) {
-        setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
-        if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-          setTemperature(Number(dev.limitMin));
-        }
-        if (dev.limitMax != null && !Number.isNaN(Number(dev.limitMax))) {
-          setHumidity(Number(dev.limitMax));
-        }
-      }
+      processSensorDevice(dev);
     }
   }, [deviceId]);
 
   useFocusEffect(
     useCallback(() => {
       loadLatestData(true);
-      loadChartData(selectedPeriod, chartMode);
-    }, [loadLatestData, loadChartData, selectedPeriod, chartMode])
+    }, [loadLatestData])
   );
-
-  // Load chart data
-  const loadChartData = useCallback(async (period, mode = chartMode) => {
-    setIsChartLoading(true);
-    let response;
-    const category = mode === "humi" ? "Kelembaban" : "Suhu";
-    response = await iotService.getGraphAverage(category, period);
-    if ((!response || response.error || !Array.isArray(response) || response.length === 0) && deviceId) {
-      response = await iotService.getDashboardGraph(deviceId, period);
-    }
-    setIsChartLoading(false);
-    if (!response?.error && Array.isArray(response) && response.length > 0) {
-      const sliced = response.length > 7 ? response.slice(-7) : response;
-      setGraphData(sliced);
-    } else {
-      setGraphData([]);
-    }
-  }, [deviceId, chartMode]);
 
   useEffect(() => {
     loadLatestData(true);
-    loadChartData(selectedPeriod, chartMode);
     const timer = setInterval(() => {
       loadLatestData(false);
-      loadChartData(selectedPeriod, chartMode);
-    }, 5000); // 5s REAL-TIME live telemetry and graph updates
+    }, 5000); // 5s REAL-TIME live telemetry updates
     return () => clearInterval(timer);
-  }, [loadLatestData, loadChartData, selectedPeriod, chartMode]);
+  }, [loadLatestData]);
 
   if (isLoading) {
     return (
@@ -233,65 +199,6 @@ function SensorStatusCard({ temperature, humidity, colors }) {
   );
 }
 
-const thinLabels = (labels) => {
-  if (!labels || labels.length === 0) return [];
-  const len = labels.length;
-  let n;
-  if (len <= 6) { n = 1; }
-  else if (len <= 12) { n = 2; }
-  else { n = 3; }
-  return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
-};
-
-function SensorChart({ isChartLoading, graphData, chartMode, colors }) {
-  const lineColor = chartMode === "temp" ? "#ef4444" : "#0284c7";
-  const chartConfig = {
-    backgroundColor: colors.cardBackground,
-    backgroundGradientFrom: colors.cardBackground,
-    backgroundGradientTo: colors.cardBackground,
-    decimalPlaces: 1,
-    color: (opacity = 1) => chartMode === "temp"
-      ? `rgba(239,68,68,${opacity})`
-      : `rgba(2,132,199,${opacity})`,
-    labelColor: () => colors.textMuted,
-    propsForDots: { r: "3", strokeWidth: "2", stroke: lineColor },
-    propsForLabels: { fontSize: 9 },
-  };
-
-  if (isChartLoading) {
-    return (
-      <View style={styles.chartPlaceholder}>
-        <ActivityIndicator size="small" color="#0059AB" />
-        <Text style={[styles.placeholderText, { color: colors.textMuted }]}>Memuat grafik...</Text>
-      </View>
-    );
-  }
-  if (!graphData || graphData.length === 0) {
-    return (
-      <View style={styles.chartPlaceholder}>
-        <TrendingUp size={28} color={colors.textMuted} />
-        <Text style={[styles.placeholderText, { color: colors.textMuted }]}>Belum ada data grafik</Text>
-      </View>
-    );
-  }
-
-  const values = graphData.map((p) => p.averageValue ?? p.average ?? 0);
-  const labels = thinLabels(graphData.map((p) => p.labelText ?? ""));
-
-  return (
-    <LineChart
-      data={{ labels, datasets: [{ data: values }] }}
-      width={CHART_WIDTH + 32}
-      height={CHART_HEIGHT + 40}
-      chartConfig={chartConfig}
-      bezier
-      style={{ borderRadius: 10, marginLeft: -16 }}
-      withHorizontalLabels={true}
-      fromZero={false}
-    />
-  );
-}
-
 function LocationHistoryCard({ locationHistory, colors }) {
   const items = Array.isArray(locationHistory) ? locationHistory : [];
 
@@ -302,7 +209,7 @@ function LocationHistoryCard({ locationHistory, colors }) {
       </Text>
       {items.length > 0 ? (
         items.map((h, idx) => (
-          <View key={idx} style={{ flexDirection: "row", gap: 12, marginBottom: idx === items.length - 1 ? 0 : 12 }}>
+          <View key={h.id || h.historyId || `loc-${idx}`} style={{ flexDirection: "row", gap: 12, marginBottom: idx === items.length - 1 ? 0 : 12 }}>
             <View style={{ alignItems: "center", width: 14 }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
               {idx < items.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
@@ -421,8 +328,8 @@ const styles = StyleSheet.create({
   periodBtnActive: { backgroundColor: "#0059AB" },
   periodBtnText: { fontSize: 12, fontWeight: "700" },
   chartArea: { flexDirection: "row", gap: 6, alignItems: "flex-end" },
-  yAxis: { justifyContent: "space-between", height: CHART_HEIGHT, paddingRight: 4 },
+  yAxis: { justifyContent: "space-between", height: 130, paddingRight: 4 },
   axisLabel: { fontSize: 9, fontWeight: "600" },
-  chartPlaceholder: { height: CHART_HEIGHT, justifyContent: "center", alignItems: "center", gap: 8 },
+  chartPlaceholder: { height: 130, justifyContent: "center", alignItems: "center", gap: 8 },
   placeholderText: { fontSize: 13, fontWeight: "600" },
 });

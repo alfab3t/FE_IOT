@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Animated } from "react-native";
+import { Animated, View } from "react-native";
 
 export default function AnimatedEntrance({
   children,

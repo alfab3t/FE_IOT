@@ -23,9 +23,10 @@ export default function NotificationPopup({
       case "warning":
         return <AlertTriangle size={32} color="#f59e0b" />;
       case "error":
+      case "danger":
         return <XCircle size={32} color="#ef4444" />;
       case "question":
-        return <HelpCircle size={32} color="#0059AB" />;
+        return <HelpCircle size={32} color="#ef4444" />;
       case "info":
       default:
         return <Info size={32} color="#0059AB" />;
@@ -35,7 +36,7 @@ export default function NotificationPopup({
   let confirmBtnBgColor = "#0059AB";
   if (type === "success") {
     confirmBtnBgColor = "#10b981";
-  } else if (type === "error") {
+  } else if (type === "error" || type === "danger" || type === "question") {
     confirmBtnBgColor = "#ef4444";
   } else if (type === "warning") {
     confirmBtnBgColor = "#f59e0b";

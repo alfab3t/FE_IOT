@@ -12,12 +12,18 @@ import Input from "../components/Input";
 import NotificationPopup from "../components/NotificationPopup";
 import {
   ArrowLeft,
-  User,
   ChevronDown,
+  User,
 } from "lucide-react-native";
 
+const isValidEmail = (email) => {
+  const atIdx = email.indexOf("@");
+  const dotIdx = email.lastIndexOf(".");
+  return atIdx > 0 && dotIdx > atIdx + 1 && dotIdx < email.length - 1;
+};
+
 export default function AddUserScreen({ navigation }) {
-  const { addUser, colors, theme, t, language } = useUser();
+  const { addUser, colors, language, t, theme } = useUser();
 
   // Form States
   const [usernameInput, setUsernameInput] = useState("");
@@ -40,64 +46,79 @@ export default function AddUserScreen({ navigation }) {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  const handleSave = async () => {
+  const validateForm = () => {
     let hasError = false;
+    const isIndo = language === "Indonesia";
 
     if (!usernameInput.trim()) {
-      setUsernameError(language === "Indonesia" ? "Username wajib diisi." : "Username is required.");
+      setUsernameError(isIndo ? "Username wajib diisi." : "Username is required.");
       hasError = true;
     } else {
       setUsernameError("");
     }
 
-    if (!emailInput.trim()) {
-      setEmailError(language === "Indonesia" ? "Email wajib diisi." : "Email is required.");
+    const trimmedEmail = emailInput.trim();
+    if (!trimmedEmail) {
+      setEmailError(isIndo ? "Email wajib diisi." : "Email is required.");
       hasError = true;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
-      setEmailError(language === "Indonesia" ? "Format email tidak valid." : "Invalid email format.");
+    } else if (!isValidEmail(trimmedEmail)) {
+      setEmailError(isIndo ? "Format email tidak valid." : "Invalid email format.");
       hasError = true;
     } else {
       setEmailError("");
     }
 
     if (!passwordInput.trim()) {
-      setPasswordError(language === "Indonesia" ? "Password wajib diisi." : "Password is required.");
+      setPasswordError(isIndo ? "Password wajib diisi." : "Password is required.");
       hasError = true;
     } else {
       setPasswordError("");
     }
 
-    if (hasError) return;
+    return !hasError;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+
+    const mapRoleNameToId = (val) => {
+      if (val === "Admin") return "ROL001";
+      if (val === "Owner/Controller") return "ROL002";
+      if (val === "Viewer") return "ROL003";
+      return val;
+    };
 
     const userData = {
       username: usernameInput.trim(),
       email: emailInput.trim(),
       password: passwordInput,
-      roleId: role,
-      status: status,
+      roleId: mapRoleNameToId(role),
+      status,
     };
 
     const response = await addUser(userData);
+    const isIndo = language === "Indonesia";
     if (response?.error) {
-      setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
-      setPopupMessage(
-        language === "Indonesia" 
-          ? response.message || "Gagal menambahkan pengguna." 
-          : "Failed to add new user."
-      );
+      const errTitle = isIndo ? "Gagal" : "Error";
+      const errMsg = isIndo ? response.message || "Gagal menambahkan pengguna." : "Failed to add new user.";
+      setPopupTitle(errTitle);
+      setPopupMessage(errMsg);
       setPopupType("error");
       setOnConfirmAction(null);
       setPopupVisible(true);
     } else {
-      setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
-      setPopupMessage(
-        language === "Indonesia" ? "Pengguna baru berhasil ditambahkan." : "New user successfully added."
-      );
-      setPopupType("success");
-      setOnConfirmAction(() => () => {
+      const succTitle = isIndo ? "Sukses" : "Success";
+      const succMsg = isIndo ? "Pengguna baru berhasil ditambahkan." : "New user successfully added.";
+
+      const onOkPress = () => {
         setPopupVisible(false);
         navigation.navigate("UsersList");
-      });
+      };
+
+      setPopupTitle(succTitle);
+      setPopupMessage(succMsg);
+      setPopupType("success");
+      setOnConfirmAction(() => onOkPress);
       setPopupVisible(true);
     }
   };
@@ -174,7 +195,7 @@ export default function AddUserScreen({ navigation }) {
               setEmailInput(val);
               if (!val.trim()) {
                 setEmailError(language === "Indonesia" ? "Email wajib diisi." : "Email is required.");
-              } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+              } else if (!isValidEmail(val.trim())) {
                 setEmailError(language === "Indonesia" ? "Format email tidak valid." : "Invalid email format.");
               } else {
                 setEmailError("");

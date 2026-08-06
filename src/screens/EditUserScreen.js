@@ -12,11 +12,27 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Input from "../components/Input";
-import { ArrowLeft, User, ChevronDown } from "lucide-react-native";
+import { ArrowLeft, ChevronDown, User } from "lucide-react-native";
 import NotificationPopup from "../components/NotificationPopup";
 
+const mapRoleIdToName = (val) => {
+  if (!val) return "Viewer";
+  const str = String(val);
+  if (str === "ROL001" || str === "ROL01" || str.toLowerCase().includes("admin")) return "Admin";
+  if (str === "ROL002" || str === "ROL02" || str.toLowerCase().includes("owner") || str.toLowerCase().includes("controller")) return "Owner/Controller";
+  if (str === "ROL003" || str === "ROL03" || str.toLowerCase().includes("viewer")) return "Viewer";
+  return val;
+};
+
+const mapRoleNameToId = (val) => {
+  if (val === "Admin") return "ROL001";
+  if (val === "Owner/Controller") return "ROL002";
+  if (val === "Viewer") return "ROL003";
+  return val;
+};
+
 export default function EditUserScreen({ route, navigation }) {
-  const { updateUser, colors, theme, t, language } = useUser();
+  const { colors, language, t, theme, updateUser } = useUser();
   const { editUsername } = route.params;
 
   // Form States
@@ -40,13 +56,15 @@ export default function EditUserScreen({ route, navigation }) {
   useEffect(() => {
     const fetchUserDetail = async () => {
       setIsLoading(true);
-      const response = await iotService.getUserDetail(editUsername);
+      const res = await iotService.getUserDetail(editUsername);
       setIsLoading(false);
-      if (!response.error && response.username) {
-        setRole(response.roleName || "Viewer");
-        setStatus(response.status || "Aktif");
-        setEmailInput(response.email || "");
-        setPhoto(response.photo);
+      if (res && !res.error) {
+        const uData = res.data || res.Data || res;
+        setEmailInput(uData.email || uData.Email || "");
+        const rawRole = uData.roleName || uData.RoleName || uData.roleId || uData.RoleId || "ROL003";
+        setRole(mapRoleIdToName(rawRole));
+        setStatus(uData.status || uData.Status || "Aktif");
+        setPhoto(uData.photo || uData.Photo || null);
       }
     };
     fetchUserDetail();
@@ -57,31 +75,44 @@ export default function EditUserScreen({ route, navigation }) {
       username: editUsername,
       email: emailInput.trim(),
       password: passwordInput,
-      roleId: role,
+      roleId: mapRoleNameToId(role),
       status: status,
     };
 
     setIsSubmitting(true);
-    const response = await updateUser(editUsername, userData);
-    setIsSubmitting(false);
-    if (response?.error) {
-      setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
-      setPopupMessage(
-        language === "Indonesia" ? response.message || "Gagal memperbarui pengguna." : "Failed to update user details."
-      );
+    let response;
+    try {
+      response = await updateUser(editUsername, userData);
+    } catch (err) {
+      response = { error: true, message: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    const isIndo = language === "Indonesia";
+    const isError = !response || response.error || response.status >= 400;
+
+    if (isError) {
+      const errTitle = isIndo ? "Gagal" : "Error";
+      const errMsg = isIndo ? response?.message || "Gagal memperbarui pengguna." : "Failed to update user details.";
+      setPopupTitle(errTitle);
+      setPopupMessage(errMsg);
       setPopupType("error");
       setOnConfirmAction(null);
       setPopupVisible(true);
     } else {
-      setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
-      setPopupMessage(
-        language === "Indonesia" ? "Informasi pengguna berhasil diperbarui." : "User information successfully updated."
-      );
-      setPopupType("success");
-      setOnConfirmAction(() => () => {
+      const succTitle = isIndo ? "Sukses" : "Success";
+      const succMsg = isIndo ? "Informasi pengguna berhasil diperbarui." : "User information successfully updated.";
+
+      const onOkPress = () => {
         setPopupVisible(false);
         navigation.navigate("UsersList");
-      });
+      };
+
+      setPopupTitle(succTitle);
+      setPopupMessage(succMsg);
+      setPopupType("success");
+      setOnConfirmAction(() => onOkPress);
       setPopupVisible(true);
     }
   };

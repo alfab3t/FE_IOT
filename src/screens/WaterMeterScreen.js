@@ -13,10 +13,10 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Droplets, MapPin, Wifi, TrendingUp, Clock, History, Calendar } from "lucide-react-native";
+import { ArrowLeft, Droplets, MapPin, Wifi, TrendingUp, History, Calendar } from "lucide-react-native";
 import { LineChart } from "react-native-chart-kit";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const SCREEN_WIDTH = Dimensions.get("window")?.width || 360;
 const CHART_WIDTH = SCREEN_WIDTH - 32 - 32;
 const CHART_HEIGHT = 160;
 
@@ -39,6 +39,14 @@ export default function WaterMeterScreen({ navigation, route }) {
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
   const [locationHistory, setLocationHistory] = useState([]);
 
+  const updateWaterMeterState = (dev) => {
+    if (!dev) return;
+    setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
+    if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
+      setLatestValue(Number(dev.limitMin));
+    }
+  };
+
   const loadLatestData = useCallback(async (isInitial = true) => {
     if (isInitial) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
@@ -52,12 +60,7 @@ export default function WaterMeterScreen({ navigation, route }) {
     if (isInitial) setIsLoading(false);
     if (!response?.error && Array.isArray(response)) {
       const dev = response.find((d) => d.id === deviceId);
-      if (dev) {
-        setDeviceStatus(dev.isActive !== false ? "Online" : "Offline");
-        if (dev.limitMin != null && !Number.isNaN(Number(dev.limitMin))) {
-          setLatestValue(Number(dev.limitMin));
-        }
-      }
+      updateWaterMeterState(dev);
     }
   }, [deviceId]);
 
@@ -288,7 +291,7 @@ function LocationHistoryCard({ locationHistory, colors }) {
             const gdg = item.gedung || item.Gedung;
 
             return (
-              <View key={index} style={styles.timelineItemRow}>
+              <View key={item.id || item.historyId || `loc-${index}`} style={styles.timelineItemRow}>
                 <View style={styles.timelineLeftColumn}>
                   <View style={[styles.timelineDot, isLast ? styles.timelineDotActive : styles.timelineDotInactive]} />
                   {!isLast && <View style={styles.timelineLine} />}

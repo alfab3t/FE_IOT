@@ -20,8 +20,8 @@ import {
   Globe,
   Sun,
   Info,
-  Database,
   ChevronDown,
+  Database,
 } from "lucide-react-native";
 
 export default function SystemSettingsScreen({ navigation }) {

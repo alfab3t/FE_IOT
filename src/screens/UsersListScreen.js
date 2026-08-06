@@ -8,8 +8,8 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
-  Alert,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,7 +23,7 @@ import {
 } from "lucide-react-native";
 
 export default function UsersListScreen({ navigation }) {
-  const { user, colors, theme, showToast, t } = useUser();
+  const { user, colors, showToast, t, theme } = useUser();
   const [activeRoleId, setActiveRoleId] = useState(""); // Default empty = "Semua"
   const [dbRoles, setDbRoles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,7 +65,9 @@ export default function UsersListScreen({ navigation }) {
               try {
                 const saved = await AsyncStorage.getItem(`avatar_${uName.toLowerCase()}`);
                 if (saved) uPhoto = saved;
-              } catch (e) {}
+              } catch (err) {
+                console.warn("Avatar fetch error:", err);
+              }
             }
           }
           return {
@@ -84,7 +86,7 @@ export default function UsersListScreen({ navigation }) {
       const mappedRoles = (Array.isArray(rawRoles) ? rawRoles : []).map((r) => ({
         roleId: r.roleId || r.RoleId || "",
         roleName: r.roleName || r.RoleName || "",
-        count: r.count !== undefined ? r.count : (r.Count !== undefined ? r.Count : 0),
+        count: r.count ?? r.Count ?? 0,
       }));
 
       setAllUsers(mappedUsers);
@@ -151,26 +153,18 @@ export default function UsersListScreen({ navigation }) {
         </View>
       );
     }
-    if (roleId === "ROL002") {
-      return (
-        <View style={[styles.roleBadge, styles.badgeOwner]}>
-          <Text style={[styles.roleBadgeText, styles.badgeTextOwner]}>{roleName}</Text>
-        </View>
-      );
-    }
+    const displayRole = roleName || (roleId === "ROL001" || roleId === "ROL01" ? "Admin" : (roleId === "ROL002" || roleId === "ROL02" ? "Owner/Controller" : "Viewer"));
     return (
-      <View style={[styles.roleBadge, styles.badgeViewer]}>
-        <Text style={[styles.roleBadgeText, styles.badgeTextViewer]}>{roleName}</Text>
+      <View style={styles.roleBadge}>
+        <Text style={styles.roleBadgeText}>{displayRole}</Text>
       </View>
     );
   };
 
   const renderUserItem = ({ item }) => {
     const isCurrentUser = item.username === user?.username;
-    let avatarBg = "#dbeafe";
-    let avatarColor = "#2563eb";
-    if (item.roleId === "ROL002") { avatarBg = "#fef3c7"; avatarColor = "#d97706"; }
-    else if (item.roleId === "ROL003") { avatarBg = "#fce7f3"; avatarColor = "#db2777"; }
+    const avatarBg = "#f0f9ff";
+    const avatarColor = "#0059AB";
 
     const isActive = item.status === "Aktif";
 
@@ -508,13 +502,16 @@ const styles = StyleSheet.create({
   },
   roleBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 12,
     borderWidth: 1,
+    backgroundColor: "#f0f9ff",
+    borderColor: "#0059AB",
   },
   roleBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "800",
+    color: "#0059AB",
   },
   badgeCurrent: {
     backgroundColor: "#eff6ff",

@@ -6,15 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Card from "../components/Card";
-import { ArrowLeft, Wind, Snowflake, Compass, Clock } from "lucide-react-native";
+import { ArrowLeft, Wind, Snowflake, Compass } from "lucide-react-native";
 
 export default function AcControlScreen({ route, navigation }) {
   const { user, colors } = useUser();
@@ -33,6 +33,41 @@ export default function AcControlScreen({ route, navigation }) {
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
   const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
+  const processAcDeviceDetail = async (currentDevice, response) => {
+    const locText = [currentDevice.ruangan, currentDevice.gedung].filter(Boolean).join(" — ");
+    setActiveBuilding(locText || "Gedung Utama");
+    setAcDeviceId(currentDevice.id);
+    setIsPowerOn(currentDevice.status === "ON");
+
+    const devDetail = await iotService.getDeviceById(currentDevice.id);
+    const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+    if (Array.isArray(historyList)) {
+      setLocationHistory(historyList);
+    }
+
+    const buildingName = currentDevice.gedung || "";
+    const tempDevInBuilding = Array.isArray(response)
+      ? response.find(
+          (dev) => dev?.gedung?.toLowerCase() === buildingName.toLowerCase() && dev?.category?.includes("Temp")
+        )
+      : null;
+    let targetTempId = "DEV_TEMP01";
+    if (tempDevInBuilding) {
+      targetTempId = tempDevInBuilding.id;
+    } else if (currentDevice.id === "DEV_AC01") {
+      targetTempId = "DEV_TEMP02";
+    }
+    setTempDeviceId(targetTempId);
+
+    const savedSettings = await iotService.getAcSettings(currentDevice.id);
+    if (!savedSettings?.error && savedSettings) {
+      setTemperature(savedSettings.temperature ?? 22);
+      setAcMode(savedSettings.mode ?? "Cool");
+      setFanSpeed(savedSettings.fanSpeed ?? "Auto");
+      setSwingMode(savedSettings.swingMode ?? "Auto");
+    }
+  };
+
   const loadAcStatus = useCallback(async (isInitial = true) => {
     if (isInitial) setIsLoading(true);
     const selectedDeviceId = route.params?.deviceId;
@@ -43,44 +78,12 @@ export default function AcControlScreen({ route, navigation }) {
       return;
     }
 
-    let currentDevice = null;
-    if (selectedDeviceId) {
-      currentDevice = response.find(dev => dev.id === selectedDeviceId);
-    }
-    
-    if (!currentDevice) {
-      currentDevice = response.find(dev => dev.category === "AC") || response[0];
-    }
+    const currentDevice = selectedDeviceId
+      ? response.find(dev => dev.id === selectedDeviceId)
+      : response.find(dev => dev.category === "AC") || response[0];
 
     if (currentDevice) {
-      const locText = [currentDevice.ruangan, currentDevice.gedung].filter(Boolean).join(" — ");
-      setActiveBuilding(locText || "Gedung Utama");
-      setAcDeviceId(currentDevice.id);
-      setIsPowerOn(currentDevice.status === "ON");
-
-      const devDetail = await iotService.getDeviceById(currentDevice.id);
-      const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
-      if (Array.isArray(historyList)) {
-        setLocationHistory(historyList);
-      }
-
-      const buildingName = currentDevice.gedung || "";
-      const tempDevInBuilding = response.find(
-        (dev) => dev?.gedung?.toLowerCase() === buildingName.toLowerCase() && dev.category.includes("Temp")
-      );
-      if (tempDevInBuilding) {
-        setTempDeviceId(tempDevInBuilding.id);
-      } else {
-        setTempDeviceId(currentDevice.id === "DEV_AC01" ? "DEV_TEMP02" : "DEV_TEMP01");
-      }
-
-      const savedSettings = await iotService.getAcSettings(currentDevice.id);
-      if (!savedSettings.error && savedSettings) {
-        setTemperature(savedSettings.temperature ?? 22);
-        setAcMode(savedSettings.mode ?? "Cool");
-        setFanSpeed(savedSettings.fanSpeed ?? "Auto");
-        setSwingMode(savedSettings.swingMode ?? "Auto");
-      }
+      await processAcDeviceDetail(currentDevice, response);
     }
 
     if (isInitial) setIsLoading(false);
@@ -339,7 +342,7 @@ export default function AcControlScreen({ route, navigation }) {
                 const period = h.periodText || h.PeriodText || h.timestampText || h.TimestampText || "-";
                 const room = h.ruangan || h.Ruangan || h.locationName || h.roomName || h.Gedung || "-";
                 return (
-                  <View key={idx} style={{ flexDirection: "row", marginBottom: idx === locationHistory.length - 1 ? 0 : 14 }}>
+                  <View key={h.id || h.historyId || `loc-${idx}`} style={{ flexDirection: "row", marginBottom: idx === locationHistory.length - 1 ? 0 : 14 }}>
                     <View style={{ alignItems: "center", width: 16, marginRight: 12 }}>
                       <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 4 }} />
                       {idx < locationHistory.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 4 }} />}

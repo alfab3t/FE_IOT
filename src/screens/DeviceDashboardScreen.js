@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,6 +10,7 @@ import {
   Image,
   Dimensions,
   Modal,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineChart } from "react-native-chart-kit";
@@ -19,7 +20,6 @@ import { authService } from "../services/authService";
 import Card from "../components/Card";
 import NotificationPopup from "../components/NotificationPopup";
 import {
-  Bell,
   User,
   Thermometer,
   Zap,
@@ -37,7 +37,7 @@ import {
   Radio,
 } from "lucide-react-native";
 
-const chartWidth = Dimensions.get("window").width - 32;
+const chartWidth = (Dimensions.get("window")?.width || 360) - 32;
 
 // Persistent global set to track shown notifications across tab switches and remounts
 const globalSeenNotifsSet = new Set();
@@ -176,9 +176,6 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     } else if (timezone === "WIT" || timezone?.includes("WIT")) {
       offsetHours = 2;
       tzLabel = "WIT";
-    } else {
-      offsetHours = 0;
-      tzLabel = "WIB";
     }
 
     const targetTime = new Date(date.getTime() + offsetHours * 3600 * 1000);

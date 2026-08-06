@@ -17,13 +17,19 @@ import NotificationPopup from "../components/NotificationPopup";
 import {
   ArrowLeft,
   User,
-  PenTool,
   Trash2,
+  Mail,
+  Shield,
+  Phone,
+  CheckCircle,
+  Clock,
+  Calendar,
+  PenTool,
 } from "lucide-react-native";
 
 export default function UserDetailScreen({ route, navigation }) {
   const { username } = route.params;
-  const { user, deleteUser, colors, t, language } = useUser();
+  const { deleteUser, colors, language, t, user } = useUser();
   const [selectedUserObj, setSelectedUserObj] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,12 +38,27 @@ export default function UserDetailScreen({ route, navigation }) {
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
   const [popupType, setPopupType] = useState("info");
+  const [showCancel, setShowCancel] = useState(false);
   const [popupConfirmText, setPopupConfirmText] = useState("OK");
   const [popupCancelText, setPopupCancelText] = useState("Batal");
   const [onConfirmAction, setOnConfirmAction] = useState(null);
 
 
   const isAdmin = selectedUserObj?.canManage === true;
+
+  const resolveUserPhoto = async (uName, rawPhoto) => {
+    if (rawPhoto) return rawPhoto;
+    if (user?.username && uName.toLowerCase() === user.username.toLowerCase() && user.foto) {
+      return user.foto;
+    }
+    try {
+      const saved = await AsyncStorage.getItem(`avatar_${uName.toLowerCase()}`);
+      return saved || "";
+    } catch (err) {
+      console.warn("Avatar fetch error:", err);
+      return "";
+    }
+  };
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -46,25 +67,20 @@ export default function UserDetailScreen({ route, navigation }) {
       setIsLoading(false);
       if (response && !response.error) {
         const uName = response.username || response.Username || username;
-        let uPhoto = response.photo || response.Photo || "";
-        if (!uPhoto) {
-          if (user?.username && uName.toLowerCase() === user.username.toLowerCase() && user.foto) {
-            uPhoto = user.foto;
-          } else {
-            try {
-              const saved = await AsyncStorage.getItem(`avatar_${uName.toLowerCase()}`);
-              if (saved) uPhoto = saved;
-            } catch (e) {}
-          }
-        }
-
+        const uPhoto = await resolveUserPhoto(uName, response.photo || response.Photo);
         const rawPhone = response.phone || response.Phone;
         const phoneVal = (rawPhone && String(rawPhone).trim() !== "") ? String(rawPhone).trim() : "—";
+        const rawRole = response.roleName || response.RoleName || response.roleId || response.RoleId || "Viewer";
+        let displayRole = rawRole;
+        if (rawRole === "ROL001" || rawRole === "ROL01" || rawRole.toLowerCase().includes("admin")) displayRole = "Admin";
+        else if (rawRole === "ROL002" || rawRole === "ROL02" || rawRole.toLowerCase().includes("owner") || rawRole.toLowerCase().includes("controller")) displayRole = "Owner/Controller";
+        else if (rawRole === "ROL003" || rawRole === "ROL03" || rawRole.toLowerCase().includes("viewer")) displayRole = "Viewer";
+
         setSelectedUserObj({
           id: uName,
           name: response.fullName || response.FullName || uName,
           email: (response.email || response.Email || `${uName}@astratech.ac.id`).toLowerCase(),
-          role: response.roleName || response.RoleName || "User",
+          role: displayRole,
           roleId: response.roleId || response.RoleId || "ROL01",
           phone: phoneVal,
           status: response.status || response.Status || "Aktif",
@@ -101,60 +117,48 @@ export default function UserDetailScreen({ route, navigation }) {
     );
   }
 
-  const handleDismissPopup = () => {
-    setPopupVisible(false);
-  };
-
-  const handleRedirectToUsersList = () => {
-    setPopupVisible(false);
-    navigation.navigate("UsersList");
-  };
-
-  const showErrorPopup = (msg) => {
-    setPopupTitle(language === "Indonesia" ? "Gagal" : "Error");
-    setPopupMessage(msg || "Gagal mencabut hak akses pengguna.");
-    setPopupType("error");
-    setPopupConfirmText("OK");
-    setOnConfirmAction(() => handleDismissPopup);
-    setPopupVisible(true);
-  };
-
-  const showSuccessPopup = () => {
-    setPopupTitle(language === "Indonesia" ? "Sukses" : "Success");
-    setPopupMessage(
-      language === "Indonesia"
-        ? "Pengguna berhasil dihapus dari sistem."
-        : "User successfully deleted from system."
-    );
-    setPopupType("success");
-    setPopupConfirmText("OK");
-    setOnConfirmAction(() => handleRedirectToUsersList);
-    setPopupVisible(true);
-  };
-
-  const performDelete = async () => {
-    setPopupVisible(false);
-    const res = await deleteUser(selectedUserObj.id);
-    setTimeout(() => {
-      if (res.error) {
-        showErrorPopup(res.message);
-      } else {
-        showSuccessPopup();
-      }
-    }, 300);
-  };
-
   const handleDelete = () => {
-    setPopupTitle(language === "Indonesia" ? "Hapus Pengguna" : "Delete User");
+    const isIndo = language === "Indonesia";
+    const targetName = selectedUserObj?.name || username;
+    const targetId = selectedUserObj?.id || username;
+
+    setPopupTitle(isIndo ? "Hapus Pengguna" : "Delete User");
     setPopupMessage(
-      language === "Indonesia"
-        ? `Apakah Anda yakin ingin menghapus akun ${selectedUserObj.name}?`
-        : `Are you sure you want to delete account ${selectedUserObj.name}?`
+      isIndo
+        ? `Apakah Anda yakin ingin menghapus akun ${targetName}?`
+        : `Are you sure you want to delete account ${targetName}?`
     );
     setPopupType("question");
-    setPopupConfirmText(language === "Indonesia" ? "HAPUS" : "DELETE");
-    setPopupCancelText(language === "Indonesia" ? "BATAL" : "CANCEL");
-    setOnConfirmAction(() => performDelete);
+    setShowCancel(true);
+    setPopupConfirmText(isIndo ? "HAPUS" : "DELETE");
+    setPopupCancelText(isIndo ? "BATAL" : "CANCEL");
+
+    const doDelete = async () => {
+      setPopupVisible(false);
+      const res = await deleteUser(targetId);
+      if (res?.error) {
+        setPopupTitle(isIndo ? "Gagal" : "Error");
+        setPopupMessage(res.message || (isIndo ? "Gagal menghapus pengguna." : "Failed to delete user."));
+        setPopupType("error");
+        setShowCancel(false);
+        setPopupConfirmText("OK");
+        setOnConfirmAction(() => () => setPopupVisible(false));
+        setPopupVisible(true);
+      } else {
+        setPopupTitle(isIndo ? "Sukses" : "Success");
+        setPopupMessage(isIndo ? "Pengguna berhasil dihapus dari sistem." : "User successfully deleted from system.");
+        setPopupType("success");
+        setShowCancel(false);
+        setPopupConfirmText("OK");
+        setOnConfirmAction(() => () => {
+          setPopupVisible(false);
+          navigation.navigate("UsersList");
+        });
+        setPopupVisible(true);
+      }
+    };
+
+    setOnConfirmAction(() => doDelete);
     setPopupVisible(true);
   };
 
@@ -244,8 +248,8 @@ export default function UserDetailScreen({ route, navigation }) {
           <View style={styles.metaRow}>
             <Text style={[styles.metaLabel, { color: colors.textMuted }]}>{t("status")}</Text>
             <View style={styles.aktifStatusBadge}>
-              <View style={styles.aktifDot} />
-              <Text style={styles.aktifText}>
+              <View style={[styles.aktifDot, { backgroundColor: selectedUserObj.status === "Aktif" ? "#10b981" : "#ef4444" }]} />
+              <Text style={[styles.aktifText, { color: selectedUserObj.status === "Aktif" ? "#10b981" : "#ef4444" }]}>
                 {selectedUserObj.status === "Aktif" ? t("aktif") : t("nonaktif")}
               </Text>
             </View>
@@ -302,6 +306,7 @@ export default function UserDetailScreen({ route, navigation }) {
         title={popupTitle}
         message={popupMessage}
         type={popupType}
+        showCancel={showCancel}
         confirmText={popupConfirmText}
         cancelText={popupCancelText}
         onConfirm={onConfirmAction}

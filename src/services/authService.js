@@ -2,7 +2,7 @@ import apiClient from "./apiClient";
 
 export const authService = {
   login: async (username, password) => {
-    return await apiClient("/api/Auth/login", {
+    return apiClient("/api/Auth/login", {
       method: "POST",
       body: JSON.stringify({
         username,
@@ -13,7 +13,7 @@ export const authService = {
   },
 
   getPermission: async (username, appId, roleId) => {
-    return await apiClient("/api/Auth/getpermission", {
+    return apiClient("/api/Auth/getpermission", {
       method: "POST",
       body: JSON.stringify({
         username,
@@ -24,7 +24,7 @@ export const authService = {
   },
 
   getMenu: async (username, appId, roleId) => {
-    return await apiClient("/api/Auth/getmenu", {
+    return apiClient("/api/Auth/getmenu", {
       method: "POST",
       body: JSON.stringify({
         username,
@@ -35,26 +35,26 @@ export const authService = {
   },
 
   getProfilePhoto: async () => {
-    return await apiClient("/api/Auth/profile/photo", {
+    return apiClient("/api/Auth/profile/photo", {
       method: "GET",
     });
   },
 
-  updateProfilePhoto: async (foto) => {
-    return await apiClient("/api/Auth/profile/photo", {
+  updateProfilePhoto: async (photo) => {
+    return apiClient("/api/Auth/profile/photo", {
       method: "POST",
       body: JSON.stringify({
-        photo: foto,
+        photo,
       }),
     });
   },
 
   updateUsername: async (newUsername, currentUsername = "") => {
-    return await apiClient("/api/Iot/users/profile/username", {
+    return apiClient("/api/Iot/users/profile/username", {
       method: "PUT",
       body: JSON.stringify({
-        currentUsername: currentUsername,
-        newUsername: newUsername,
+        currentUsername,
+        newUsername,
       }),
     });
   },

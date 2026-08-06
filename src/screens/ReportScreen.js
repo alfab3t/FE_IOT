@@ -13,12 +13,12 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import {
   ArrowLeft,
-  Tv,
   Wifi,
   WifiOff,
   Thermometer,
   Droplet,
   Zap,
+  Tv,
   User,
 } from "lucide-react-native";
 

@@ -5,15 +5,16 @@ import {
   View,
   TouchableOpacity,
   FlatList,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Animated,
   PanResponder,
+  Alert,
 } from "react-native";
 import { iotService } from "../services/iotService";
 import { useUser } from "../context/UserContext";
 import Card from "../components/Card";
+import NotificationPopup from "../components/NotificationPopup";
 import {
   Bell,
   Home,
@@ -175,15 +176,17 @@ export default function NotificationsScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Tabs: 0: Alarm, 1: Home, 2: Bulletin
-  const [activeTab, setActiveTab] = useState(1); // Default to Home
-
   // Edit mode states
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   // Filter category state: "Semua", "Telah Dibaca", "Belum Dibaca"
   const [filterCategory, setFilterCategory] = useState("Semua");
+
+  const getFilterPillBg = (isActive) => {
+    if (isActive) return "#0059AB";
+    return theme === "Dark Mode" ? "#1e293b" : "#f1f5f9";
+  };
 
   const loadNotifications = async (showLoader = true) => {
     if (showLoader) setIsLoading(true);
@@ -262,6 +265,16 @@ export default function NotificationsScreen({ navigation }) {
     }
   };
 
+  // Custom Popup States
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("info");
+  const [showCancel, setShowCancel] = useState(false);
+  const [popupConfirmText, setPopupConfirmText] = useState("OK");
+  const [popupCancelText, setPopupCancelText] = useState("Batal");
+  const [onConfirmAction, setOnConfirmAction] = useState(null);
+
   const executeDelete = async (ids) => {
     setNotifications((prev) => prev.filter((notif) => !ids.includes(notif.id)));
     setIsEditMode(false);
@@ -269,38 +282,62 @@ export default function NotificationsScreen({ navigation }) {
 
     const response = await iotService.deleteNotificationsBulk(ids);
     if (response.error) {
-      Alert.alert("Gagal", "Gagal menghapus dari server.");
+      setPopupTitle("Gagal");
+      setPopupMessage("Gagal menghapus dari server.");
+      setPopupType("error");
+      setShowCancel(false);
+      setPopupConfirmText("OK");
+      setOnConfirmAction(() => () => setPopupVisible(false));
+      setPopupVisible(true);
       loadNotifications(false);
     }
   };
 
   const handleSingleDelete = (id) => {
-    Alert.alert("Hapus Notifikasi", "Apakah Anda yakin ingin menghapus notifikasi ini?", [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Hapus",
-        style: "destructive",
-        onPress: () => executeDelete([id]),
-      },
-    ]);
+    const isId = language === "Indonesia";
+    setPopupTitle(isId ? "Hapus Notifikasi" : "Delete Notification");
+    setPopupMessage(
+      isId
+        ? "Apakah Anda yakin ingin menghapus notifikasi ini?"
+        : "Are you sure you want to delete this notification?"
+    );
+    setPopupType("question");
+    setShowCancel(true);
+    setPopupConfirmText(isId ? "HAPUS" : "DELETE");
+    setPopupCancelText(isId ? "BATAL" : "CANCEL");
+
+    const doDelete = () => {
+      setPopupVisible(false);
+      executeDelete([id]);
+    };
+
+    setOnConfirmAction(() => doDelete);
+    setPopupVisible(true);
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
-
     const ids = Array.from(selectedIds);
-    Alert.alert(
-      "Hapus Notifikasi",
-      `Apakah Anda yakin ingin menghapus ${selectedIds.size} notifikasi terpilih?`,
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: () => executeDelete(ids),
-        },
-      ]
+    const isId = language === "Indonesia";
+
+    setPopupTitle(isId ? "Hapus Notifikasi" : "Delete Notifications");
+    setPopupMessage(
+      isId
+        ? `Apakah Anda yakin ingin menghapus ${ids.length} notifikasi terpilih?`
+        : `Are you sure you want to delete ${ids.length} selected notifications?`
     );
+    setPopupType("question");
+    setShowCancel(true);
+    setPopupConfirmText(isId ? "HAPUS" : "DELETE");
+    setPopupCancelText(isId ? "BATAL" : "CANCEL");
+
+    const doDelete = () => {
+      setPopupVisible(false);
+      executeDelete(ids);
+    };
+
+    setOnConfirmAction(() => doDelete);
+    setPopupVisible(true);
   };
 
   const getNotificationTitle = (msg = "") => {
@@ -396,7 +433,7 @@ export default function NotificationsScreen({ navigation }) {
               style={[
                 styles.filterPill,
                 {
-                  backgroundColor: isActive ? "#0059AB" : (theme === "Dark Mode" ? "#1e293b" : "#f1f5f9"),
+                  backgroundColor: getFilterPillBg(isActive),
                   borderColor: isActive ? "#0059AB" : colors.border,
                 },
               ]}
@@ -455,6 +492,18 @@ export default function NotificationsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       )}
+
+      <NotificationPopup
+        visible={popupVisible}
+        title={popupTitle}
+        message={popupMessage}
+        type={popupType}
+        showCancel={showCancel}
+        confirmText={popupConfirmText}
+        cancelText={popupCancelText}
+        onConfirm={onConfirmAction}
+        onClose={() => setPopupVisible(false)}
+      />
     </View>
   );
 }

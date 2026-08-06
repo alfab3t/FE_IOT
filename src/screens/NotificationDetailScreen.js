@@ -12,17 +12,16 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import {
   ArrowLeft,
-  Calendar,
   Clock,
   Bell,
-  FileText,
   Home,
+  Calendar,
   CheckCircle,
 } from "lucide-react-native";
 
 export default function NotificationDetailScreen({ route, navigation }) {
   const { notification } = route.params;
-  const { colors, language, t, translateNotification } = useUser();
+  const { colors, translateNotification, t, language } = useUser();
 
   const time = notification.triggeredDate
     ? notification.triggeredDate.substring(11, 16)

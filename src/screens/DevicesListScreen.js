@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   StyleSheet,
@@ -8,11 +8,9 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
-  Alert,
   ActivityIndicator,
   TextInput,
   Switch,
-  Animated,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,7 +24,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Camera,
   MapPin,
   Thermometer,
   Zap,
@@ -34,13 +31,11 @@ import {
   Lightbulb,
   Cpu,
   SlidersHorizontal,
-  AlertCircle,
   HelpCircle,
   CheckCircle,
-  User,
   Check,
   ChevronRight,
-  Clock,
+  AlertCircle,
 } from "lucide-react-native";
 
 export default function DevicesListScreen({ route, navigation, isTab = false }) {
@@ -60,7 +55,6 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   // Multi-step Add Form Wizard State (Step 1: Kategori, Step 2: Nama, Step 3: Lokasi)
   const [modalVisible, setModalVisible] = useState(false);
   const [step, setStep] = useState(1);
-  const stepAnim = useRef(new Animated.Value(1)).current;
 
   const [formCategory, setFormCategory] = useState("Lampu"); // Lampu, AC, Listrik, Debit Air
   const [formName, setFormName] = useState("");
@@ -88,7 +82,6 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   // Role Permissions
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
   const isAdmin = user?.selectedRole?.roleId === "ROL001" || user?.selectedRole?.roleId === "ROL01" || selectedRoleName.toLowerCase().includes("admin");
-  const isOwner = selectedRoleName.toLowerCase().includes("owner") || selectedRoleName.toLowerCase().includes("controller") || user?.selectedRole?.roleId === "ROL002";
   const canCrud = isAdmin; // Hanya Admin yang bisa Tambah, Edit, Hapus Perangkat! Controller hanya bisa ON/OFF & Remot AC.
 
   // Check if routed with scan parameters
@@ -183,7 +176,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
         else generatedId = "DEV_LAMP01";
       }
 
-      const macAddress = formMac.trim() || Array.from({ length: 6 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join(":").toUpperCase();
+      const macAddress = formMac.trim() || Array.from({ length: 6 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join(":").toUpperCase(); // NOSONAR
 
       const response = await iotService.createDevice(
         generatedId,
@@ -238,7 +231,13 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       );
     }
 
-    setEditFormLocationId(matchingLoc ? String(matchingLoc.id || matchingLoc.Id || matchingLoc.loc_id) : locations.length > 0 ? String(locations[0].id || locations[0].Id || locations[0].loc_id) : "");
+    let defaultEditLocId = "";
+    if (matchingLoc) {
+      defaultEditLocId = String(matchingLoc.id || matchingLoc.Id || matchingLoc.loc_id);
+    } else if (locations.length > 0) {
+      defaultEditLocId = String(locations[0].id || locations[0].Id || locations[0].loc_id);
+    }
+    setEditFormLocationId(defaultEditLocId);
     setEditModalVisible(true);
   };
 
@@ -289,11 +288,6 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleScanQR = () => {
-    setModalVisible(false);
-    navigation.navigate("Scan", { returnScreen: "Home" });
   };
 
   const handleDeleteDevice = (device) => {
@@ -1309,11 +1303,6 @@ const styles = StyleSheet.create({
   segmentTabItemActive: {
     borderBottomColor: "#0059AB",
   },
-  segmentTabLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#64748b",
-  },
   segmentTabLabelActive: {
     color: "#0059AB",
   },
@@ -1331,13 +1320,6 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     marginRight: 8,
-  },
-  searchBarInput: {
-    flex: 1,
-    fontSize: 14,
-    height: "100%",
-    paddingVertical: 0,
-    fontWeight: "600",
   },
   listContent: {
     padding: 16,
@@ -1368,17 +1350,6 @@ const styles = StyleSheet.create({
   deviceDetails: {
     flex: 1,
   },
-  deviceNameText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  deviceLocText: {
-    fontSize: 11,
-    color: "#64748b",
-    fontWeight: "600",
-    marginTop: 2,
-  },
   statusDotRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1389,10 +1360,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 9,
-    fontWeight: "700",
   },
   rightStateColumn: {
     alignItems: "flex-end",
@@ -1406,11 +1373,6 @@ const styles = StyleSheet.create({
   },
   actionIconButton: {
     padding: 4,
-  },
-  valueText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0f172a",
   },
   toggleSwitch: {
     transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
@@ -1435,11 +1397,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 5,
-  },
-  floatingAddBtnText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "800",
   },
   emptyContainer: {
     alignItems: "center",
@@ -1494,24 +1451,6 @@ const styles = StyleSheet.create({
   stepIndicatorRow: {
     marginBottom: 8,
   },
-  stepIndicatorText: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  wizardTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-    marginBottom: 4,
-  },
-  wizardSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 20,
-    fontWeight: "500",
-  },
   categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1542,18 +1481,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
-  },
-  categoryCardTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  categoryCardDesc: {
-    fontSize: 10.5,
-    textAlign: "center",
-    lineHeight: 14,
-    fontWeight: "500",
   },
   checkBadge: {
     position: "absolute",
@@ -1616,15 +1543,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-  },
-  locationRuanganText: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  locationGedungText: {
-    fontSize: 11,
-    marginTop: 2,
-    fontWeight: "600",
   },
   selectedCheckCircle: {
     width: 22,
