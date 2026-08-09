@@ -14,6 +14,7 @@ import { iotService } from "../services/iotService";
 import { useUser } from "../context/UserContext";
 import Card from "../components/Card";
 import { ArrowLeft } from "lucide-react-native";
+import DateRangeFilter from "../components/DateRangeFilter";
 
 const chartWidth = (Dimensions.get("window")?.width || 360) - 32;
 
@@ -23,7 +24,9 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   const [isGraphLoading, setIsGraphLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("Semua"); // Semua, Suhu, Kelembapan, Listrik
   const [toggleMode, setToggleMode] = useState("Grafik"); // Grafik, Data
-  const [timePeriod, setTimePeriod] = useState("Per Jam"); // Per Jam, Per Hari, Per Minggu
+  const [timePeriod, setTimePeriod] = useState("Per Jam");
+  const [rangeStart, setRangeStart] = useState(null);
+  const [rangeEnd, setRangeEnd] = useState(null);
 
   const [activeDevice, setActiveDevice] = useState(null);
 
@@ -64,7 +67,11 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
   };
 
   const fetchSingleDeviceGraph = async (dev, period) => {
-    let res = await iotService.getDashboardGraph(dev.id, period);
+    const startISO = rangeStart ? rangeStart.toISOString() : null;
+    const endISO = rangeEnd ? rangeEnd.toISOString() : null;
+    const hasCustomRange = !!(rangeStart && rangeEnd);
+
+    let res = await iotService.getDashboardGraph(dev.id, period, startISO, endISO);
     if (res?.error || !Array.isArray(res) || res.length === 0) {
       setTempPoints([]);
       setHumiPoints([]);
@@ -73,7 +80,8 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
       return;
     }
 
-    if (res.length > 7) res = res.slice(-7);
+    if (!hasCustomRange && res.length > 7) res = res.slice(-7);
+
     const values = res.map((pt) => Number.parseFloat(pt.averageValue || 0));
     setGraphLabels(res.map((pt) => pt.labelText || ""));
 
@@ -83,7 +91,7 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
       setPowerPoints(values.map((v) => (v > 100 ? v / 1000.0 : v)));
     } else {
       setTempPoints(values);
-      const humiRes = await iotService.getGraphAverage("Kelembaban", period);
+      const humiRes = await iotService.getGraphAverage("Kelembaban", period, startISO, endISO);
       setHumiPoints(!humiRes?.error && Array.isArray(humiRes) ? humiRes.map((pt) => Number.parseFloat(pt.averageValue || 0)) : []);
       setPowerPoints([]);
     }
@@ -107,15 +115,19 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
 };
 
   const fetchCategoryAverageGraph = async (period) => {
+    const startISO = rangeStart ? rangeStart.toISOString() : null;
+    const endISO = rangeEnd ? rangeEnd.toISOString() : null;
+    const hasCustomRange = !!(rangeStart && rangeEnd);
+
     const [suhuRaw, humiRaw, pwrRaw] = await Promise.all([
-      iotService.getGraphAverage("Suhu", period),
-      iotService.getGraphAverage("Kelembaban", period),
-      iotService.getGraphAverage("Listrik", period),
+      iotService.getGraphAverage("Suhu", period, startISO, endISO),
+      iotService.getGraphAverage("Kelembaban", period, startISO, endISO),
+      iotService.getGraphAverage("Listrik", period, startISO, endISO),
     ]);
 
-    const suhuRes = Array.isArray(suhuRaw) && suhuRaw.length > 7 ? suhuRaw.slice(-7) : suhuRaw;
-    const humiRes = Array.isArray(humiRaw) && humiRaw.length > 7 ? humiRaw.slice(-7) : humiRaw;
-    const pwrRes = Array.isArray(pwrRaw) && pwrRaw.length > 7 ? pwrRaw.slice(-7) : pwrRaw;
+    const suhuRes = !hasCustomRange && Array.isArray(suhuRaw) && suhuRaw.length > 7 ? suhuRaw.slice(-7) : suhuRaw;
+    const humiRes = !hasCustomRange && Array.isArray(humiRaw) && humiRaw.length > 7 ? humiRaw.slice(-7) : humiRaw;
+    const pwrRes = !hasCustomRange && Array.isArray(pwrRaw) && pwrRaw.length > 7 ? pwrRaw.slice(-7) : pwrRaw;
 
     setTempPoints(extractPoints(suhuRes));
     setHumiPoints(extractPoints(humiRes));
@@ -146,7 +158,7 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
 
   useEffect(() => {
     loadGraphs(true);
-  }, [timePeriod, activeDevice?.id, activeTab]);
+  }, [timePeriod, activeDevice?.id, activeTab, rangeStart, rangeEnd]);
 
   useEffect(() => {
     let intervalMs = 30000;
@@ -160,7 +172,7 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshInterval, timePeriod, activeDevice?.id, activeTab]);
+  }, [refreshInterval, timePeriod, activeDevice?.id, activeTab, rangeStart, rangeEnd]);
 
   const chartConfig = {
     backgroundColor: colors.cardBackground,
@@ -476,6 +488,14 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <DateRangeFilter
+          startDate={rangeStart}
+          endDate={rangeEnd}
+          onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
+          colors={colors}
+        />
+
         {renderMainContent()}
       </ScrollView>
     </SafeAreaView>
@@ -483,6 +503,43 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
 }
 
 // ── Helpers & Subcomponents ───────────────────────────────────────────────
+function ChartXLabel({ xLabel, colors }) {
+  return (
+    <Text
+      style={{
+        textAlign: "center",
+        fontSize: 11,
+        fontWeight: "700",
+        color: colors.textMuted,
+        marginTop: -5,
+        marginBottom: 5,
+      }}
+    >
+      {xLabel}
+    </Text>
+  );
+}
+
+function ChartYLabel({ yLabel, colors, chartHeight = 190 }) {
+  return (
+    <View style={{ width: 20, height: chartHeight, justifyContent: "center", alignItems: "center" }}>
+      <Text
+        style={{
+          width: chartHeight,
+          textAlign: "center",
+          fontSize: 11,
+          fontWeight: "700",
+          color: colors.textMuted,
+          transform: [{ rotate: "-90deg" }],
+        }}
+        numberOfLines={1}
+      >
+        {yLabel}
+      </Text>
+    </View>
+  );
+}
+
 const thinLabels = (labels) => {
   if (!labels || labels.length === 0) return [];
   const len = labels.length;
@@ -511,6 +568,12 @@ const thinLabels = (labels) => {
   });
 };
 
+const formatDecimal = (value, digits = 3) =>
+  Number(value).toLocaleString("id-ID", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+
 function TelemetryEmptyState({ hasTelemetry, colors, language }) {
   if (hasTelemetry) return null;
   return (
@@ -538,39 +601,44 @@ function SuhuChart({ showSuhu, tempPoints, latestTemp, colors, theme, language, 
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
         <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("suhu")} (°C)</Text>
-        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{latestTemp.toFixed(1)}°C</Text>
+        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestTemp)}°C</Text>
       </View>
 
       <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Rata-rata" : "Average"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{avgTemp.toFixed(1)}°C</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgTemp)}°C</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tertinggi" : "Highest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{maxTemp.toFixed(1)}°C</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxTemp)}°C</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Terendah" : "Lowest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{minTemp.toFixed(1)}°C</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minTemp)}°C</Text>
         </View>
       </View>
 
-      <LineChart
-        data={{
-          labels: thinLabels(graphLabels),
-          datasets: [{ data: tempPoints }],
-        }}
-        width={chartWidth - 24}
-        height={190}
-        chartConfig={chartConfig}
-        bezier
-        verticalLabelRotation={0}
-        xLabelsOffset={2}
-        style={styles.chart}
-        withHorizontalLabels={true}
-        fromZero={false}
-      />
+       <ChartXLabel xLabel="Waktu" colors={colors} />
+
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <ChartYLabel yLabel="Suhu (°C)" colors={colors} chartHeight={190} />
+        <LineChart
+          data={{
+            labels: thinLabels(graphLabels),
+            datasets: [{ data: tempPoints }],
+          }}
+          width={chartWidth - 24 - 20}
+          height={190}
+          chartConfig={chartConfig}
+          bezier
+          verticalLabelRotation={0}
+          xLabelsOffset={2}
+          style={styles.chart}
+          withHorizontalLabels={true}
+          fromZero={false}
+        />
+      </View>
     </Card>
   );
 }
@@ -586,39 +654,44 @@ function HumiChart({ showHumi, humiPoints, latestHumi, colors, theme, language, 
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
         <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("kelembapan")} (%)</Text>
-        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{latestHumi.toFixed(1)}%</Text>
+        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestHumi, 1)}%</Text>
       </View>
 
       <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Rata-rata" : "Average"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{avgHum.toFixed(1)}%</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgHum, 1)}%</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tertinggi" : "Highest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{maxHum.toFixed(1)}%</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxHum, 1)}%</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Terendah" : "Lowest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{minHum.toFixed(1)}%</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minHum, 1)}%</Text>
         </View>
       </View>
 
-      <LineChart
-        data={{
-          labels: thinLabels(graphLabels),
-          datasets: [{ data: humiPoints }],
-        }}
-        width={chartWidth - 24}
-        height={190}
-        chartConfig={chartConfig}
-        bezier
-        verticalLabelRotation={0}
-        xLabelsOffset={2}
-        style={styles.chart}
-        withHorizontalLabels={true}
-        fromZero={false}
-      />
+      <ChartXLabel xLabel="Waktu" colors={colors} />
+
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <ChartYLabel yLabel="Kelembapan (%)" colors={colors} chartHeight={190} />
+        <LineChart
+          data={{
+            labels: thinLabels(graphLabels),
+            datasets: [{ data: humiPoints }],
+          }}
+         width={chartWidth - 24 - 20}
+          height={190}
+          chartConfig={chartConfig}
+          bezier
+          verticalLabelRotation={0}
+          xLabelsOffset={2}
+          style={styles.chart}
+          withHorizontalLabels={true}
+          fromZero={false}
+        />
+      </View>
     </Card>
   );
 }
@@ -634,39 +707,44 @@ function PowerChart({ showPower, powerPoints, latestPower, colors, theme, langua
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
         <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("listrik")} (kWh)</Text>
-        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{latestPower.toFixed(3)} kWh</Text>
+        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestPower, 3)} kWh</Text>
       </View>
 
       <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Rata-rata" : "Average"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{avgPower.toFixed(3)} kWh</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgPower, 3)} kWh</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tertinggi" : "Highest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{maxPower.toFixed(3)} kWh</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxPower, 3)} kWh</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Terendah" : "Lowest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{minPower.toFixed(3)} kWh</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minPower, 3)} kWh</Text>
         </View>
       </View>
 
-      <LineChart
-        data={{
-          labels: thinLabels(graphLabels),
-          datasets: [{ data: powerPoints }],
-        }}
-        width={chartWidth - 24}
-        height={190}
-        chartConfig={chartConfig}
-        bezier
-        verticalLabelRotation={0}
-        xLabelsOffset={2}
-        style={styles.chart}
-        withHorizontalLabels={true}
-        fromZero={false}
-      />
+      <ChartXLabel xLabel="Waktu" colors={colors} />
+
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <ChartYLabel yLabel="Listrik (kWh)" colors={colors} chartHeight={190} />
+        <LineChart
+          data={{
+            labels: thinLabels(graphLabels),
+            datasets: [{ data: powerPoints }],
+          }}
+          width={chartWidth - 24 - 20}
+          height={190}
+          chartConfig={chartConfig}
+          bezier
+          verticalLabelRotation={0}
+          xLabelsOffset={2}
+          style={styles.chart}
+          withHorizontalLabels={true}
+          fromZero={false}
+        />
+      </View>
     </Card>
   );
 }

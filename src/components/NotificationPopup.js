@@ -66,10 +66,10 @@ export default function NotificationPopup({
           <View style={styles.buttonRow}>
             {onConfirm && showCancel && (
               <TouchableOpacity
-                style={[styles.btn, styles.btnCancel, { borderColor: colors.border }]}
+                style={[styles.btn, styles.btnCancel, { borderColor: colors.border, backgroundColor: colors.background }]}
                 onPress={onClose}
               >
-                <Text style={[styles.btnCancelText, { color: colors.textMuted }]}>{cancelText}</Text>
+                <Text style={[styles.btnCancelText, { color: colors.text }]}>{cancelText}</Text>
               </TouchableOpacity>
             )}
 
@@ -153,7 +153,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnCancel: {
-    backgroundColor: "transparent",
     borderWidth: 1,
   },
   btnCancelText: {

@@ -146,14 +146,14 @@ export function UserProvider({ children }) {
       // New bilingual additions
       beranda: "Beranda",
       perangkat: "Perangkat",
-      monitoring: "Monitoring",
+      monitoring: "Pemantauan",
       profil: "Profil",
       selamat_datang: "Selamat Datang,",
       status_sistem: "Status Sistem",
       device_online: "Perangkat Aktif",
       device_offline: "Perangkat Tidak Aktif",
       total_user: "Total Pengguna",
-      monitoring_sistem: "Monitoring Sistem",
+      monitoring_sistem: "Pemantauan Sistem",
       aktivitas_terakhir: "Aktivitas Terakhir",
       lihat_semua: "Lihat Semua",
       alarm: "Alarm",
@@ -220,6 +220,7 @@ export function UserProvider({ children }) {
       arah_swing: "Arah Swing (Hembusan)",
       sakelar_lampu: "Sakelar Lampu",
       hidupkan_matikan_lampu: "Hidupkan atau matikan aliran listrik lampu utama.",
+      total_perangkat: "Total Perangkat",
     },
     English: {
       menu_admin: "ADMINISTRATION MENU",
@@ -329,6 +330,7 @@ export function UserProvider({ children }) {
       arah_swing: "Swing Direction",
       sakelar_lampu: "Lamp Switch",
       hidupkan_matikan_lampu: "Turn on or turn off main light power.",
+      total_perangkat: "Total Devices", 
     }
   };
 
@@ -452,16 +454,29 @@ export function UserProvider({ children }) {
 
   // User Management Actions
   const addUser = async (userData) => {
-    return await iotService.createUser(userData.username, userData.roleId, userData.status, userData.email, userData.password);
+    return await iotService.createUser(userData.username, userData.roleId, userData.status, userData.email, userData.password, userData.photo);
   };
 
   const updateUser = async (userId, userData) => {
-    const res = await iotService.updateUser(userId, userData.roleId, userData.status, userData.email, userData.password);
+    const res = await iotService.updateUser(
+      userId,
+      userData.roleId,
+      userData.status,
+      userData.email,
+      userData.password,
+      userData.photo // ✅ tambah ini
+    );
     if (!res?.error) {
       setManagedUsers((prev) =>
         prev.map((u) =>
           (u.id === userId || u.name === userId || u.username === userId)
-            ? { ...u, status: userData.status || u.status, email: userData.email || u.email, roleId: userData.roleId || u.roleId }
+            ? {
+                ...u,
+                status: userData.status || u.status,
+                email: userData.email || u.email,
+                roleId: userData.roleId || u.roleId,
+                photo: userData.photo !== undefined ? userData.photo : u.photo, // ✅ tambah ini
+              }
             : u
         )
       );

@@ -20,7 +20,7 @@ import Button from "../components/Button";
 import { Search, Plus, MapPin, ArrowLeft } from "lucide-react-native";
 
 export default function LocationsScreen({ route, navigation }) {
-  const { user, t, theme } = useUser();
+  const { user } = useUser();
   const [locations, setLocations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");

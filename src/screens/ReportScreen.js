@@ -22,9 +22,17 @@ import {
   User,
 } from "lucide-react-native";
 
+const formatDecimal = (value, digits = 1, language = "Indonesia") =>
+  Number(value).toLocaleString(
+    language === "Indonesia" ? "id-ID" : "en-US",
+    {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }
+  );
 
 export default function ReportScreen({ navigation }) {
-  const { colors, theme, t } = useUser();
+  const { colors, theme, t, language } = useUser();
   const [selectedPeriod, setSelectedPeriod] = useState("Hari Ini");
   const [summary, setSummary]   = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +102,7 @@ export default function ReportScreen({ navigation }) {
             <ActivityIndicator size="large" color="#0059AB" />
           </View>
         ) : (
-          <ReportStatsCard summary={summary} colors={colors} theme={theme} t={t} />
+          <ReportStatsCard summary={summary} colors={colors} theme={theme} t={t} language={language} />
         )}
 
       </ScrollView>
@@ -103,26 +111,49 @@ export default function ReportScreen({ navigation }) {
 }
 
 // ── Helpers & Subcomponents ───────────────────────────────────────────────
-function ReportStatsCard({ summary, colors, theme, t }) {
+function ReportStatsCard({ summary, colors, theme, t , language }) {
   if (!summary) return null;
 
-  const totalDevStr = `${summary.totalDevice ?? "-"} ${t("bahasa") === "Indonesia" ? "unit" : "units"}`;
-  const onlineDevStr = `${summary.deviceOnline ?? "-"} ${t("bahasa") === "Indonesia" ? "unit" : "units"}`;
-  const offlineDevStr = `${summary.deviceOffline ?? "-"} ${t("bahasa") === "Indonesia" ? "unit" : "units"}`;
-  const totalUsersStr = `${summary.totalUsers ?? "-"} ${t("bahasa") === "Indonesia" ? "orang" : "users"}`;
+  const unitText = language === "Indonesia" ? "unit" : "units";
+  const userText = language === "Indonesia" ? "pengguna" : "users";
 
-  const avgTemp = Number.parseFloat(summary.avgTemperature || 0).toFixed(1);
-  const avgHum = Number.parseFloat(summary.avgHumidity || 0).toFixed(1);
-  const totalPower = Number.parseFloat(summary.totalPowerKwh || 0).toFixed(2);
+  const totalDevStr = `${summary.totalDevice ?? "-"} ${unitText}`;
+  const onlineDevStr = `${summary.deviceOnline ?? "-"} ${unitText}`;
+  const offlineDevStr = `${summary.deviceOffline ?? "-"} ${unitText}`;
+  const totalUsersStr = `${summary.totalUsers ?? "-"} ${userText}`;  
+ 
+  const avgTemp = formatDecimal(summary.avgTemperature || 0, 1, language);
+  const avgHum = formatDecimal(summary.avgHumidity || 0, 1, language);
+  const totalPower = formatDecimal(summary.totalPowerKwh || 0, 0, language);
 
-  const monitoringTitle = t("bahasa") === "Indonesia" ? "Ringkasan Monitoring" : "Monitoring Summary";
-  const deviceOnlineTitle = t("perangkat_online") || "Devices Online";
-  const deviceOfflineTitle = t("perangkat_offline") || "Devices Offline";
-  const totalUserTitle = t("total_user") || "Total Users";
-  const avgSuhuTitle = t("bahasa") === "Indonesia" ? "Rata-rata Suhu" : "Average Temperature";
-  const avgHumiTitle = t("bahasa") === "Indonesia" ? "Rata-rata Kelembapan" : "Average Humidity";
-  const totalPowerTitle = t("bahasa") === "Indonesia" ? "Total Listrik" : "Total Electricity";
-
+  const monitoringTitle =
+    language === "Indonesia"
+      ? "Ringkasan Monitoring"
+      : "Monitoring Summary";
+  const deviceOnlineTitle =
+    language === "Indonesia"
+      ? "Perangkat Online"
+      : "Devices Online";
+  const deviceOfflineTitle =
+    language === "Indonesia"
+      ? "Perangkat Offline"
+      : "Devices Offline";
+  const totalUserTitle =
+    language === "Indonesia"
+      ? "Total Pengguna"
+      : "Total Users";
+  const avgSuhuTitle =
+    language === "Indonesia"
+      ? "Rata-rata Suhu"
+      : "Average Temperature";
+  const avgHumiTitle =
+  language === "Indonesia"
+    ? "Rata-rata Kelembapan"
+    : "Average Humidity";
+const totalPowerTitle =
+  language === "Indonesia"
+    ? "Total Listrik"
+    : "Total Electricity";
   const isDark = theme === "Dark Mode";
 
   return (
@@ -137,8 +168,10 @@ function ReportStatsCard({ summary, colors, theme, t }) {
           <View style={[styles.iconContainer, { backgroundColor: isDark ? "#334155" : "#f1f5f9" }]}>
             <Tv size={16} color="#64748b" />
           </View>
-          <Text style={[styles.statLabelText, { color: colors.text }]}>Total Devices</Text>
-        </View>
+            <Text style={[styles.statLabelText, { color: colors.text }]}>
+              {language === "Indonesia" ? "Total Perangkat" : "Total Devices"}
+            </Text>        
+          </View>
         <Text style={[styles.statValueText, { color: "#2563eb" }]}>
           {totalDevStr}
         </Text>

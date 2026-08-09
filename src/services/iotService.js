@@ -80,23 +80,23 @@ export const iotService = {
     });
   },
 
-  getGraphData: async (deviceId, period = "Daily") => {
-    const params = { period };
-    return apiClient(`/api/Iot/dashboard/graph/${deviceId}`, {
-      method: "GET",
-    }, params);
-  },
-
-  getDashboardGraph: async (deviceId, period = "Daily") => {
-    return iotService.getGraphData(deviceId, period);
-  },
-
-  getGraphAverage: async (category, period = "Daily") => {
+  getGraphAverage: async (category, period = "Daily", startDate = null, endDate = null) => {
     const normCategory = category === "Kelembapan" ? "Kelembaban" : category;
     const params = { category: normCategory, period };
-    return apiClient("/api/Iot/dashboard/graph-average", {
-      method: "GET",
-    }, params);
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return apiClient("/api/Iot/dashboard/graph-average", { method: "GET" }, params);
+  },
+
+  getGraphData: async (deviceId, period = "Daily", startDate = null, endDate = null) => {
+    const params = { period };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return apiClient(`/api/Iot/dashboard/graph/${deviceId}`, { method: "GET" }, params);
+  },
+
+  getDashboardGraph: async (deviceId, period = "Daily", startDate = null, endDate = null) => {
+    return iotService.getGraphData(deviceId, period, startDate, endDate);
   },
 
   getGraphDataByDate: async (deviceId, date) => {
@@ -183,17 +183,17 @@ export const iotService = {
     });
   },
 
-  createUser: async (username, roleId, status = "Aktif", email = null, password = null) => {
+  createUser: async (username, roleId, status = "Aktif", email = null, password = null, photo = null) => {
     return apiClient("/api/Iot/users", {
       method: "POST",
-      body: JSON.stringify({ username, roleId, status, email, password }),
+      body: JSON.stringify({ username, roleId, status, email, password, photo }),
     });
   },
 
-  updateUser: async (username, roleId, status = "Aktif", email = null, password = null) => {
+  updateUser: async (username, roleId, status = "Aktif", email = null, password = null, photo = null) => {
     return apiClient("/api/Iot/users", {
       method: "PUT",
-      body: JSON.stringify({ username, roleId, status, email, password }),
+      body: JSON.stringify({ username, roleId, status, email, password, photo }), // ✅ tambah photo
     });
   },
 

@@ -18,12 +18,6 @@ import {
   ArrowLeft,
   User,
   Trash2,
-  Mail,
-  Shield,
-  Phone,
-  CheckCircle,
-  Clock,
-  Calendar,
   PenTool,
 } from "lucide-react-native";
 
@@ -200,7 +194,7 @@ export default function UserDetailScreen({ route, navigation }) {
             {selectedUserObj.photo ? (
               <Image
                 source={{
-                  uri: selectedUserObj.photo.startsWith("data:")
+                  uri: selectedUserObj.photo.startsWith("data:") || selectedUserObj.photo.startsWith("http")
                     ? selectedUserObj.photo
                     : `data:image/jpeg;base64,${selectedUserObj.photo}`,
                 }}

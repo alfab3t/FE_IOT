@@ -14,6 +14,12 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import { ArrowLeft, Thermometer, Droplets, MapPin, Wifi } from "lucide-react-native";
 
+const formatDecimal = (value, digits = 1) =>
+  Number(value).toLocaleString("id-ID", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+
 export default function SensorDetailScreen({ navigation, route }) {
   const { colors } = useUser();
   const { deviceId, deviceName, deviceLocation } = route.params || {};
@@ -143,7 +149,7 @@ function SensorReadingsCard({ temperature, humidity }) {
         </View>
         <Text style={styles.readingCardLabel}>Suhu</Text>
         <Text style={[styles.readingCardValue, { color: "#ef4444" }]}>
-          {temperature !== null ? temperature.toFixed(1) : "—"}
+          {temperature !== null ? formatDecimal(temperature, 1) : "—"}
         </Text>
         <Text style={styles.readingCardUnit}>°C</Text>
       </View>
@@ -154,7 +160,7 @@ function SensorReadingsCard({ temperature, humidity }) {
         </View>
         <Text style={styles.readingCardLabel}>Kelembaban</Text>
         <Text style={[styles.readingCardValue, { color: "#0284c7" }]}>
-          {humidity !== null ? humidity.toFixed(1) : "—"}
+          {humidity !== null ? formatDecimal(humidity, 1) : "—"}
         </Text>
         <Text style={styles.readingCardUnit}>%</Text>
       </View>

@@ -5,8 +5,11 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 import { useUser } from "../context/UserContext";
 import Input from "../components/Input";
 import NotificationPopup from "../components/NotificationPopup";
@@ -14,7 +17,11 @@ import {
   ArrowLeft,
   ChevronDown,
   User,
+  Upload,
 } from "lucide-react-native";
+
+const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+const ACCEPTED_PHOTO_LABEL = "JPG, PNG";
 
 const isValidEmail = (email) => {
   const atIdx = email.indexOf("@");
@@ -24,14 +31,22 @@ const isValidEmail = (email) => {
 
 export default function AddUserScreen({ navigation }) {
   const { addUser, colors, language, t, theme } = useUser();
+  const isIndo = language === "Indonesia";
 
   // Form States
   const [usernameInput, setUsernameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
-  const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+
+  // New user is always created as Active.
+  // Status can only be changed later from the Edit User screen.
+  const status = "Aktif";
+
+  // Profile Photo State
+  const [photoUri, setPhotoUri] = useState(null); // local uri, only for preview
+  const [photoBase64, setPhotoBase64] = useState(null); // "data:image/jpeg;base64,...." sent to backend
 
   // Custom Popup States
   const [popupVisible, setPopupVisible] = useState(false);
@@ -46,9 +61,107 @@ export default function AddUserScreen({ navigation }) {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  const showPopup = (title, message, type = "error") => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setOnConfirmAction(null);
+    setPopupVisible(true);
+  };
+
+  // Shared handling for whatever ImagePicker gives back, whether it came
+  // from the gallery or the camera: validate size, derive mime type, and
+  // store both the local preview uri and the base64 payload sent to the backend.
+  const processPickedAsset = (asset) => {
+    if (asset.fileSize && asset.fileSize > MAX_PHOTO_SIZE_BYTES) {
+      showPopup(
+        isIndo ? "Ukuran Terlalu Besar" : "File Too Large",
+        isIndo ? `Ukuran foto maksimal 2MB.` : `Maximum photo size is 2MB.`
+      );
+      return;
+    }
+
+    if (!asset.base64) {
+      showPopup(
+        isIndo ? "Gagal Memuat Foto" : "Failed to Load Photo",
+        isIndo ? "Tidak bisa membaca file foto ini." : "Could not read this photo file."
+      );
+      return;
+    }
+
+    const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
+    const mime = ext === "png" ? "image/png" : "image/jpeg";
+
+    setPhotoUri(asset.uri); // for local preview only
+    setPhotoBase64(`data:${mime};base64,${asset.base64}`); // this is what actually gets sent
+  };
+
+  const handlePickFromGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showPopup(
+        isIndo ? "Izin Dibutuhkan" : "Permission Needed",
+        isIndo
+          ? "Aplikasi memerlukan akses galeri untuk mengunggah foto profil."
+          : "The app needs gallery access to upload a profile photo."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true, // ask expo-image-picker to include base64 directly, no extra FS read needed
+    });
+
+    if (result.canceled) return;
+    processPickedAsset(result.assets[0]);
+  };
+
+  const handleTakePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showPopup(
+        isIndo ? "Izin Dibutuhkan" : "Permission Needed",
+        isIndo
+          ? "Aplikasi memerlukan akses kamera untuk mengambil foto profil."
+          : "The app needs camera access to take a profile photo."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (result.canceled) return;
+    processPickedAsset(result.assets[0]);
+  };
+
+  const handlePickPhoto = () => {
+    Alert.alert(
+      isIndo ? "Pilih Foto Profil" : "Choose Profile Photo",
+      isIndo ? "Ambil foto baru atau pilih dari galeri." : "Take a new photo or choose from gallery.",
+      [
+        { text: isIndo ? "Kamera" : "Camera", onPress: handleTakePhoto },
+        { text: isIndo ? "Galeri" : "Gallery", onPress: handlePickFromGallery },
+        { text: isIndo ? "Batal" : "Cancel", style: "cancel" },
+      ]
+    );
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUri(null);
+    setPhotoBase64(null);
+  };
+
   const validateForm = () => {
     let hasError = false;
-    const isIndo = language === "Indonesia";
 
     if (!usernameInput.trim()) {
       setUsernameError(isIndo ? "Username wajib diisi." : "Username is required.");
@@ -88,24 +201,23 @@ export default function AddUserScreen({ navigation }) {
       return val;
     };
 
+    // Plain object, sent as regular JSON — same shape as before, just with
+    // an extra "photo" field (base64 data URI, or null if none was picked).
     const userData = {
       username: usernameInput.trim(),
       email: emailInput.trim(),
       password: passwordInput,
       roleId: mapRoleNameToId(role),
-      status,
+      status, // always "Aktif" on creation
+      photo: photoBase64,
     };
 
     const response = await addUser(userData);
-    const isIndo = language === "Indonesia";
+
     if (response?.error) {
       const errTitle = isIndo ? "Gagal" : "Error";
       const errMsg = isIndo ? response.message || "Gagal menambahkan pengguna." : "Failed to add new user.";
-      setPopupTitle(errTitle);
-      setPopupMessage(errMsg);
-      setPopupType("error");
-      setOnConfirmAction(null);
-      setPopupVisible(true);
+      showPopup(errTitle, errMsg, "error");
     } else {
       const succTitle = isIndo ? "Sukses" : "Success";
       const succMsg = isIndo ? "Pengguna baru berhasil ditambahkan." : "New user successfully added.";
@@ -122,16 +234,6 @@ export default function AddUserScreen({ navigation }) {
       setPopupVisible(true);
     }
   };
-
-  let activeBgColor = colors.cardBackground;
-  if (status === "Aktif") {
-    activeBgColor = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
-  }
-
-  let inactiveBgColor = colors.cardBackground;
-  if (status === "Tidak Aktif") {
-    inactiveBgColor = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -157,9 +259,40 @@ export default function AddUserScreen({ navigation }) {
         {/* Profile photo circle */}
         <Text style={[styles.formLabel, { color: colors.text }]}>{t("foto_profil")}</Text>
         <View style={styles.avatarSection}>
-          <View style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}>
-            <User size={36} color={colors.textMuted} />
+          <TouchableOpacity
+            style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
+            onPress={handlePickPhoto}
+            activeOpacity={0.8}
+          >
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+            ) : (
+              <User size={36} color={colors.textMuted} />
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.avatarActions}>
+            <TouchableOpacity style={styles.uploadBtn} onPress={handlePickPhoto} activeOpacity={0.8}>
+              <Upload size={14} color="#0059AB" />
+              <Text style={styles.uploadBtnText}>
+                {isIndo ? "Unggah Foto" : "Upload Photo"}
+              </Text>
+            </TouchableOpacity>
+
+            {photoUri && (
+              <TouchableOpacity onPress={handleRemovePhoto} activeOpacity={0.8}>
+                <Text style={styles.removePhotoText}>
+                  {isIndo ? "Hapus" : "Remove"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
+
+          <Text style={[styles.photoHintText, { color: colors.textMuted }]}>
+            {isIndo
+              ? `Format: ${ACCEPTED_PHOTO_LABEL}. Ukuran maks. 2MB.`
+              : `Format: ${ACCEPTED_PHOTO_LABEL}. Max size 2MB.`}
+          </Text>
         </View>
 
         {/* Inputs */}
@@ -173,7 +306,7 @@ export default function AddUserScreen({ navigation }) {
             onChangeText={(val) => {
               setUsernameInput(val);
               if (!val.trim()) {
-                setUsernameError(language === "Indonesia" ? "Username wajib diisi." : "Username is required.");
+                setUsernameError(isIndo ? "Username wajib diisi." : "Username is required.");
               } else {
                 setUsernameError("");
               }
@@ -194,9 +327,9 @@ export default function AddUserScreen({ navigation }) {
             onChangeText={(val) => {
               setEmailInput(val);
               if (!val.trim()) {
-                setEmailError(language === "Indonesia" ? "Email wajib diisi." : "Email is required.");
+                setEmailError(isIndo ? "Email wajib diisi." : "Email is required.");
               } else if (!isValidEmail(val.trim())) {
-                setEmailError(language === "Indonesia" ? "Format email tidak valid." : "Invalid email format.");
+                setEmailError(isIndo ? "Format email tidak valid." : "Invalid email format.");
               } else {
                 setEmailError("");
               }
@@ -218,7 +351,7 @@ export default function AddUserScreen({ navigation }) {
             onChangeText={(val) => {
               setPasswordInput(val);
               if (!val.trim()) {
-                setPasswordError(language === "Indonesia" ? "Password wajib diisi." : "Password is required.");
+                setPasswordError(isIndo ? "Password wajib diisi." : "Password is required.");
               } else {
                 setPasswordError("");
               }
@@ -262,52 +395,11 @@ export default function AddUserScreen({ navigation }) {
           )}
         </View>
 
-        {/* Status Radio Buttons Selector */}
-        <Text style={[styles.inputLabelText, { marginTop: 10, color: colors.text }]}>
-          {t("status")}<Text style={styles.redAsterisk}>*</Text>
-        </Text>
-        
-        {/* Option 1: Aktif */}
-        <TouchableOpacity
-          style={[
-            styles.radioItemRow,
-            {
-              borderColor: status === "Aktif" ? "#0059AB" : colors.border,
-              backgroundColor: activeBgColor
-            }
-          ]}
-          onPress={() => setStatus("Aktif")}
-          activeOpacity={0.9}
-        >
-          <View style={[styles.radioOuterCircle, { borderColor: status === "Aktif" ? "#0059AB" : colors.textMuted }]}>
-            {status === "Aktif" && <View style={styles.radioInnerCircle} />}
-          </View>
-          <View style={styles.radioTextContainer}>
-            <Text style={[styles.radioTitleText, { color: colors.text }]}>{t("aktif")}</Text>
-            <Text style={[styles.radioDescText, { color: colors.textMuted }]}>{t("pengguna_dapat_login")}</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Option 2: Tidak Aktif */}
-        <TouchableOpacity
-          style={[
-            styles.radioItemRow,
-            {
-              borderColor: status === "Tidak Aktif" ? "#0059AB" : colors.border,
-              backgroundColor: inactiveBgColor
-            }
-          ]}
-          onPress={() => setStatus("Tidak Aktif")}
-          activeOpacity={0.9}
-        >
-          <View style={[styles.radioOuterCircle, { borderColor: status === "Tidak Aktif" ? "#0059AB" : colors.textMuted }]}>
-            {status === "Tidak Aktif" && <View style={styles.radioInnerCircle} />}
-          </View>
-          <View style={styles.radioTextContainer}>
-            <Text style={[styles.radioTitleText, { color: colors.text }]}>{t("nonaktif")}</Text>
-            <Text style={[styles.radioDescText, { color: colors.textMuted }]}>{t("pengguna_tidak_dapat_login")}</Text>
-          </View>
-        </TouchableOpacity>
+        {/*
+          NOTE: Status (Aktif / Tidak Aktif) selector removed per revision
+          checklist — a newly created user is always "Aktif" by default.
+          Status can only be changed afterwards from the Edit User screen.
+        */}
 
         {/* Action Buttons Row */}
         <View style={styles.btnRow}>
@@ -376,7 +468,7 @@ const styles = StyleSheet.create({
   },
   avatarSection: {
     alignItems: "flex-start",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   avatarCircle: {
     width: 72,
@@ -387,6 +479,43 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  avatarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 10,
+  },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#0059AB",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  uploadBtnText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0059AB",
+  },
+  removePhotoText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ef4444",
+  },
+  photoHintText: {
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 6,
   },
   inputContainer: {
     marginBottom: 16,
@@ -441,53 +570,6 @@ const styles = StyleSheet.create({
   optionTextActive: {
     color: "#0059AB",
     fontWeight: "800",
-  },
-  radioItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    backgroundColor: "#fff",
-  },
-  radioItemRowActive: {
-    borderColor: "#0059AB",
-    backgroundColor: "#f0f9ff",
-  },
-  radioOuterCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#cbd5e1",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 14,
-  },
-  radioOuterCircleActive: {
-    borderColor: "#0059AB",
-  },
-  radioInnerCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#0059AB",
-  },
-  radioTextContainer: {
-    flex: 1,
-  },
-  radioTitleText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  radioDescText: {
-    fontSize: 10,
-    color: "#64748b",
-    fontWeight: "600",
-    marginTop: 2,
   },
   btnRow: {
     flexDirection: "row",

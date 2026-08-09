@@ -7,13 +7,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 import { useUser } from "../context/UserContext";
 import { iotService } from "../services/iotService";
 import Input from "../components/Input";
-import { ArrowLeft, ChevronDown, User } from "lucide-react-native";
+import { ArrowLeft, ChevronDown, User, Upload } from "lucide-react-native";
 import NotificationPopup from "../components/NotificationPopup";
+
+const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 
 const mapRoleIdToName = (val) => {
   if (!val) return "Viewer";
@@ -34,16 +38,21 @@ const mapRoleNameToId = (val) => {
 export default function EditUserScreen({ route, navigation }) {
   const { colors, language, t, theme, updateUser } = useUser();
   const { editUsername } = route.params;
+  const isIndo = language === "Indonesia";
 
   // Form States
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
-  const [role, setRole] = useState("Viewer"); // Admin, Owner/Controller, Viewer
-  const [status, setStatus] = useState("Aktif"); // Aktif, Nonaktif
+  const [role, setRole] = useState("Viewer");
+  const [status, setStatus] = useState("Aktif");
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-  const [photo, setPhoto] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [originalPhoto, setOriginalPhoto] = useState(null);
+  const [photoUri, setPhotoUri] = useState(null);
+  const [photoBase64, setPhotoBase64] = useState(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
 
   // Custom Popup States
   const [popupVisible, setPopupVisible] = useState(false);
@@ -52,6 +61,14 @@ export default function EditUserScreen({ route, navigation }) {
   const [popupType, setPopupType] = useState("info");
   const [popupConfirmText] = useState("OK");
   const [onConfirmAction, setOnConfirmAction] = useState(null);
+
+  const showPopup = (title, message, type = "error") => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setOnConfirmAction(null);
+    setPopupVisible(true);
+  };
 
   useEffect(() => {
     const fetchUserDetail = async () => {
@@ -64,19 +81,120 @@ export default function EditUserScreen({ route, navigation }) {
         const rawRole = uData.roleName || uData.RoleName || uData.roleId || uData.RoleId || "ROL003";
         setRole(mapRoleIdToName(rawRole));
         setStatus(uData.status || uData.Status || "Aktif");
-        setPhoto(uData.photo || uData.Photo || null);
+
+        const rawPhoto = uData.photo || uData.Photo || null;
+        const cleanPhoto = rawPhoto && String(rawPhoto).trim() !== "" ? String(rawPhoto).trim() : null;
+        setOriginalPhoto(cleanPhoto);
+        setPhotoUri(cleanPhoto);
       }
     };
     fetchUserDetail();
   }, [editUsername]);
 
+  // ── Photo picking (sama seperti AddUserScreen) ──────────────────────────
+  const processPickedAsset = (asset) => {
+    if (asset.fileSize && asset.fileSize > MAX_PHOTO_SIZE_BYTES) {
+      showPopup(
+        isIndo ? "Ukuran Terlalu Besar" : "File Too Large",
+        isIndo ? "Ukuran foto maksimal 2MB." : "Maximum photo size is 2MB."
+      );
+      return;
+    }
+    if (!asset.base64) {
+      showPopup(
+        isIndo ? "Gagal Memuat Foto" : "Failed to Load Photo",
+        isIndo ? "Tidak bisa membaca file foto ini." : "Could not read this photo file."
+      );
+      return;
+    }
+    const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
+    const mime = ext === "png" ? "image/png" : "image/jpeg";
+
+    setPhotoUri(asset.uri);
+    setPhotoBase64(`data:${mime};base64,${asset.base64}`);
+    setPhotoRemoved(false);
+  };
+
+  const handlePickFromGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showPopup(
+        isIndo ? "Izin Dibutuhkan" : "Permission Needed",
+        isIndo
+          ? "Aplikasi memerlukan akses galeri untuk mengunggah foto profil."
+          : "The app needs gallery access to upload a profile photo."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (result.canceled) return;
+    processPickedAsset(result.assets[0]);
+  };
+
+  const handleTakePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showPopup(
+        isIndo ? "Izin Dibutuhkan" : "Permission Needed",
+        isIndo
+          ? "Aplikasi memerlukan akses kamera untuk mengambil foto profil."
+          : "The app needs camera access to take a profile photo."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (result.canceled) return;
+    processPickedAsset(result.assets[0]);
+  };
+
+  const handlePickPhoto = () => {
+    Alert.alert(
+      isIndo ? "Ubah Foto Profil" : "Change Profile Photo",
+      isIndo ? "Ambil foto baru atau pilih dari galeri." : "Take a new photo or choose from gallery.",
+      [
+        { text: isIndo ? "Kamera" : "Camera", onPress: handleTakePhoto },
+        { text: isIndo ? "Galeri" : "Gallery", onPress: handlePickFromGallery },
+        { text: isIndo ? "Batal" : "Cancel", style: "cancel" },
+      ]
+    );
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUri(null);
+    setPhotoBase64(null);
+    setPhotoRemoved(true);
+  };
+  // ──────────────────────────────────────────────────────────────────────
+
   const handleSave = async () => {
+    // Tentukan foto yang dikirim:
+    // - user pilih foto baru -> photoBase64
+    // - user hapus foto -> null
+    // - user gak sentuh sama sekali -> kirim balik originalPhoto (biar gak ke-null-in)
+    const photoToSend = photoBase64
+      ? photoBase64
+      : photoRemoved
+        ? null
+        : originalPhoto;
+
     const userData = {
       username: editUsername,
       email: emailInput.trim(),
       password: passwordInput,
       roleId: mapRoleNameToId(role),
       status: status,
+      photo: photoToSend,
     };
 
     setIsSubmitting(true);
@@ -89,7 +207,6 @@ export default function EditUserScreen({ route, navigation }) {
       setIsSubmitting(false);
     }
 
-    const isIndo = language === "Indonesia";
     const isError = !response || response.error || response.status >= 400;
 
     if (isError) {
@@ -134,11 +251,8 @@ export default function EditUserScreen({ route, navigation }) {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.navigate("UsersList");
-            }
+            if (navigation.canGoBack()) navigation.goBack();
+            else navigation.navigate("UsersList");
           }}
         >
           <ArrowLeft size={24} color={colors.text} />
@@ -148,40 +262,52 @@ export default function EditUserScreen({ route, navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile photo circle */}
+        {/* Profile photo — sekarang bisa diubah */}
         <Text style={[styles.formLabel, { color: colors.text }]}>{t("foto_profil")}</Text>
         <View style={styles.avatarSection}>
-          <View style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder, overflow: "hidden" }]}>
-            {photo ? (
+          <TouchableOpacity
+            style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder, overflow: "hidden" }]}
+            onPress={handlePickPhoto}
+            activeOpacity={0.8}
+          >
+            {photoUri ? (
               <Image
                 source={{
-                  uri: photo.startsWith("data:")
-                    ? photo
-                    : `data:image/jpeg;base64,${photo}`,
+                  uri: photoUri.startsWith("data:") || photoUri.startsWith("http") || photoUri.startsWith("file:") || photoUri.startsWith("content:")
+                    ? photoUri
+                    : `data:image/jpeg;base64,${photoUri}`,
                 }}
                 style={styles.avatarImage}
               />
             ) : (
               <User size={36} color={colors.textMuted} />
             )}
+          </TouchableOpacity>
+
+          <View style={styles.avatarActions}>
+            <TouchableOpacity style={styles.uploadBtn} onPress={handlePickPhoto} activeOpacity={0.8}>
+              <Upload size={14} color="#0059AB" />
+              <Text style={styles.uploadBtnText}>{isIndo ? "Ganti Foto" : "Change Photo"}</Text>
+            </TouchableOpacity>
+
+            {photoUri && (
+              <TouchableOpacity onPress={handleRemovePhoto} activeOpacity={0.8}>
+                <Text style={styles.removePhotoText}>{isIndo ? "Hapus" : "Remove"}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
         {/* Inputs */}
         <View style={styles.inputContainer}>
-          <Text style={[styles.inputLabelText, { color: colors.text }]}>
-            Username
-          </Text>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>Username</Text>
           <View style={[styles.rolePickerBox, { backgroundColor: colors.border, borderColor: colors.border }]}>
             <Text style={[styles.rolePickerText, { color: colors.textMuted }]}>{editUsername}</Text>
           </View>
         </View>
 
-        {/* Email Input */}
         <View style={styles.inputContainer}>
-          <Text style={[styles.inputLabelText, { color: colors.text }]}>
-            Email Pengguna
-          </Text>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>Email Pengguna</Text>
           <Input
             placeholder="Masukkan Email (Contoh: user@gmail.com)"
             value={emailInput}
@@ -191,7 +317,6 @@ export default function EditUserScreen({ route, navigation }) {
           />
         </View>
 
-        {/* Password Input (Optional for edit) */}
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
             Password Baru (Kosongkan jika tidak diubah)
@@ -204,7 +329,6 @@ export default function EditUserScreen({ route, navigation }) {
           />
         </View>
 
-        {/* Custom Role Dropdown Picker */}
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
             {t("role")}<Text style={styles.redAsterisk}>*</Text>
@@ -238,13 +362,11 @@ export default function EditUserScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* Status Selection */}
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
             {t("status")}<Text style={styles.redAsterisk}>*</Text>
           </Text>
 
-          {/* Aktif option */}
           <TouchableOpacity
             style={[
               styles.statusSelectorRow,
@@ -262,7 +384,6 @@ export default function EditUserScreen({ route, navigation }) {
             </View>
           </TouchableOpacity>
 
-          {/* Nonaktif option */}
           <TouchableOpacity
             style={[
               styles.statusSelectorRow,
@@ -281,25 +402,17 @@ export default function EditUserScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Buttons Row */}
         <View style={styles.btnRow}>
           <TouchableOpacity
             style={[styles.cancelFormBtn, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
             onPress={() => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.navigate("UsersList");
-              }
+              if (navigation.canGoBack()) navigation.goBack();
+              else navigation.navigate("UsersList");
             }}
           >
             <Text style={[styles.cancelFormText, { color: colors.text }]}>{t("batal")}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.saveFormBtn}
-            onPress={handleSave}
-            disabled={isSubmitting}
-          >
+          <TouchableOpacity style={styles.saveFormBtn} onPress={handleSave} disabled={isSubmitting}>
             <Text style={styles.saveFormText}>{t("simpan")}</Text>
           </TouchableOpacity>
         </View>
@@ -319,15 +432,8 @@ export default function EditUserScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  container: { flex: 1, backgroundColor: "#f8fafc" },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   navbar: {
     height: 60,
     backgroundColor: "#fff",
@@ -338,28 +444,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
   },
-  backBtn: {
-    padding: 8,
-  },
-  navTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0f172a",
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#64748b",
-    marginBottom: 8,
-    marginTop: 10,
-  },
-  avatarSection: {
-    alignItems: "center",
-    marginVertical: 14,
-  },
+  backBtn: { padding: 8 },
+  navTitle: { fontSize: 16, fontWeight: "800", color: "#0f172a" },
+  scrollContent: { padding: 20 },
+  formLabel: { fontSize: 12, fontWeight: "700", color: "#64748b", marginBottom: 8, marginTop: 10 },
+  avatarSection: { alignItems: "flex-start", marginBottom: 20 },
   avatarCircle: {
     width: 80,
     height: 80,
@@ -368,23 +457,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  avatarImage: { width: 80, height: 80, borderRadius: 40 },
+  avatarActions: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10 },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#0059AB",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
-  inputContainer: {
-    marginBottom: 16,
-    width: "100%",
-  },
-  inputLabelText: {
-    fontSize: 12,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  redAsterisk: {
-    color: "#ef4444",
-  },
+  uploadBtnText: { fontSize: 12, fontWeight: "800", color: "#0059AB" },
+  removePhotoText: { fontSize: 12, fontWeight: "700", color: "#ef4444" },
+  inputContainer: { marginBottom: 16, width: "100%" },
+  inputLabelText: { fontSize: 12, fontWeight: "700", marginBottom: 8 },
+  redAsterisk: { color: "#ef4444" },
   rolePickerBox: {
     height: 48,
     borderWidth: 1,
@@ -394,97 +483,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 14,
   },
-  rolePickerText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  dropdownOptionsBox: {
-    borderWidth: 1,
-    borderRadius: 12,
-    marginTop: 6,
-    overflow: "hidden",
-  },
-  dropdownOptionRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "transparent",
-  },
-  optionText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  optionTextActive: {
-    color: "#0059AB",
-    fontWeight: "800",
-  },
-  statusSelectorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderWidth: 1,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  radioCircleActive: {
-    borderColor: "#0059AB",
-  },
-  radioInnerCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#0059AB",
-  },
-  statusLabelColumn: {
-    flex: 1,
-  },
-  statusMainLabelText: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  statusSubLabelText: {
-    fontSize: 10,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  btnRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  cancelFormBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  cancelFormText: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  saveFormBtn: {
-    flex: 1,
-    height: 48,
-    backgroundColor: "#0059AB",
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  saveFormText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
-  },
+  rolePickerText: { fontSize: 14, fontWeight: "600" },
+  dropdownOptionsBox: { borderWidth: 1, borderRadius: 12, marginTop: 6, overflow: "hidden" },
+  dropdownOptionRow: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: "transparent" },
+  optionText: { fontSize: 14, fontWeight: "600" },
+  optionTextActive: { color: "#0059AB", fontWeight: "800" },
+  statusSelectorRow: { flexDirection: "row", alignItems: "center", padding: 14, borderWidth: 1, borderRadius: 12, marginBottom: 10 },
+  radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: "center", justifyContent: "center", marginRight: 12 },
+  radioCircleActive: { borderColor: "#0059AB" },
+  radioInnerCircle: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#0059AB" },
+  statusLabelColumn: { flex: 1 },
+  statusMainLabelText: { fontSize: 13, fontWeight: "800" },
+  statusSubLabelText: { fontSize: 10, fontWeight: "600", marginTop: 2 },
+  btnRow: { flexDirection: "row", gap: 12, marginTop: 20, marginBottom: 40 },
+  cancelFormBtn: { flex: 1, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  cancelFormText: { fontSize: 14, fontWeight: "800" },
+  saveFormBtn: { flex: 1, height: 48, backgroundColor: "#0059AB", borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  saveFormText: { color: "#fff", fontSize: 14, fontWeight: "800" },
 });

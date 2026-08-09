@@ -153,7 +153,17 @@ export default function UsersListScreen({ navigation }) {
         </View>
       );
     }
-    const displayRole = roleName || (roleId === "ROL001" || roleId === "ROL01" ? "Admin" : (roleId === "ROL002" || roleId === "ROL02" ? "Owner/Controller" : "Viewer"));
+    let displayRole = roleName;
+
+    if (!displayRole) {
+      if (roleId === "ROL001" || roleId === "ROL01") {
+        displayRole = "Admin";
+      } else if (roleId === "ROL002" || roleId === "ROL02") {
+        displayRole = "Owner/Controller";
+      } else {
+        displayRole = "Viewer";
+      }
+    }   
     return (
       <View style={styles.roleBadge}>
         <Text style={styles.roleBadgeText}>{displayRole}</Text>

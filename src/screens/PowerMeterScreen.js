@@ -14,6 +14,8 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import { ArrowLeft, Zap, TrendingUp, MapPin, Wifi } from "lucide-react-native";
 import { LineChart } from "react-native-chart-kit";
+import DateRangeFilter from "../components/DateRangeFilter";
+
 
 const SCREEN_WIDTH = Dimensions.get("window")?.width || 360;
 const CHART_WIDTH = SCREEN_WIDTH - 32 - 32; // padding horizontal
@@ -25,6 +27,15 @@ const PERIOD_OPTIONS = [
   { label: "Mingguan", value: "Weekly" },
 ];
 
+// Format angka dengan koma sebagai pemisah desimal (format Indonesia)
+const formatDecimal = (value, digits = 2) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
+  return Number(value).toLocaleString("id-ID", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+};
+
 export default function PowerMeterScreen({ navigation, route }) {
   const { colors } = useUser();
   const { deviceId, deviceName, deviceLocation } = route.params || {};
@@ -35,6 +46,8 @@ export default function PowerMeterScreen({ navigation, route }) {
   const [deviceStatus, setDeviceStatus] = useState("Online");
   const [graphData, setGraphData] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
+  const [rangeStart, setRangeStart] = useState(null);
+  const [rangeEnd, setRangeEnd] = useState(null);
 
   const updateDeviceState = (dev) => {
     if (!dev) {
@@ -68,7 +81,8 @@ export default function PowerMeterScreen({ navigation, route }) {
   // Load chart data
   const loadChartData = useCallback(async (period) => {
     setIsChartLoading(true);
-    const response = await iotService.getGraphData(deviceId, period);
+    const response = await iotService.getGraphData(deviceId, period,rangeStart ? rangeStart.toISOString() : null,
+    rangeEnd ? rangeEnd.toISOString() : null);
     setIsChartLoading(false);
     if (!response?.error && Array.isArray(response) && response.length > 0) {
       const sliced = response.length > 7 ? response.slice(-7) : response;
@@ -76,7 +90,7 @@ export default function PowerMeterScreen({ navigation, route }) {
     } else {
       setGraphData([]);
     }
-  }, [deviceId]);
+  }, [deviceId, rangeStart, rangeEnd]);
 
   useEffect(() => {
     loadLatestData(true);
@@ -169,15 +183,21 @@ export default function PowerMeterScreen({ navigation, route }) {
   };
 
   // ── Stats Summary ────────────────────────────────────────────────────────
-  const avgValue = graphData.length > 0
-    ? ((graphData.reduce((s, p) => s + (p.averageValue ?? p.average ?? 0), 0) / graphData.length) / 1000).toFixed(3)
-    : "—";
-  const maxValue = graphData.length > 0
-    ? (Math.max(...graphData.map((p) => p.maximumValue ?? p.max ?? 0)) / 1000).toFixed(3)
-    : "—";
-  const minValue = graphData.length > 0
-    ? (Math.min(...graphData.map((p) => p.minimumValue ?? p.min ?? 0)) / 1000).toFixed(3)
-    : "—";
+  const hasConsumption = latestValue !== null && latestValue !== undefined && Number(latestValue) > 0;
+
+  const avgValueRaw = graphData.length > 0
+    ? (graphData.reduce((s, p) => s + (p.averageValue ?? p.average ?? 0), 0) / graphData.length) / 1000
+    : null;
+  const maxValueRaw = graphData.length > 0
+    ? Math.max(...graphData.map((p) => p.maximumValue ?? p.max ?? 0)) / 1000
+    : null;
+  const minValueRaw = graphData.length > 0
+    ? Math.min(...graphData.map((p) => p.minimumValue ?? p.min ?? 0)) / 1000
+    : null;
+
+  const avgValue = formatDecimal(avgValueRaw, 3);
+  const maxValue = formatDecimal(maxValueRaw, 3);
+  const minValue = formatDecimal(minValueRaw, 3);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -227,15 +247,20 @@ export default function PowerMeterScreen({ navigation, route }) {
           {/* Current Reading Card */}
           <Card style={[styles.readingCard, { backgroundColor: "#0059AB" }]}>
             <Text style={styles.readingLabel}>Konsumsi Daya Saat Ini</Text>
-            <View style={styles.readingValueRow}>
-              <Text style={styles.readingValue}>
-                {latestValue !== null && latestValue !== undefined
-                  ? (Number(latestValue) / 1000).toFixed(2)
-                  : "—"}
-              </Text>
-              <Text style={styles.readingUnit}>kWh</Text>
-            </View>
-
+            {hasConsumption ? (
+              <View style={styles.readingValueRow}>
+                <Text style={styles.readingValue}>
+                  {formatDecimal(Number(latestValue) / 1000, 2)}
+                </Text>
+                <Text style={styles.readingUnit}>kWh</Text>
+              </View>
+            ) : (
+              <View style={styles.emptyReadingBox}>
+                <Text style={styles.emptyReadingText}>
+                  Saat ini tidak ada perangkat yang menggunakan power meter/plug ini
+                </Text>
+              </View>
+            )}
           </Card>
 
           {/* Stats Row */}
@@ -277,6 +302,13 @@ export default function PowerMeterScreen({ navigation, route }) {
               })}
             </ScrollView>
 
+            <DateRangeFilter
+              startDate={rangeStart}
+              endDate={rangeEnd}
+              onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
+              colors={colors}
+            />
+            
             {/* Chart */}
             <View style={styles.chartWrapper}>
               {renderChart()}
@@ -328,6 +360,18 @@ const styles = StyleSheet.create({
   readingValue: { color: "#fff", fontSize: 52, fontWeight: "900", lineHeight: 60 },
   readingUnit: { color: "rgba(255,255,255,0.85)", fontSize: 20, fontWeight: "700", marginBottom: 10 },
   readingDeviceId: { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 8, fontWeight: "600" },
+  emptyReadingBox: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  emptyReadingText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
+    lineHeight: 20,
+  },
 
   // Stats
   statsRow: { flexDirection: "row", gap: 8, marginBottom: 12 },

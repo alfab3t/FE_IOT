@@ -297,6 +297,7 @@ export default function ProfileScreen({ navigation }) {
         title={language === "Indonesia" ? "Keluar Sesi" : "Logout Session"}
         message={language === "Indonesia" ? "Apakah Anda yakin ingin keluar dari aplikasi?" : "Are you sure you want to logout from the application?"}
         type="warning"
+        showCancel={true}
         confirmText={language === "Indonesia" ? "Keluar" : "Logout"}
         cancelText={t("batal")}
         onClose={() => setLogoutPopupVisible(false)}
@@ -324,6 +325,8 @@ export default function ProfileScreen({ navigation }) {
     </View>
   );
 }
+
+
 
 // ── Helpers & Subcomponents ───────────────────────────────────────────────
 function UsernameModal({

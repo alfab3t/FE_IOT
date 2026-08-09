@@ -10,7 +10,6 @@ import {
   Image,
   Dimensions,
   Modal,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LineChart } from "react-native-chart-kit";
@@ -19,6 +18,7 @@ import { iotService } from "../services/iotService";
 import { authService } from "../services/authService";
 import Card from "../components/Card";
 import NotificationPopup from "../components/NotificationPopup";
+import DateRangeFilter from "../components/DateRangeFilter";
 import {
   User,
   Thermometer,
@@ -39,6 +39,47 @@ import {
 
 const chartWidth = (Dimensions.get("window")?.width || 360) - 32;
 
+const formatDecimal = (value, digits = 1) =>
+  Number(value).toLocaleString("id-ID", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+
+  function ChartXLabel({ xLabel, colors }) {
+  return (
+    <Text
+      style={{
+        textAlign: "center",
+        fontSize: 11,
+        fontWeight: "700",
+        color: colors.textMuted,
+        marginBottom: 4,
+      }}
+    >
+      {xLabel}
+    </Text>
+  );
+}
+
+function ChartYLabel({ yLabel, colors, chartHeight = 180 }) {
+  return (
+    <View style={{ width: 20, height: chartHeight, justifyContent: "center", alignItems: "center" }}>
+      <Text
+        style={{
+          width: chartHeight,
+          textAlign: "center",
+          fontSize: 11,
+          fontWeight: "700",
+          color: colors.textMuted,
+          transform: [{ rotate: "-90deg" }],
+        }}
+        numberOfLines={1}
+      >
+        {yLabel}
+      </Text>
+    </View>
+  );
+}
 // Persistent global set to track shown notifications across tab switches and remounts
 const globalSeenNotifsSet = new Set();
 
@@ -49,6 +90,8 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [rangeStart, setRangeStart] = useState(null);
+  const [rangeEnd, setRangeEnd] = useState(null);
 
   // Custom Navigation Drawers / Modals
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -60,14 +103,18 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const isOwner = selectedRoleName.toLowerCase().includes("owner") || selectedRoleName.toLowerCase().includes("controller");
   const isAdmin = selectedRoleName.toLowerCase().includes("admin");
 
+  // Drawer menu access per role — hanya "Kelola Pengguna" yang admin-only,
+  // menu lain (Laporan, Pengaturan Sistem) tampil untuk semua role
+  const canManageUsers = isAdmin;
+
   // Chart Interactive State
   const [activeChartTab, setActiveChartTab] = useState("Suhu"); // Suhu, Kelembaban, Listrik
   const [chartDataState, setChartDataState] = useState([]);
   const [chartLabelsState, setChartLabelsState] = useState([]);
 
   const loadChartData = async (tab, devicesList = devices) => {
-    // Call the average graph endpoint directly with the selected category tab (Hourly / Per Jam)
-    let response = await iotService.getGraphAverage(tab, "Hourly");
+    let response = await iotService.getGraphAverage(tab, "Hourly", rangeStart ? rangeStart.toISOString() : null,
+    rangeEnd ? rangeEnd.toISOString() : null);
     if (!response.error && Array.isArray(response) && response.length > 0) {
       if (response.length > 8) {
         response = response.slice(-8);
@@ -157,7 +204,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
   useEffect(() => {
     loadChartData(activeChartTab);
-  }, [activeChartTab]);
+  }, [activeChartTab, rangeStart, rangeEnd]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -194,24 +241,20 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   // Active Metric values
   const getMetricValue = (category) => {
     if (category === "Suhu") {
-      return stats.avgSuhu > 0 ? `${stats.avgSuhu.toFixed(1)}°C` : "26.3°C";
+      return stats.avgSuhu > 0 ? `${formatDecimal(stats.avgSuhu, 1)}°C` : "26.3°C";
     }
     if (category === "Kelembaban") {
-      return stats.avgHumi > 0 ? `${stats.avgHumi.toFixed(1)}%` : "64.2%";
+      return stats.avgHumi > 0 ? `${formatDecimal(stats.avgHumi, 1)}%` : "64.2%";
     }
     if (category === "Listrik") {
       // stats.avgPower is in Watts, convert to kW
-      return stats.avgPower > 0 ? `${(stats.avgPower / 1000.0).toFixed(1)} kW` : "542.7 kWh";
+      return stats.avgPower > 0 ? `${formatDecimal(stats.avgPower / 1000.0, 1)} kW` : "542.7 kWh";
     }
     if (category === "Air") {
-      return "13.8 m³";
+      return "13,8 m³";
     }
     return "N/A";
   };
-
-  useEffect(() => {
-    loadChartData(activeChartTab);
-  }, [activeChartTab]);
 
   const getChartStats = () => {
     if (!chartDataState || chartDataState.length === 0) {
@@ -228,12 +271,12 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     else if (activeChartTab === "Listrik") unit = " kW";
 
     // Estimasi total energi untuk Listrik (rata-rata kW * 2 jam)
-    const energyVal = activeChartTab === "Listrik" ? `${(avg * 2.0).toFixed(2)} kWh` : "-";
+    const energyVal = activeChartTab === "Listrik" ? `${formatDecimal(avg * 2.0, 2)} kWh` : "-";
 
     return {
-      avg: `${avg.toFixed(1)}${unit}`,
-      min: `${min.toFixed(1)}${unit}`,
-      max: `${max.toFixed(1)}${unit}`,
+      avg: `${formatDecimal(avg, 1)}${unit}`,
+      min: `${formatDecimal(min, 1)}${unit}`,
+      max: `${formatDecimal(max, 1)}${unit}`,
       energy: energyVal
     };
   };
@@ -249,6 +292,13 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     propsForDots: { r: "3", strokeWidth: "2", stroke: "#0059AB" },
     propsForLabels: { fontSize: 9 },
   };
+
+  const getYAxisLabel = () => {
+  if (activeChartTab === "Suhu") return "Suhu (°C)";
+  if (activeChartTab === "Kelembaban") return "Kelembapan (%)";
+  if (activeChartTab === "Listrik") return "Listrik (kW)";
+  return "";
+};
 
   // Thin out labels: only show every Nth label to prevent X-axis overlap
   const thinLabels = (labels) => {
@@ -272,7 +322,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         <View style={styles.summaryRow}>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
             <Smartphone size={24} color="#0059AB" />
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Perangkat</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t("total_perangkat")}</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{totalDevices || 54}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: colors.cardBackground }]}>
@@ -317,6 +367,13 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             })}
           </View>
 
+          <DateRangeFilter
+            startDate={rangeStart}
+            endDate={rangeEnd}
+            onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
+            colors={colors}
+          />
+
           {/* Stats Summary Info Panel */}
           {chartDataState.length > 0 && (
             <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
@@ -349,19 +406,25 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
               </Text>
             </View>
           ) : (
-            <LineChart
-              data={{
-                labels: thinLabels(chartLabelsState),
-                datasets: [{ data: chartDataState }],
-              }}
-              width={chartWidth}
-              height={180}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chartVisual}
-              withHorizontalLabels={true}
-              fromZero={false}
-            />
+            <>
+              <ChartXLabel xLabel="Waktu" colors={colors} />
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ChartYLabel yLabel={getYAxisLabel()} colors={colors} chartHeight={180} />
+                <LineChart
+                  data={{
+                    labels: thinLabels(chartLabelsState),
+                    datasets: [{ data: chartDataState }],
+                  }}
+                  width={chartWidth - 20 - 32}
+                  height={180}
+                  chartConfig={chartConfig}
+                  bezier
+                  style={styles.chartVisual}
+                  withHorizontalLabels={true}
+                  fromZero={false}
+                />
+              </View>
+           </>
           )}
 
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(2)}>
@@ -384,7 +447,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 <View style={styles.statusRowBadge}>
                   <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
                   <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                    {isOnline ? "Online" : "Offline"}
+                    {isOnline ? t("device_online") : t("device_offline")}
                   </Text>
                 </View>
               </View>
@@ -481,6 +544,13 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             {t("grafik")} {t(activeChartTab === "Kelembaban" ? "kelembapan" : activeChartTab.toLowerCase())}
           </Text>
 
+          <DateRangeFilter
+            startDate={rangeStart}
+            endDate={rangeEnd}
+            onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
+            colors={colors}
+          />
+
           {/* Stats Summary Info Panel */}
           {chartDataState.length > 0 && (
             <View style={styles.chartStatsRow}>
@@ -512,19 +582,25 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
               </Text>
             </View>
           ) : (
-            <LineChart
-              data={{
-                labels: thinLabels(chartLabelsState),
-                datasets: [{ data: chartDataState }],
-              }}
-              width={chartWidth}
-              height={180}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chartVisual}
-              withHorizontalLabels={true}
-              fromZero={false}
-            />
+            <>
+              <ChartXLabel xLabel="Waktu" colors={colors} />
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ChartYLabel yLabel={getYAxisLabel()} colors={colors} chartHeight={180} />
+                <LineChart
+                  data={{
+                    labels: thinLabels(chartLabelsState),
+                    datasets: [{ data: chartDataState }],
+                  }}
+                  width={chartWidth - 20 - 32}
+                  height={180}
+                  chartConfig={chartConfig}
+                  bezier
+                  style={styles.chartVisual}
+                  withHorizontalLabels={true}
+                  fromZero={false}
+                />
+              </View>
+            </>
           )}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(2)}>
             <Text style={styles.chartLinkText}>{t("lihat_semua")}</Text>
@@ -533,7 +609,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         </Card>
 
         {/* Perangkat Aktif */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Active Devices</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("perangkat_aktif")}</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {devices.filter((d) => d.category === "AC" || d.category === "Lampu").slice(0, 3).map((dev) => {
             const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");
@@ -560,7 +636,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                 <View style={styles.statusRowBadge}>
                   <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
                   <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                    {isOnline ? "Online" : "Offline"}
+                    {isOnline ? t("online") : t("offline")}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -693,23 +769,27 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
               </View>
             </View>
 
-            {/* Menu List */}
+            {/* Menu List — menu yg tampil disaring sesuai role (isAdmin / isOwner / viewer) */}
             <ScrollView contentContainerStyle={styles.drawerMenuScroll}>
-              <Text style={[styles.drawerSectionHeader, { color: colors.textMuted }]}>{t("menu_admin")}</Text>
+              <Text style={[styles.drawerSectionHeader, { color: colors.textMuted }]}>
+                {isAdmin ? t("menu_admin") : t("menu")}
+              </Text>
 
-              <TouchableOpacity
-                style={styles.drawerMenuItem}
-                onPress={() => {
-                  setDrawerVisible(false);
-                  navigation.navigate("UsersList");
-                }}
-              >
-                <View style={[styles.menuIconContainer, { backgroundColor: colors.background }]}>
-                  <User size={18} color="#0059AB" />
-                </View>
-                <Text style={[styles.menuItemText, { color: colors.text }]}>{t("kelola_pengguna")}</Text>
-                <ChevronRight size={18} color={colors.textMuted} />
-              </TouchableOpacity>
+              {canManageUsers && (
+                <TouchableOpacity
+                  style={styles.drawerMenuItem}
+                  onPress={() => {
+                    setDrawerVisible(false);
+                    navigation.navigate("UsersList");
+                  }}
+                >
+                  <View style={[styles.menuIconContainer, { backgroundColor: colors.background }]}>
+                    <User size={18} color="#0059AB" />
+                  </View>
+                  <Text style={[styles.menuItemText, { color: colors.text }]}>{t("kelola_pengguna")}</Text>
+                  <ChevronRight size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={styles.drawerMenuItem}
@@ -864,6 +944,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         type="warning"
         confirmText={t("logout_btn")}
         cancelText={t("batal")}
+        showCancel
         onClose={() => setLogoutPopupVisible(false)}
         onConfirm={() => {
           setLogoutPopupVisible(false);
