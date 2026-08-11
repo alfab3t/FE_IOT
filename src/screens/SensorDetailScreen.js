@@ -21,7 +21,7 @@ const formatDecimal = (value, digits = 1) =>
   });
 
 export default function SensorDetailScreen({ navigation, route }) {
-  const { colors } = useUser();
+  const { colors, language } = useUser();
   const { deviceId, deviceName, deviceLocation } = route.params || {};
 
   const [isLoading, setIsLoading] = useState(true);
@@ -79,7 +79,9 @@ export default function SensorDetailScreen({ navigation, route }) {
         <SensorNavBar navigation={navigation} deviceName={deviceName} colors={colors} />
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Memuat data sensor...</Text>
+          <Text style={[styles.loaderText, { color: colors.textMuted }]}>
+            {language === "Indonesia" ? "Memuat data sensor..." : "Loading sensor data..."}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -90,9 +92,9 @@ export default function SensorDetailScreen({ navigation, route }) {
       <SensorNavBar navigation={navigation} deviceName={deviceName} colors={colors} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <SensorInfoCard deviceName={deviceName} deviceLocation={deviceLocation} deviceStatus={deviceStatus} colors={colors} />
-        <SensorReadingsCard temperature={temperature} humidity={humidity} />
-        <SensorStatusCard temperature={temperature} humidity={humidity} colors={colors} />
-        <LocationHistoryCard locationHistory={locationHistory} colors={colors} />
+        <SensorReadingsCard temperature={temperature} humidity={humidity} language={language} />
+        <SensorStatusCard temperature={temperature} humidity={humidity} colors={colors} language={language} />
+        <LocationHistoryCard locationHistory={locationHistory} colors={colors} language={language} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -140,14 +142,16 @@ function SensorInfoCard({ deviceName, deviceLocation, deviceStatus, colors }) {
   );
 }
 
-function SensorReadingsCard({ temperature, humidity }) {
+function SensorReadingsCard({ temperature, humidity, language }) {
   return (
     <View style={styles.readingsRow}>
       <View style={[styles.readingCard, { backgroundColor: "#fef2f2" }]}>
         <View style={[styles.readingIconCircle, { backgroundColor: "#fee2e2" }]}>
           <Thermometer size={22} color="#ef4444" />
         </View>
-        <Text style={styles.readingCardLabel}>Suhu</Text>
+        <Text style={styles.readingCardLabel}>
+          {language === "Indonesia" ? "Suhu" : "Temperature"}
+        </Text>
         <Text style={[styles.readingCardValue, { color: "#ef4444" }]}>
           {temperature !== null ? formatDecimal(temperature, 1) : "—"}
         </Text>
@@ -158,7 +162,9 @@ function SensorReadingsCard({ temperature, humidity }) {
         <View style={[styles.readingIconCircle, { backgroundColor: "#dbeafe" }]}>
           <Droplets size={22} color="#0284c7" />
         </View>
-        <Text style={styles.readingCardLabel}>Kelembaban</Text>
+        <Text style={styles.readingCardLabel}>
+          {language === "Indonesia" ? "Kelembaban" : "Humidity"}
+        </Text>
         <Text style={[styles.readingCardValue, { color: "#0284c7" }]}>
           {humidity !== null ? formatDecimal(humidity, 1) : "—"}
         </Text>
@@ -168,17 +174,25 @@ function SensorReadingsCard({ temperature, humidity }) {
   );
 }
 
-function SensorStatusCard({ temperature, humidity, colors }) {
+function SensorStatusCard({ temperature, humidity, colors, language }) {
   const getTempStatus = () => {
-    if (temperature !== null && temperature > 30) return "⚠️ Suhu di atas normal (> 30°C)";
-    if (temperature !== null && temperature < 18) return "❄️ Suhu di bawah normal (< 18°C)";
-    return "✅ Suhu dalam kondisi normal";
+    if (temperature !== null && temperature > 30) {
+      return language === "Indonesia" ? "⚠️ Suhu di atas normal (> 30°C)" : "⚠️ Temperature above normal (> 30°C)";
+    }
+    if (temperature !== null && temperature < 18) {
+      return language === "Indonesia" ? "❄️ Suhu di bawah normal (< 18°C)" : "❄️ Temperature below normal (< 18°C)";
+    }
+    return language === "Indonesia" ? "✅ Suhu dalam kondisi normal" : "✅ Temperature is normal";
   };
 
   const getHumiStatus = () => {
-    if (humidity > 80) return "💧 Kelembaban sangat tinggi (> 80%)";
-    if (humidity < 40) return "🌵 Kelembaban terlalu rendah (< 40%)";
-    return "✅ Kelembaban dalam kondisi normal";
+    if (humidity > 80) {
+      return language === "Indonesia" ? "💧 Kelembaban sangat tinggi (> 80%)" : "💧 Humidity very high (> 80%)";
+    }
+    if (humidity < 40) {
+      return language === "Indonesia" ? "🌵 Kelembaban terlalu rendah (< 40%)" : "🌵 Humidity too low (< 40%)";
+    }
+    return language === "Indonesia" ? "✅ Kelembaban dalam kondisi normal" : "✅ Humidity is normal";
   };
 
   return (
@@ -205,34 +219,160 @@ function SensorStatusCard({ temperature, humidity, colors }) {
   );
 }
 
-function LocationHistoryCard({ locationHistory, colors }) {
+const formatLocationHistoryText = (text, language) => {
+  if (!text || typeof text !== "string") return text || "-";
+  if (language === "Indonesia") return text;
+  return text
+    .replace(/\bSekarang\b/gi, "Present")
+    .replace(/\bLokasi Terbaru\b/gi, "Latest Location")
+    .replace(/\bTerbaru\b/gi, "Latest")
+    .replace(/\bHari Ini\b/gi, "Today")
+    .replace(/\bMinggu Ini\b/gi, "This Week")
+    .replace(/\bBulan Ini\b/gi, "This Month")
+    .replace(/\bDari\b/gi, "From")
+    .replace(/\bKe\b/gi, "To")
+    .replace(/\bs\/d\b/gi, "-")
+    .replace(/\bsd\b/gi, "-")
+    .replace(/\bsampai\b/gi, "to")
+
+    // Specific Dashboard Device Titles & Rooms
+    .replace(/\bAC Ruang Lab\b/gi, "Lab Room AC")
+    .replace(/\bLampu Ruang Lab\b/gi, "Lab Room Lamp")
+    .replace(/\bPower Meter Gedung B\b/gi, "Building B Power Meter")
+    .replace(/\bPower Meter Gedung C\b/gi, "Building C Power Meter")
+    .replace(/\bPower Meter Gedung D\b/gi, "Building D Power Meter")
+    .replace(/\bPower Meter Gedung\b/gi, "Building Power Meter")
+    .replace(/\bWater Meter Gedung C\b/gi, "Building C Water Meter")
+    .replace(/\bWater Meter Gedung\b/gi, "Building Water Meter")
+    .replace(/\bRuang Dosen PSI\b/gi, "PSI Lecturer Room")
+    .replace(/\bRuang Lab\b/gi, "Lab Room")
+
+    // General Category Filters & Devices
+    .replace(/\bTemperatur & Kelembaban\b/gi, "Temperature & Humidity")
+    .replace(/\bTemperatur & Kelembapan\b/gi, "Temperature & Humidity")
+    .replace(/\bSensor Suhu & Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu dan Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu & Kelembapan\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu\b/gi, "Temperature Sensor")
+    .replace(/\bSensor Kelembaban\b/gi, "Humidity Sensor")
+    .replace(/\bSensor Kelembapan\b/gi, "Humidity Sensor")
+    .replace(/\bPower Meter\b/gi, "Power Meter")
+    .replace(/\bWater Meter\b/gi, "Water Meter")
+    .replace(/\bMeteran Air\b/gi, "Water Meter")
+    .replace(/\bMeteran Listrik\b/gi, "Power Meter")
+    .replace(/\bKontrol AC\b/gi, "AC Control")
+    .replace(/\bKontrol Lampu\b/gi, "Lamp Control")
+    .replace(/\bLampu Utama\b/gi, "Main Lamp")
+    .replace(/\bLampu\b/gi, "Lamp")
+    .replace(/\bListrik\b/gi, "Power / Electricity")
+    .replace(/\bSemua Perangkat\b/gi, "All Devices")
+    .replace(/\bSemua Kategori\b/gi, "All Categories")
+    .replace(/\bSemua\b/gi, "All")
+    .replace(/\bPerangkat Aktif\b/gi, "Active Devices")
+    .replace(/\bPerangkat Tidak Aktif\b/gi, "Inactive Devices")
+
+    // Labs & Rooms
+    .replace(/\bLab IoT\b/gi, "IoT Lab")
+    .replace(/\bLab Kontrol\b/gi, "Control Lab")
+    .replace(/\bLab Otomotif\b/gi, "Automotive Lab")
+    .replace(/\bLab Pemrograman\b/gi, "Programming Lab")
+    .replace(/\bLab AI\b/gi, "AI Lab")
+    .replace(/\bLab Mekatronika\b/gi, "Mechatronics Lab")
+    .replace(/\bLab Komputer\b/gi, "Computer Lab")
+    .replace(/\bLab Otomasi\b/gi, "Automation Lab")
+    .replace(/\bLab Robotika\b/gi, "Robotics Lab")
+    .replace(/\bLab Elektronika\b/gi, "Electronics Lab")
+    .replace(/\bLab Jaringan\b/gi, "Network Lab")
+    .replace(/\bLab Telekomunikasi\b/gi, "Telecommunication Lab")
+    .replace(/\bLab Manufaktur\b/gi, "Manufacturing Lab")
+    .replace(/\bLab Multimedia\b/gi, "Multimedia Lab")
+    .replace(/\bLab Basis Data\b/gi, "Database Lab")
+    .replace(/\bLab Bahasa\b/gi, "Language Lab")
+    .replace(/\bLaboratorium\b/gi, "Laboratory")
+    .replace(/\bRuang Dosen\b/gi, "Lecturer Room")
+    .replace(/\bRuang Dekan\b/gi, "Dean Room")
+    .replace(/\bRuang Kaprodi\b/gi, "Department Head Room")
+    .replace(/\bRuang Rapat Utama\b/gi, "Main Meeting Room")
+    .replace(/\bRuang Rapat\b/gi, "Meeting Room")
+    .replace(/\bRuang Server\b/gi, "Server Room")
+    .replace(/\bRuang Kontrol\b/gi, "Control Room")
+    .replace(/\bRuang Direktur\b/gi, "Director Room")
+    .replace(/\bRuang Staf\b/gi, "Staff Room")
+    .replace(/\bRuang Kuliah\b/gi, "Lecture Room")
+    .replace(/\bRuang Kelas\b/gi, "Classroom")
+    .replace(/\bRuangan\b/gi, "Room")
+    .replace(/\bRuang\b/gi, "Room")
+    .replace(/\bGedung A\b/gi, "Building A")
+    .replace(/\bGedung B\b/gi, "Building B")
+    .replace(/\bGedung C\b/gi, "Building C")
+    .replace(/\bGedung D\b/gi, "Building D")
+    .replace(/\bGedung E\b/gi, "Building E")
+    .replace(/\bGedung Utama\b/gi, "Main Building")
+    .replace(/\bGedung\b/gi, "Building")
+    .replace(/\bLantai\b/gi, "Floor")
+    .replace(/\bSenin\b/gi, "Monday")
+    .replace(/\bSelasa\b/gi, "Tuesday")
+    .replace(/\bRabu\b/gi, "Wednesday")
+    .replace(/\bKamis\b/gi, "Thursday")
+    .replace(/\bJum'at\b/gi, "Friday")
+    .replace(/\bJumat\b/gi, "Friday")
+    .replace(/\bSabtu\b/gi, "Saturday")
+    .replace(/\bMinggu\b/gi, "Sunday")
+    .replace(/\bJanuari\b/gi, "January")
+    .replace(/\bFebruari\b/gi, "February")
+    .replace(/\bMaret\b/gi, "March")
+    .replace(/\bMei\b/gi, "May")
+    .replace(/\bJuni\b/gi, "June")
+    .replace(/\bJuli\b/gi, "July")
+    .replace(/\bAgustus\b/gi, "August")
+    .replace(/\bAgt\b/gi, "Aug")
+    .replace(/\bAgu\b/gi, "Aug")
+    .replace(/\bSeptember\b/gi, "September")
+    .replace(/\bSept?\b/gi, "Sep")
+    .replace(/\bOktober\b/gi, "October")
+    .replace(/\bOkt\b/gi, "Oct")
+    .replace(/\bNovember\b/gi, "November")
+    .replace(/\bNov\b/gi, "Nov")
+    .replace(/\bDesember\b/gi, "December")
+    .replace(/\bDes\b/gi, "Dec");
+};
+
+function LocationHistoryCard({ locationHistory, colors, language }) {
   const items = Array.isArray(locationHistory) ? locationHistory : [];
 
   return (
     <Card style={{ padding: 16, marginTop: 12, backgroundColor: colors.cardBackground }}>
       <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 12 }}>
-        Riwayat Perpindahan Lokasi
+        {language === "Indonesia" ? "Riwayat Perpindahan Lokasi" : "Location Transfer History"}
       </Text>
       {items.length > 0 ? (
-        items.map((h, idx) => (
-          <View key={h.id || h.historyId || `loc-${idx}`} style={{ flexDirection: "row", gap: 12, marginBottom: idx === items.length - 1 ? 0 : 12 }}>
-            <View style={{ alignItems: "center", width: 14 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
-              {idx < items.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
+        items.map((h, idx) => {
+          const rawPeriod = h.periodText || h.PeriodText || "-";
+          const rawRoom = h.ruangan || h.Ruangan || "-";
+          const period = formatLocationHistoryText(rawPeriod, language);
+          const room = formatLocationHistoryText(rawRoom, language);
+          return (
+            <View key={h.id || h.historyId || `loc-${idx}`} style={{ flexDirection: "row", gap: 12, marginBottom: idx === items.length - 1 ? 0 : 12 }}>
+              <View style={{ alignItems: "center", width: 14 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: idx === 0 ? "#10b981" : "#0059AB", marginTop: 2 }} />
+                {idx < items.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: "#cbd5e1", marginTop: 2 }} />}
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB" }}>
+                  {period}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>
+                  {room}
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={{ fontSize: 11, fontWeight: "700", color: idx === 0 ? "#10b981" : "#0059AB" }}>
-                {h.periodText || h.PeriodText}
-              </Text>
-              <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>
-                {h.ruangan || h.Ruangan}
-              </Text>
-            </View>
-          </View>
-        ))
+          );
+        })
       ) : (
         <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
-          Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+          {language === "Indonesia"
+            ? "Belum ada riwayat perpindahan lokasi untuk perangkat ini."
+            : "No location transfer history recorded for this device."}
         </Text>
       )}
     </Card>

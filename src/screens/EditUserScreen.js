@@ -307,9 +307,9 @@ export default function EditUserScreen({ route, navigation }) {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={[styles.inputLabelText, { color: colors.text }]}>Email Pengguna</Text>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>{isIndo ? "Email Pengguna" : "User Email"}</Text>
           <Input
-            placeholder="Masukkan Email (Contoh: user@gmail.com)"
+            placeholder={isIndo ? "Masukkan Email (Contoh: user@gmail.com)" : "Enter Email (e.g. user@gmail.com)"}
             value={emailInput}
             onChangeText={(val) => setEmailInput(val)}
             keyboardType="email-address"
@@ -319,10 +319,10 @@ export default function EditUserScreen({ route, navigation }) {
 
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
-            Password Baru (Kosongkan jika tidak diubah)
+            {isIndo ? "Password Baru (Kosongkan jika tidak diubah)" : "New Password (Leave blank if unchanged)"}
           </Text>
           <Input
-            placeholder="Masukkan Password Baru (Opsional)"
+            placeholder={isIndo ? "Masukkan Password Baru (Opsional)" : "Enter New Password (Optional)"}
             value={passwordInput}
             onChangeText={(val) => setPasswordInput(val)}
             secureTextEntry={true}

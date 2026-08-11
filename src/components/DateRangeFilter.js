@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Calendar, X } from "lucide-react-native";
+import { useUser } from "../context/UserContext";
 
-const formatDate = (date) => {
-  if (!date) return "Pilih";
-  return date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+const formatDate = (date, lang = "Indonesia") => {
+  if (!date) return lang === "Indonesia" ? "Pilih" : "Select";
+  return date.toLocaleDateString(lang === "Indonesia" ? "id-ID" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
 };
 
 /**
@@ -15,6 +16,7 @@ const formatDate = (date) => {
  * - colors: theme colors from useUser()
  */
 export default function DateRangeFilter({ startDate, endDate, onChange, colors }) {
+  const { language } = useUser();
   const [activeTarget, setActiveTarget] = useState(null); // "start" | "end" | null
   const [tempDate, setTempDate] = useState(new Date());
 
@@ -55,8 +57,8 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
         >
           <Calendar size={13} color="#0059AB" />
           <View>
-            <Text style={[styles.pillLabel, { color: colors.textMuted }]}>Dari</Text>
-            <Text style={[styles.pillText, { color: colors.text }]}>{formatDate(startDate)}</Text>
+            <Text style={[styles.pillLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Dari" : "From"}</Text>
+            <Text style={[styles.pillText, { color: colors.text }]}>{formatDate(startDate, language)}</Text>
           </View>
         </TouchableOpacity>
 
@@ -68,8 +70,8 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
         >
           <Calendar size={13} color="#0059AB" />
           <View>
-            <Text style={[styles.pillLabel, { color: colors.textMuted }]}>Sampai</Text>
-            <Text style={[styles.pillText, { color: colors.text }]}>{formatDate(endDate)}</Text>
+            <Text style={[styles.pillLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Sampai" : "To"}</Text>
+            <Text style={[styles.pillText, { color: colors.text }]}>{formatDate(endDate, language)}</Text>
           </View>
         </TouchableOpacity>
 
@@ -98,7 +100,7 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
             <View style={[styles.modalSheet, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {activeTarget === "start" ? "Pilih Tanggal Mulai" : "Pilih Tanggal Selesai"}
+                  {activeTarget === "start" ? (language === "Indonesia" ? "Pilih Tanggal Mulai" : "Select Start Date") : (language === "Indonesia" ? "Pilih Tanggal Selesai" : "Select End Date")}
                 </Text>
                 <TouchableOpacity onPress={closePicker}>
                   <X size={20} color={colors.textMuted} />
@@ -115,7 +117,7 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
               />
 
               <TouchableOpacity style={styles.confirmBtn} onPress={confirmIos}>
-                <Text style={styles.confirmBtnText}>Selesai</Text>
+                <Text style={styles.confirmBtnText}>{language === "Indonesia" ? "Selesai" : "Done"}</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -3,15 +3,19 @@ import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Button from "../components/Button";
+import { useUser } from "../context/UserContext";
 
 export default function ScanScreen({ route, navigation }) {
+  const { language } = useUser();
   const [permission, requestPermission] = useCameraPermissions();
   const { returnScreen } = route.params || {};
 
   if (!permission) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.infoText}>Memuat izin kamera...</Text>
+        <Text style={styles.infoText}>
+          {language === "Indonesia" ? "Memuat izin kamera..." : "Loading camera permission..."}
+        </Text>
       </View>
     );
   }
@@ -20,11 +24,19 @@ export default function ScanScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.permissionContainer}>
         <View style={styles.permissionContent}>
-          <Text style={styles.permissionTitle}>Izin Kamera Diperlukan</Text>
-          <Text style={styles.permissionText}>
-            Aplikasi membutuhkan akses kamera untuk memindai kode QR / MAC Address yang tertempel di perangkat fisik IoT Anda.
+          <Text style={styles.permissionTitle}>
+            {language === "Indonesia" ? "Izin Kamera Diperlukan" : "Camera Permission Required"}
           </Text>
-          <Button label="Berikan Izin Kamera" onPress={requestPermission} type="primary" />
+          <Text style={styles.permissionText}>
+            {language === "Indonesia"
+              ? "Aplikasi membutuhkan akses kamera untuk memindai kode QR / MAC Address yang tertempel di perangkat fisik IoT Anda."
+              : "App needs camera access to scan QR codes or MAC Addresses on your IoT physical devices."}
+          </Text>
+          <Button
+            label={language === "Indonesia" ? "Berikan Izin Kamera" : "Grant Camera Permission"}
+            onPress={requestPermission}
+            type="primary"
+          />
           <TouchableOpacity
             style={styles.cancelTextBtn}
             onPress={() => {
@@ -35,7 +47,7 @@ export default function ScanScreen({ route, navigation }) {
               }
             }}
           >
-            <Text style={styles.cancelTextLink}>Kembali</Text>
+            <Text style={styles.cancelTextLink}>{language === "Indonesia" ? "Kembali" : "Back"}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -58,7 +70,9 @@ export default function ScanScreen({ route, navigation }) {
       />
       <View style={styles.overlay}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Scan QR Code Perangkat</Text>
+          <Text style={styles.headerTitle}>
+            {language === "Indonesia" ? "Scan QR Code Perangkat" : "Scan Device QR Code"}
+          </Text>
         </View>
         
         <View style={styles.scannerFrame} />
@@ -73,7 +87,7 @@ export default function ScanScreen({ route, navigation }) {
             }
           }}
         >
-          <Text style={styles.cancelText}>Batal</Text>
+          <Text style={styles.cancelText}>{language === "Indonesia" ? "Batal" : "Cancel"}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -301,7 +301,7 @@ export default function AddUserScreen({ navigation }) {
             Username<Text style={styles.redAsterisk}>*</Text>
           </Text>
           <Input
-            placeholder="Masukkan Username (Contoh: user123)"
+            placeholder={isIndo ? "Masukkan Username (Contoh: user123)" : "Enter Username (e.g. user123)"}
             value={usernameInput}
             onChangeText={(val) => {
               setUsernameInput(val);
@@ -319,10 +319,10 @@ export default function AddUserScreen({ navigation }) {
         {/* Email Input */}
         <View style={styles.inputContainer}>
           <Text style={[styles.inputLabelText, { color: colors.text }]}>
-            Email Pengguna<Text style={styles.redAsterisk}>*</Text>
+            {isIndo ? "Email Pengguna" : "User Email"}<Text style={styles.redAsterisk}>*</Text>
           </Text>
           <Input
-            placeholder="Masukkan Email (Contoh: user@gmail.com)"
+            placeholder={isIndo ? "Masukkan Email (Contoh: user@gmail.com)" : "Enter Email (e.g. user@gmail.com)"}
             value={emailInput}
             onChangeText={(val) => {
               setEmailInput(val);
@@ -346,7 +346,7 @@ export default function AddUserScreen({ navigation }) {
             Password<Text style={styles.redAsterisk}>*</Text>
           </Text>
           <Input
-            placeholder="Masukkan Password"
+            placeholder={isIndo ? "Masukkan Password" : "Enter Password"}
             value={passwordInput}
             onChangeText={(val) => {
               setPasswordInput(val);

@@ -40,6 +40,14 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     setActiveTab(tab);
   };
 
+  const handlePeriodChange = (newPeriod) => {
+    if (newPeriod === "Per Jam") {
+      setRangeStart(null);
+      setRangeEnd(null);
+    }
+    setTimePeriod(newPeriod);
+  };
+
   const loadMonitoringData = async (isInitialLoad = false) => {
     if (isInitialLoad) setIsLoading(true);
     const response = await iotService.getDashboardLatest();
@@ -97,9 +105,64 @@ export default function AggregateDashboardScreen({ route, navigation, isTab = fa
     }
   };
 
+const fillMissingDataPoints = (points) => {
+  if (!points || !Array.isArray(points) || points.length === 0) return [];
+  let lastVal = 0;
+  for (const v of points) {
+    const num = Number(v);
+    if (num && !Number.isNaN(num) && num > 0) {
+      lastVal = num;
+      break;
+    }
+  }
+  return points.map((v) => {
+    const num = Number(v);
+    if (num && !Number.isNaN(num) && num > 0) {
+      lastVal = num;
+      return num;
+    }
+    return lastVal;
+  });
+};
+
+const formatTableTime = (timeStr, lang) => {
+  if (!timeStr || lang === "Indonesia") return timeStr;
+  let formatted = timeStr;
+  formatted = formatted.replace(/^Minggu\s+(\d+)/i, "Week $1");
+  formatted = formatted.replace(/^Minggu ke-(\d+)/i, "Week $1");
+  formatted = formatted.replace(/^Minggu ke (\d+)/i, "Week $1");
+  formatted = formatted.replace(/^Senin\b/i, "Monday");
+  formatted = formatted.replace(/^Selasa\b/i, "Tuesday");
+  formatted = formatted.replace(/^Rabu\b/i, "Wednesday");
+  formatted = formatted.replace(/^Kamis\b/i, "Thursday");
+  formatted = formatted.replace(/^Jumat\b/i, "Friday");
+  formatted = formatted.replace(/^Sabtu\b/i, "Saturday");
+  formatted = formatted.replace(/^Minggu\b/i, "Sunday");
+  formatted = formatted.replace(/^Mgg\b/i, "Sun");
+  formatted = formatted.replace(/\bJanuari\b/gi, "January");
+  formatted = formatted.replace(/\bFebruari\b/gi, "February");
+  formatted = formatted.replace(/\bMaret\b/gi, "March");
+  formatted = formatted.replace(/\bMei\b/gi, "May");
+  formatted = formatted.replace(/\bJuni\b/gi, "June");
+  formatted = formatted.replace(/\bJuli\b/gi, "July");
+  formatted = formatted.replace(/\bAgustus\b/gi, "August");
+  formatted = formatted.replace(/\bAgt\b/gi, "Aug");
+  formatted = formatted.replace(/\bAgu\b/gi, "Aug");
+  formatted = formatted.replace(/\bSeptember\b/gi, "September");
+  formatted = formatted.replace(/\bSept?\b/gi, "Sep");
+  formatted = formatted.replace(/\bOktober\b/gi, "October");
+  formatted = formatted.replace(/\bOkt\b/gi, "Oct");
+  formatted = formatted.replace(/\bNovember\b/gi, "November");
+  formatted = formatted.replace(/\bNov\b/gi, "Nov");
+  formatted = formatted.replace(/\bDesember\b/gi, "December");
+  formatted = formatted.replace(/\bDes\b/gi, "Dec");
+  return formatted;
+};
+
 const extractPoints = (res, divisor = 1.0) => {
   if (!res || res.error || !Array.isArray(res)) return [];
-  return res.map((pt) => Number.parseFloat(pt.averageValue || 0) / divisor);
+  const rawValues = res.map((pt) => Number.parseFloat(pt.averageValue || 0) / divisor);
+  return fillMissingDataPoints(rawValues);
 };
 
 const extractLabelsFromRes = (res) => {
@@ -108,9 +171,6 @@ const extractLabelsFromRes = (res) => {
 };
 
 const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
-  if (tab === "Listrik") return extractLabelsFromRes(pwrRes) || [];
-  if (tab === "Kelembapan" || tab === "Kelembaban") return extractLabelsFromRes(humiRes) || [];
-  if (tab === "Suhu") return extractLabelsFromRes(suhuRes) || [];
   return extractLabelsFromRes(pwrRes) || extractLabelsFromRes(suhuRes) || extractLabelsFromRes(humiRes) || [];
 };
 
@@ -190,27 +250,33 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
   const latestHumi = humiPoints.length > 0 ? humiPoints[humiPoints.length - 1] : 0;
   const latestPower = powerPoints.length > 0 ? powerPoints[powerPoints.length - 1] : 0;
 
+  const formatVal = (num) => {
+    if (num === undefined || num === null || Number.isNaN(Number(num))) return "-";
+    const str = Number(num).toFixed(1);
+    return language === "Indonesia" ? str.replace(".", ",") : str;
+  };
+
   const tableLogs = graphLabels.length > 0
     ? graphLabels.map((lbl, idx) => {
         let tempVal = "-";
         if (tempPoints[idx] !== undefined && tempPoints[idx] !== null) {
-          tempVal = tempPoints[idx].toFixed(1);
+          tempVal = formatVal(tempPoints[idx]);
         } else if (tempPoints.length > 0) {
-          tempVal = tempPoints[tempPoints.length - 1].toFixed(1);
+          tempVal = formatVal(tempPoints[tempPoints.length - 1]);
         }
 
         let humVal = "-";
         if (humiPoints[idx] !== undefined && humiPoints[idx] !== null) {
-          humVal = humiPoints[idx].toFixed(1);
+          humVal = formatVal(humiPoints[idx]);
         } else if (humiPoints.length > 0) {
-          humVal = humiPoints[humiPoints.length - 1].toFixed(1);
+          humVal = formatVal(humiPoints[humiPoints.length - 1]);
         }
 
         let powerVal = "-";
         if (powerPoints[idx] !== undefined && powerPoints[idx] !== null) {
-          powerVal = powerPoints[idx].toFixed(1);
+          powerVal = formatVal(powerPoints[idx]);
         } else if (powerPoints.length > 0) {
-          powerVal = powerPoints[powerPoints.length - 1].toFixed(1);
+          powerVal = formatVal(powerPoints[powerPoints.length - 1]);
         }
 
         return {
@@ -332,7 +398,9 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
       return (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>Memuat data tabel...</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>
+            {language === "Indonesia" ? "Memuat data tabel..." : "Loading table data..."}
+          </Text>
         </View>
       );
     }
@@ -360,6 +428,12 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
         <View style={[styles.timeFilterRow, { marginTop: 0, marginBottom: 16 }]}>
           {["Per Jam", "Per Hari", "Per Minggu"].map((p) => {
             const active = timePeriod === p;
+            let pLabel = p;
+            if (language === "English") {
+              if (p === "Per Jam") pLabel = "Hourly";
+              else if (p === "Per Hari") pLabel = "Daily";
+              else if (p === "Per Minggu") pLabel = "Weekly";
+            }
             return (
               <TouchableOpacity
                 key={p}
@@ -368,9 +442,9 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
                   { backgroundColor: colors.cardBackground, borderColor: colors.border },
                   active && [styles.timeBtnActive, { backgroundColor: "#0059AB", borderColor: "#0059AB" }]
                 ]}
-                onPress={() => setTimePeriod(p)}
+                onPress={() => handlePeriodChange(p)}
               >
-                <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>{p}</Text>
+                <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>{pLabel}</Text>
               </TouchableOpacity>
             );
           })}
@@ -383,16 +457,19 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
             <Text style={[styles.thText, { flex: 1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
           </View>
 
-          {tableLogs.map((log, idx) => (
-            <View key={log.time + idx} style={[styles.tableRow, idx === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.tdText, { flex: 1.2, color: colors.textMuted }]}>{log.time}</Text>
-              {renderTableRowCells(log)}
-              <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
-                <View style={styles.normalDot} />
-                <Text style={[styles.tdText, { flex: 0, color: "#10b981", fontWeight: "700" }]}>{log.status || t("normal")}</Text>
+          {tableLogs.map((log, idx) => {
+            const formattedTime = formatTableTime(log.time, language);
+            return (
+              <View key={log.time + idx} style={[styles.tableRow, idx === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.tdText, { flex: 1.2, color: colors.textMuted }]}>{formattedTime}</Text>
+                {renderTableRowCells(log)}
+                <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+                  <View style={styles.normalDot} />
+                  <Text style={[styles.tdText, { flex: 0, color: "#10b981", fontWeight: "700" }]}>{log.status || t("normal")}</Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </Card>
         <Text style={[styles.tableFooterInfo, { color: colors.textMuted }]}>{t("tampil_data_terbaru")}</Text>
       </View>
@@ -428,7 +505,7 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
           graphLabels={graphLabels}
           chartConfig={chartConfig}
           timePeriod={timePeriod}
-          setTimePeriod={setTimePeriod}
+          setTimePeriod={handlePeriodChange}
           activeTab={activeTab}
           activeDevice={activeDevice}
         />
@@ -489,12 +566,14 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
           </TouchableOpacity>
         </View>
 
-        <DateRangeFilter
-          startDate={rangeStart}
-          endDate={rangeEnd}
-          onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
-          colors={colors}
-        />
+        {timePeriod !== "Per Jam" && (
+          <DateRangeFilter
+            startDate={rangeStart}
+            endDate={rangeEnd}
+            onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
+            colors={colors}
+          />
+        )}
 
         {renderMainContent()}
       </ScrollView>
@@ -543,10 +622,10 @@ function ChartYLabel({ yLabel, colors, chartHeight = 190 }) {
 const thinLabels = (labels) => {
   if (!labels || labels.length === 0) return [];
   const len = labels.length;
-  const n = len > 7 ? Math.max(1, Math.ceil(len / 4)) : 1;
+  const n = len > 15 ? Math.max(1, Math.ceil(len / 8)) : 1;
 
   return labels.map((lbl, i) => {
-    if (!lbl || (len > 7 && i !== 0 && i !== len - 1 && i % n !== 0)) return "";
+    if (!lbl || (len > 15 && i !== 0 && i !== len - 1 && i % n !== 0)) return "";
     let s = lbl.trim();
 
     // Membedakan antara Hari Minggu (e.g. "Minggu (26/07)") vs Minggu ke-N (e.g. "Minggu 1 (Agustus 2026)")
@@ -568,8 +647,8 @@ const thinLabels = (labels) => {
   });
 };
 
-const formatDecimal = (value, digits = 3) =>
-  Number(value).toLocaleString("id-ID", {
+const formatDecimal = (value, digits = 1, lang = "Indonesia") =>
+  Number(value).toLocaleString(lang === "Indonesia" ? "id-ID" : "en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -601,28 +680,28 @@ function SuhuChart({ showSuhu, tempPoints, latestTemp, colors, theme, language, 
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
         <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("suhu")} (°C)</Text>
-        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestTemp)}°C</Text>
+        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestTemp, 1, language)}°C</Text>
       </View>
 
       <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Rata-rata" : "Average"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgTemp)}°C</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgTemp, 1, language)}°C</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tertinggi" : "Highest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxTemp)}°C</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxTemp, 1, language)}°C</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Terendah" : "Lowest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minTemp)}°C</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minTemp, 1, language)}°C</Text>
         </View>
       </View>
 
-       <ChartXLabel xLabel="Waktu" colors={colors} />
+       <ChartXLabel xLabel={t("waktu")} colors={colors} />
 
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <ChartYLabel yLabel="Suhu (°C)" colors={colors} chartHeight={190} />
+        <ChartYLabel yLabel={`${t("suhu")} (°C)`} colors={colors} chartHeight={190} />
         <LineChart
           data={{
             labels: thinLabels(graphLabels),
@@ -631,7 +710,8 @@ function SuhuChart({ showSuhu, tempPoints, latestTemp, colors, theme, language, 
           width={chartWidth - 24 - 20}
           height={190}
           chartConfig={chartConfig}
-          bezier
+          formatYLabel={(yValue) => language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue)}
+          bezier={tempPoints.length > 1 && Math.max(...tempPoints) !== Math.min(...tempPoints)}
           verticalLabelRotation={0}
           xLabelsOffset={2}
           style={styles.chart}
@@ -654,37 +734,38 @@ function HumiChart({ showHumi, humiPoints, latestHumi, colors, theme, language, 
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
         <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("kelembapan")} (%)</Text>
-        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestHumi, 1)}%</Text>
+        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestHumi, 1, language)}%</Text>
       </View>
 
       <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Rata-rata" : "Average"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgHum, 1)}%</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgHum, 1, language)}%</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tertinggi" : "Highest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxHum, 1)}%</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxHum, 1, language)}%</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Terendah" : "Lowest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minHum, 1)}%</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minHum, 1, language)}%</Text>
         </View>
       </View>
 
-      <ChartXLabel xLabel="Waktu" colors={colors} />
+      <ChartXLabel xLabel={t("waktu")} colors={colors} />
 
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <ChartYLabel yLabel="Kelembapan (%)" colors={colors} chartHeight={190} />
+        <ChartYLabel yLabel={`${t("kelembapan")} (%)`} colors={colors} chartHeight={190} />
         <LineChart
           data={{
             labels: thinLabels(graphLabels),
             datasets: [{ data: humiPoints }],
           }}
-         width={chartWidth - 24 - 20}
+          width={chartWidth - 24 - 20}
           height={190}
           chartConfig={chartConfig}
-          bezier
+          formatYLabel={(yValue) => language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue)}
+          bezier={humiPoints.length > 1 && Math.max(...humiPoints) !== Math.min(...humiPoints)}
           verticalLabelRotation={0}
           xLabelsOffset={2}
           style={styles.chart}
@@ -707,28 +788,28 @@ function PowerChart({ showPower, powerPoints, latestPower, colors, theme, langua
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
         <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("listrik")} (kWh)</Text>
-        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestPower, 3)} kWh</Text>
+        <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestPower, 1, language)} kWh</Text>
       </View>
 
       <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Rata-rata" : "Average"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgPower, 3)} kWh</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(avgPower, 1, language)} kWh</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tertinggi" : "Highest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxPower, 3)} kWh</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(maxPower, 1, language)} kWh</Text>
         </View>
         <View style={styles.chartStatBox}>
           <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Terendah" : "Lowest"}</Text>
-          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minPower, 3)} kWh</Text>
+          <Text style={[styles.chartStatValue, { color: colors.text }]}>{formatDecimal(minPower, 1, language)} kWh</Text>
         </View>
       </View>
 
-      <ChartXLabel xLabel="Waktu" colors={colors} />
+      <ChartXLabel xLabel={t("waktu")} colors={colors} />
 
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <ChartYLabel yLabel="Listrik (kWh)" colors={colors} chartHeight={190} />
+        <ChartYLabel yLabel={`${t("listrik")} (kWh)`} colors={colors} chartHeight={190} />
         <LineChart
           data={{
             labels: thinLabels(graphLabels),
@@ -737,7 +818,8 @@ function PowerChart({ showPower, powerPoints, latestPower, colors, theme, langua
           width={chartWidth - 24 - 20}
           height={190}
           chartConfig={chartConfig}
-          bezier
+          formatYLabel={(yValue) => language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue)}
+          bezier={powerPoints.length > 1 && Math.max(...powerPoints) !== Math.min(...powerPoints)}
           verticalLabelRotation={0}
           xLabelsOffset={2}
           style={styles.chart}
@@ -749,7 +831,13 @@ function PowerChart({ showPower, powerPoints, latestPower, colors, theme, langua
   );
 }
 
-function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
+function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t, language }) {
+  const getPeriodLabel = (p) => {
+    if (p === "Per Jam") return language === "Indonesia" ? "Per Jam" : "Hourly";
+    if (p === "Per Hari") return language === "Indonesia" ? "Per Hari" : "Daily";
+    if (p === "Per Minggu") return language === "Indonesia" ? "Per Minggu" : "Weekly";
+    return p;
+  };
   return (
     <View style={styles.timeFilterRow}>
       {["Per Jam", "Per Hari", "Per Minggu"].map((p) => {
@@ -765,7 +853,7 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
             onPress={() => setTimePeriod(p)}
           >
             <Text style={[styles.timeBtnLabel, active ? styles.timeBtnLabelActive : { color: colors.textMuted }]}>
-              {p}
+              {getPeriodLabel(p)}
             </Text>
           </TouchableOpacity>
         );
@@ -774,7 +862,7 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
   );
 }
   
-  function CategoryEmptyCard({ title, subtext, colors, theme }) {
+  function CategoryEmptyCard({ title, subtext, colors, theme, language }) {
     return (
       <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground, padding: 20 }]}>
         <View style={styles.chartMetricHeader}>
@@ -782,7 +870,7 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
         </View>
         <View style={[{ paddingVertical: 24, alignItems: "center", justifyContent: "center", borderRadius: 12, marginTop: 8 }, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
           <Text style={{ color: colors.text, fontWeight: "700", fontSize: 15, textAlign: "center", marginBottom: 4 }}>
-            Tidak Ada Data Telemetri
+            {language === "Indonesia" ? "Tidak Ada Data Telemetri" : "No Telemetry Data"}
           </Text>
           <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
             {subtext}
@@ -854,6 +942,7 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
           }
           colors={colors}
           theme={theme}
+          language={language}
         />
       );
     };
@@ -884,6 +973,7 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
           }
           colors={colors}
           theme={theme}
+          language={language}
         />
       );
     };
@@ -914,6 +1004,7 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
           }
           colors={colors}
           theme={theme}
+          language={language}
         />
       );
     };
@@ -1027,12 +1118,15 @@ function TimePeriodFilter({ timePeriod, setTimePeriod, colors, t }) {
           setTimePeriod={setTimePeriod}
           colors={colors}
           t={t}
+          language={language}
         />
 
         {isGraphLoading ? (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#0059AB" />
-            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>Memuat grafik telemetri...</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>
+              {language === "Indonesia" ? "Memuat grafik telemetri..." : "Loading telemetry chart..."}
+            </Text>
           </View>
         ) : (
           renderContentForTab()

@@ -121,7 +121,7 @@ export function UserProvider({ children }) {
       lainnya: "LAINNYA",
       logout: "Keluar Sesi",
       logout_confirm: "Apakah Anda yakin ingin keluar?",
-      logout_btn: "Logout",
+      logout_btn: "Keluar",
       batal: "Batal",
       tambah_pengguna: "Tambah Pengguna",
       detail_pengguna: "Detail Pengguna",
@@ -221,6 +221,15 @@ export function UserProvider({ children }) {
       sakelar_lampu: "Sakelar Lampu",
       hidupkan_matikan_lampu: "Hidupkan atau matikan aliran listrik lampu utama.",
       total_perangkat: "Total Perangkat",
+      status_perangkat_terbaru: "Status Perangkat Terbaru",
+      rata_rata: "Rata-rata",
+      tertinggi: "Tertinggi",
+      terendah: "Terendah",
+      est_konsumsi: "Est. Konsumsi",
+      sistem_normal: "Sistem berjalan normal. Tidak ada alarm.",
+      belum_ada_telemetri: "Belum ada data telemetri",
+      perangkat_aktif: "Perangkat Aktif",
+      perangkat_tidak_aktif: "Perangkat Tidak Aktif",
     },
     English: {
       menu_admin: "ADMINISTRATION MENU",
@@ -260,8 +269,8 @@ export function UserProvider({ children }) {
       profil: "Profile",
       selamat_datang: "Welcome,",
       status_sistem: "System Status",
-      device_online: "Device Online",
-      device_offline: "Device Offline",
+      device_online: "Active Device",
+      device_offline: "Inactive Device",
       total_user: "Total Users",
       monitoring_sistem: "System Monitoring",
       aktivitas_terakhir: "Recent Activities",
@@ -313,7 +322,7 @@ export function UserProvider({ children }) {
       terdaftar_sejak: "Registered Since",
       login_terakhir: "Last Login",
       aksi: "Actions",
-      edit_pengguna: "Edit User",
+      edit_pengguna: "Update User",
       ubah_info_pengguna: "Modify user details",
       hapus_pengguna: "Delete User",
       hapus_pengguna_desc: "Delete user account from the system",
@@ -330,7 +339,16 @@ export function UserProvider({ children }) {
       arah_swing: "Swing Direction",
       sakelar_lampu: "Lamp Switch",
       hidupkan_matikan_lampu: "Turn on or turn off main light power.",
-      total_perangkat: "Total Devices", 
+      total_perangkat: "Total Devices",
+      status_perangkat_terbaru: "Recent Device Status",
+      rata_rata: "Average",
+      tertinggi: "Highest",
+      terendah: "Lowest",
+      est_konsumsi: "Est. Consumption",
+      sistem_normal: "System running normally. No alarms.",
+      belum_ada_telemetri: "No telemetry data recorded",
+      perangkat_aktif: "Active Devices",
+      perangkat_tidak_aktif: "Inactive Devices",
     }
   };
 
@@ -345,6 +363,8 @@ export function UserProvider({ children }) {
 
     let translated = msg;
     translated = translated.replaceAll("Peringatan: Perangkat", "Warning: Device");
+    translated = translated.replaceAll("penggunaan daya", "power consumption");
+    translated = translated.replaceAll("melebihi", "exceeded");
     translated = translated.replaceAll("melampaui batas normal maksimum", "exceeded maximum normal limit");
     translated = translated.replaceAll("melampaui batas normal minimum", "exceeded minimum normal limit");
     translated = translated.replaceAll("Kembali ke status normal", "Returned to normal status");
@@ -352,6 +372,8 @@ export function UserProvider({ children }) {
     translated = translated.replaceAll("berhasil dihapus dari sistem", "successfully deleted from the system");
     translated = translated.replaceAll("status mati (OFF)", "OFF status");
     translated = translated.replaceAll("status hidup (ON)", "ON status");
+    translated = translated.replaceAll("Gedung Utama", "Main Building");
+    translated = translated.replaceAll("Gedung", "Building");
 
     return translated;
   };
@@ -540,6 +562,7 @@ export function UserProvider({ children }) {
           type={toast.type}
           onPress={toast.onPress}
           colors={colors}
+          language={language}
           onDismiss={() => setToast(null)}
         />
       )}

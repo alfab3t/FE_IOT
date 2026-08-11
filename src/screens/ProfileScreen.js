@@ -277,7 +277,7 @@ export default function ProfileScreen({ navigation }) {
         {/* Premium Logout Button (Figma Style: white background, red border) */}
         <TouchableOpacity style={[styles.logoutBtnOutline, { backgroundColor: colors.cardBackground }]} onPress={handleLogout}>
           <LogOut size={20} color="#ef4444" style={{ marginRight: 8 }} />
-          <Text style={styles.logoutBtnText}>Logout</Text>
+          <Text style={styles.logoutBtnText}>{t("logout_btn")}</Text>
         </TouchableOpacity>
       </ScrollView>
 

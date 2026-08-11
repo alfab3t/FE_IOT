@@ -23,7 +23,7 @@ import {
 } from "lucide-react-native";
 
 export default function UsersListScreen({ navigation }) {
-  const { user, colors, showToast, t, theme } = useUser();
+  const { user, colors, showToast, t, theme, language } = useUser();
   const [activeRoleId, setActiveRoleId] = useState(""); // Default empty = "Semua"
   const [dbRoles, setDbRoles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,20 +123,21 @@ export default function UsersListScreen({ navigation }) {
   });
 
   const handleToggleStatus = async (u) => {
+    const isIndo = language === "Indonesia";
     const newStatus = u.status === "Aktif" ? "Tidak Aktif" : "Aktif";
     Alert.alert(
-      "Ubah Status Pengguna",
-      `Ubah status ${u.fullName} menjadi "${newStatus}"?`,
+      isIndo ? "Ubah Status Pengguna" : "Change User Status",
+      isIndo ? `Ubah status ${u.fullName} menjadi "${newStatus}"?` : `Change status of ${u.fullName} to "${newStatus === "Aktif" ? "Active" : "Inactive"}"?`,
       [
-        { text: "Batal", style: "cancel" },
+        { text: isIndo ? "Batal" : "Cancel", style: "cancel" },
         {
-          text: "Ubah",
+          text: "OK",
           onPress: async () => {
             const res = await iotService.setUserStatus(u.username, newStatus);
             if (res.error) {
-              showToast(res.message || "Gagal mengubah status.", "error");
+              showToast(isIndo ? "Gagal mengubah status." : "Failed to update status.", "error");
             } else {
-              showToast(`Status ${u.fullName} berhasil diubah.`, "success");
+              showToast(isIndo ? `Status ${u.fullName} berhasil diubah.` : `Status of ${u.fullName} successfully updated.`, "success");
               loadUsers();
             }
           },
@@ -149,7 +150,7 @@ export default function UsersListScreen({ navigation }) {
     if (isCurrentUser) {
       return (
         <View style={[styles.roleBadge, styles.badgeCurrent]}>
-          <Text style={[styles.roleBadgeText, styles.badgeTextCurrent]}>You</Text>
+          <Text style={[styles.roleBadgeText, styles.badgeTextCurrent]}>{language === "Indonesia" ? "Anda" : "You"}</Text>
         </View>
       );
     }
@@ -215,7 +216,7 @@ export default function UsersListScreen({ navigation }) {
         <View style={styles.rightSection}>
           {renderRoleBadge(item.roleId, item.roleName, isCurrentUser)}
           <Text style={[styles.statusText, { color: isActive ? "#10b981" : "#ef4444" }]}>
-            {item.status}
+            {language === "Indonesia" ? (isActive ? "Aktif" : "Tidak Aktif") : (isActive ? "Active" : "Inactive")}
           </Text>
         </View>
       </TouchableOpacity>
@@ -302,7 +303,7 @@ export default function UsersListScreen({ navigation }) {
           ItemSeparatorComponent={renderSeparator}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Tidak ada pengguna ditemukan
+              {language === "Indonesia" ? "Tidak ada pengguna ditemukan" : "No users found"}
             </Text>
           }
         />
@@ -345,6 +346,7 @@ export default function UsersListScreen({ navigation }) {
 
             {["Semua", "Aktif", "Tidak Aktif"].map((statusOption) => {
               const isSelected = statusFilter === statusOption;
+              const labelText = statusOption === "Semua" ? (language === "Indonesia" ? "Semua" : "All") : statusOption === "Aktif" ? (language === "Indonesia" ? "Aktif" : "Active") : (language === "Indonesia" ? "Tidak Aktif" : "Inactive");
               let optionBg = "transparent";
               if (isSelected) {
                 optionBg = theme === "Dark Mode" ? "#1e293b" : "#f0f9ff";
@@ -365,7 +367,7 @@ export default function UsersListScreen({ navigation }) {
                     setFilterModalVisible(false);
                   }}
                 >
-                  <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : colors.text }]}>{statusOption}</Text>
+                  <Text style={[styles.optionRowText, { color: isSelected ? "#0059AB" : colors.text }]}>{labelText}</Text>
                 </TouchableOpacity>
               );
             })}

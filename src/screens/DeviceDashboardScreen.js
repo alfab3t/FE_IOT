@@ -37,10 +37,128 @@ import {
   Radio,
 } from "lucide-react-native";
 
+const formatLocationHistoryText = (text, language) => {
+  if (!text || typeof text !== "string") return text || "-";
+  if (language === "Indonesia") return text;
+  return text
+    .replace(/\bSekarang\b/gi, "Present")
+    .replace(/\bLokasi Terbaru\b/gi, "Latest Location")
+    .replace(/\bTerbaru\b/gi, "Latest")
+    .replace(/\bHari Ini\b/gi, "Today")
+    .replace(/\bMinggu Ini\b/gi, "This Week")
+    .replace(/\bBulan Ini\b/gi, "This Month")
+    .replace(/\bDari\b/gi, "From")
+    .replace(/\bKe\b/gi, "To")
+    .replace(/\bs\/d\b/gi, "-")
+    .replace(/\bsd\b/gi, "-")
+    .replace(/\bsampai\b/gi, "to")
+
+    // Specific Dashboard Device Titles & Rooms
+    .replace(/\bAC Ruang Lab\b/gi, "Lab Room AC")
+    .replace(/\bLampu Ruang Lab\b/gi, "Lab Room Lamp")
+    .replace(/\bPower Meter Gedung B\b/gi, "Building B Power Meter")
+    .replace(/\bPower Meter Gedung C\b/gi, "Building C Power Meter")
+    .replace(/\bPower Meter Gedung D\b/gi, "Building D Power Meter")
+    .replace(/\bPower Meter Gedung\b/gi, "Building Power Meter")
+    .replace(/\bWater Meter Gedung C\b/gi, "Building C Water Meter")
+    .replace(/\bWater Meter Gedung\b/gi, "Building Water Meter")
+    .replace(/\bRuang Dosen PSI\b/gi, "PSI Lecturer Room")
+    .replace(/\bRuang Lab\b/gi, "Lab Room")
+
+    // General Category Filters & Devices
+    .replace(/\bTemperatur & Kelembaban\b/gi, "Temperature & Humidity")
+    .replace(/\bTemperatur & Kelembapan\b/gi, "Temperature & Humidity")
+    .replace(/\bSensor Suhu & Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu dan Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu & Kelembapan\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu\b/gi, "Temperature Sensor")
+    .replace(/\bSensor Kelembaban\b/gi, "Humidity Sensor")
+    .replace(/\bSensor Kelembapan\b/gi, "Humidity Sensor")
+    .replace(/\bPower Meter\b/gi, "Power Meter")
+    .replace(/\bWater Meter\b/gi, "Water Meter")
+    .replace(/\bMeteran Air\b/gi, "Water Meter")
+    .replace(/\bMeteran Listrik\b/gi, "Power Meter")
+    .replace(/\bKontrol AC\b/gi, "AC Control")
+    .replace(/\bKontrol Lampu\b/gi, "Lamp Control")
+    .replace(/\bLampu Utama\b/gi, "Main Lamp")
+    .replace(/\bLampu\b/gi, "Lamp")
+    .replace(/\bListrik\b/gi, "Power / Electricity")
+    .replace(/\bSemua Perangkat\b/gi, "All Devices")
+    .replace(/\bSemua Kategori\b/gi, "All Categories")
+    .replace(/\bSemua\b/gi, "All")
+    .replace(/\bPerangkat Aktif\b/gi, "Active Devices")
+    .replace(/\bPerangkat Tidak Aktif\b/gi, "Inactive Devices")
+
+    // Labs & Rooms
+    .replace(/\bLab IoT\b/gi, "IoT Lab")
+    .replace(/\bLab Kontrol\b/gi, "Control Lab")
+    .replace(/\bLab Otomotif\b/gi, "Automotive Lab")
+    .replace(/\bLab Pemrograman\b/gi, "Programming Lab")
+    .replace(/\bLab AI\b/gi, "AI Lab")
+    .replace(/\bLab Mekatronika\b/gi, "Mechatronics Lab")
+    .replace(/\bLab Komputer\b/gi, "Computer Lab")
+    .replace(/\bLab Otomasi\b/gi, "Automation Lab")
+    .replace(/\bLab Robotika\b/gi, "Robotics Lab")
+    .replace(/\bLab Elektronika\b/gi, "Electronics Lab")
+    .replace(/\bLab Jaringan\b/gi, "Network Lab")
+    .replace(/\bLab Telekomunikasi\b/gi, "Telecommunication Lab")
+    .replace(/\bLab Manufaktur\b/gi, "Manufacturing Lab")
+    .replace(/\bLab Multimedia\b/gi, "Multimedia Lab")
+    .replace(/\bLab Basis Data\b/gi, "Database Lab")
+    .replace(/\bLab Bahasa\b/gi, "Language Lab")
+    .replace(/\bLaboratorium\b/gi, "Laboratory")
+    .replace(/\bRuang Dosen\b/gi, "Lecturer Room")
+    .replace(/\bRuang Dekan\b/gi, "Dean Room")
+    .replace(/\bRuang Kaprodi\b/gi, "Department Head Room")
+    .replace(/\bRuang Rapat Utama\b/gi, "Main Meeting Room")
+    .replace(/\bRuang Rapat\b/gi, "Meeting Room")
+    .replace(/\bRuang Server\b/gi, "Server Room")
+    .replace(/\bRuang Kontrol\b/gi, "Control Room")
+    .replace(/\bRuang Direktur\b/gi, "Director Room")
+    .replace(/\bRuang Staf\b/gi, "Staff Room")
+    .replace(/\bRuang Kuliah\b/gi, "Lecture Room")
+    .replace(/\bRuang Kelas\b/gi, "Classroom")
+    .replace(/\bRuangan\b/gi, "Room")
+    .replace(/\bRuang\b/gi, "Room")
+    .replace(/\bGedung A\b/gi, "Building A")
+    .replace(/\bGedung B\b/gi, "Building B")
+    .replace(/\bGedung C\b/gi, "Building C")
+    .replace(/\bGedung D\b/gi, "Building D")
+    .replace(/\bGedung E\b/gi, "Building E")
+    .replace(/\bGedung Utama\b/gi, "Main Building")
+    .replace(/\bGedung\b/gi, "Building")
+    .replace(/\bLantai\b/gi, "Floor")
+    .replace(/\bSenin\b/gi, "Monday")
+    .replace(/\bSelasa\b/gi, "Tuesday")
+    .replace(/\bRabu\b/gi, "Wednesday")
+    .replace(/\bKamis\b/gi, "Thursday")
+    .replace(/\bJum'at\b/gi, "Friday")
+    .replace(/\bJumat\b/gi, "Friday")
+    .replace(/\bSabtu\b/gi, "Saturday")
+    .replace(/\bMinggu\b/gi, "Sunday")
+    .replace(/\bJanuari\b/gi, "January")
+    .replace(/\bFebruari\b/gi, "February")
+    .replace(/\bMaret\b/gi, "March")
+    .replace(/\bMei\b/gi, "May")
+    .replace(/\bJuni\b/gi, "June")
+    .replace(/\bJuli\b/gi, "July")
+    .replace(/\bAgustus\b/gi, "August")
+    .replace(/\bAgt\b/gi, "Aug")
+    .replace(/\bAgu\b/gi, "Aug")
+    .replace(/\bSeptember\b/gi, "September")
+    .replace(/\bSept?\b/gi, "Sep")
+    .replace(/\bOktober\b/gi, "October")
+    .replace(/\bOkt\b/gi, "Oct")
+    .replace(/\bNovember\b/gi, "November")
+    .replace(/\bNov\b/gi, "Nov")
+    .replace(/\bDesember\b/gi, "December")
+    .replace(/\bDes\b/gi, "Dec");
+};
+
 const chartWidth = (Dimensions.get("window")?.width || 360) - 32;
 
-const formatDecimal = (value, digits = 1) =>
-  Number(value).toLocaleString("id-ID", {
+const formatDecimal = (value, digits = 1, lang = "Indonesia") =>
+  Number(value).toLocaleString(lang === "Indonesia" ? "id-ID" : "en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -84,7 +202,7 @@ function ChartYLabel({ yLabel, colors, chartHeight = 180 }) {
 const globalSeenNotifsSet = new Set();
 
 export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
-  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme, timezone } = useUser();
+  const { user, logout, setUser, refreshInterval, t, translateNotification, colors, showToast, theme, timezone, language } = useUser();
   const [devices, setDevices] = useState([]);
   const [activities, setActivities] = useState([]);
   const [stats, setStats] = useState({ totalDevices: 0, onlineDevices: 0, offlineDevices: 0, totalUsers: 0, avgSuhu: 0, avgHumi: 0, avgPower: 0, estKWh: 0 });
@@ -112,29 +230,94 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const [chartDataState, setChartDataState] = useState([]);
   const [chartLabelsState, setChartLabelsState] = useState([]);
 
-  const loadChartData = async (tab, devicesList = devices) => {
-    let response = await iotService.getGraphAverage(tab, "Hourly", rangeStart ? rangeStart.toISOString() : null,
-    rangeEnd ? rangeEnd.toISOString() : null);
-    if (!response.error && Array.isArray(response) && response.length > 0) {
-      if (response.length > 8) {
-        response = response.slice(-8);
-      }
-      const labels = response.map((pt) => pt.labelText || "");
-      const values = response.map((pt) => Number.parseFloat(pt.averageValue || 0));
-      setChartLabelsState(labels);
+  const expandHourlyPoints = (points) => {
+    if (!points || !Array.isArray(points) || points.length === 0) return points;
+    if (points.length >= 5) return points;
 
-      if (tab === "Suhu") {
-        setChartDataState(values);
-      } else if (tab === "Kelembaban") {
-        // Use true average humidity values directly from DB
-        setChartDataState(values);
-      } else if (tab === "Listrik") {
-        // Convert Watts to kW for cleaner Y-axis labels
-        const powerKW = values.map((v) => v / 1000.0);
-        setChartDataState(powerKW);
+    const result = [];
+    for (let i = 0; i < points.length; i++) {
+      const curr = points[i];
+      result.push(curr);
+      if (i < points.length - 1) {
+        const next = points[i + 1];
+        const currHour = parseInt((curr.labelText || "").split(":")[0], 10);
+        const nextHour = parseInt((next.labelText || "").split(":")[0], 10);
+        const currVal = Number.parseFloat(curr.averageValue || 0);
+        const nextVal = Number.parseFloat(next.averageValue || 0);
+
+        if (!Number.isNaN(currHour) && !Number.isNaN(nextHour) && nextHour > currHour + 1) {
+          const steps = nextHour - currHour;
+          const valDiff = (nextVal - currVal) / steps;
+          for (let h = currHour + 1; h < nextHour; h++) {
+            const paddedHour = `${String(h).padStart(2, "0")}:00`;
+            const paddedVal = currVal + valDiff * (h - currHour);
+            result.push({
+              labelText: paddedHour,
+              averageValue: Number(paddedVal.toFixed(2)),
+            });
+          }
+        }
       }
+    }
+    return result;
+  };
+
+  const fillMissingDataPoints = (points) => {
+    if (!points || !Array.isArray(points) || points.length === 0) return [];
+    let lastVal = 0;
+    for (const v of points) {
+      const num = Number(v);
+      if (num && !Number.isNaN(num) && num > 0) {
+        lastVal = num;
+        break;
+      }
+    }
+    return points.map((v) => {
+      const num = Number(v);
+      if (num && !Number.isNaN(num) && num > 0) {
+        lastVal = num;
+        return num;
+      }
+      return lastVal;
+    });
+  };
+
+  const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
+    const extract = (res) => (Array.isArray(res) && res.length > 0 ? res.map((pt) => pt.labelText || "") : null);
+    return extract(pwrRes) || extract(suhuRes) || extract(humiRes) || [];
+  };
+
+  const loadChartData = async (tab, devicesList = devices) => {
+    const startISO = rangeStart ? rangeStart.toISOString() : null;
+    const endISO = rangeEnd ? rangeEnd.toISOString() : null;
+    const hasCustomRange = !!(rangeStart && rangeEnd);
+
+    const [suhuRaw, humiRaw, pwrRaw] = await Promise.all([
+      iotService.getGraphAverage("Suhu", "Hourly", startISO, endISO),
+      iotService.getGraphAverage("Kelembaban", "Hourly", startISO, endISO),
+      iotService.getGraphAverage("Listrik", "Hourly", startISO, endISO),
+    ]);
+
+    const suhuRes = !hasCustomRange && Array.isArray(suhuRaw) && suhuRaw.length > 7 ? suhuRaw.slice(-7) : suhuRaw;
+    const humiRes = !hasCustomRange && Array.isArray(humiRaw) && humiRaw.length > 7 ? humiRaw.slice(-7) : humiRaw;
+    const pwrRes = !hasCustomRange && Array.isArray(pwrRaw) && pwrRaw.length > 7 ? pwrRaw.slice(-7) : pwrRaw;
+
+    let targetRes = suhuRes;
+    let divisor = 1.0;
+    if (tab === "Kelembaban" || tab === "Kelembapan") {
+      targetRes = humiRes;
+    } else if (tab === "Listrik") {
+      targetRes = pwrRes;
+      divisor = 1000.0;
+    }
+
+    if (Array.isArray(targetRes) && targetRes.length > 0) {
+      const labels = resolveCategoryLabels(tab, suhuRes, humiRes, pwrRes);
+      let values = targetRes.map((pt) => Number.parseFloat(pt.averageValue || 0) / divisor);
+      values = fillMissingDataPoints(values);
+      setChartLabelsState(labels);
+      setChartDataState(values);
     } else {
-      // API returned empty — show empty chart
       setChartLabelsState([]);
       setChartDataState([]);
     }
@@ -189,9 +372,8 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
       });
     }
 
-    let intervalMs = 30000;
-    if (refreshInterval === "5 detik") intervalMs = 5000;
-    else if (refreshInterval === "10 detik") intervalMs = 10000;
+    let intervalMs = 5000;
+    if (refreshInterval === "10 detik") intervalMs = 10000;
     else if (refreshInterval === "60 detik") intervalMs = 60000;
 
     const timer = setInterval(() => {
@@ -200,7 +382,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [refreshInterval]);
+  }, [refreshInterval, activeChartTab, rangeStart, rangeEnd]);
 
   useEffect(() => {
     loadChartData(activeChartTab);
@@ -227,7 +409,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
     const targetTime = new Date(date.getTime() + offsetHours * 3600 * 1000);
     const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
-    const dateStr = targetTime.toLocaleDateString("id-ID", options);
+    const dateStr = targetTime.toLocaleDateString(language === "Indonesia" ? "id-ID" : "en-US", options);
     const hours = String(targetTime.getHours()).padStart(2, "0");
     const minutes = String(targetTime.getMinutes()).padStart(2, "0");
     return `${dateStr} • ${hours}:${minutes} ${tzLabel}`;
@@ -241,17 +423,16 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   // Active Metric values
   const getMetricValue = (category) => {
     if (category === "Suhu") {
-      return stats.avgSuhu > 0 ? `${formatDecimal(stats.avgSuhu, 1)}°C` : "26.3°C";
+      return stats.avgSuhu > 0 ? `${formatDecimal(stats.avgSuhu, 1, language)}°C` : `27${language === "Indonesia" ? "," : "."}1°C`;
     }
     if (category === "Kelembaban") {
-      return stats.avgHumi > 0 ? `${formatDecimal(stats.avgHumi, 1)}%` : "64.2%";
+      return stats.avgHumi > 0 ? `${formatDecimal(stats.avgHumi, 1, language)}%` : `53${language === "Indonesia" ? "," : "."}9%`;
     }
     if (category === "Listrik") {
-      // stats.avgPower is in Watts, convert to kW
-      return stats.avgPower > 0 ? `${formatDecimal(stats.avgPower / 1000.0, 1)} kW` : "542.7 kWh";
+      return stats.avgPower > 0 ? `${formatDecimal(stats.avgPower / 1000.0, 1, language)} kW` : `542${language === "Indonesia" ? "," : "."}7 kWh`;
     }
     if (category === "Air") {
-      return "13,8 m³";
+      return `13${language === "Indonesia" ? "," : "."}8 m³`;
     }
     return "N/A";
   };
@@ -270,13 +451,12 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
     else if (activeChartTab === "Kelembaban") unit = "%";
     else if (activeChartTab === "Listrik") unit = " kW";
 
-    // Estimasi total energi untuk Listrik (rata-rata kW * 2 jam)
-    const energyVal = activeChartTab === "Listrik" ? `${formatDecimal(avg * 2.0, 2)} kWh` : "-";
+    const energyVal = activeChartTab === "Listrik" ? `${formatDecimal(avg * 2.0, 2, language)} kWh` : "-";
 
     return {
-      avg: `${formatDecimal(avg, 1)}${unit}`,
-      min: `${formatDecimal(min, 1)}${unit}`,
-      max: `${formatDecimal(max, 1)}${unit}`,
+      avg: `${formatDecimal(avg, 1, language)}${unit}`,
+      min: `${formatDecimal(min, 1, language)}${unit}`,
+      max: `${formatDecimal(max, 1, language)}${unit}`,
       energy: energyVal
     };
   };
@@ -294,23 +474,36 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   };
 
   const getYAxisLabel = () => {
-  if (activeChartTab === "Suhu") return "Suhu (°C)";
-  if (activeChartTab === "Kelembaban") return "Kelembapan (%)";
-  if (activeChartTab === "Listrik") return "Listrik (kW)";
-  return "";
-};
+    if (activeChartTab === "Suhu") return `${t("suhu")} (°C)`;
+    if (activeChartTab === "Kelembaban") return `${t("kelembapan")} (%)`;
+    if (activeChartTab === "Listrik") return `${t("listrik")} (kW)`;
+    return "";
+  };
 
   // Thin out labels: only show every Nth label to prevent X-axis overlap
   const thinLabels = (labels) => {
     if (!labels || labels.length === 0) return [];
     const len = labels.length;
-    let n = 3;
-    if (len <= 6) {
-      n = 1;
-    } else if (len <= 12) {
-      n = 2;
-    }
-    return labels.map((lbl, i) => (i === 0 || i === len - 1 || i % n === 0 ? lbl : ""));
+    const n = len > 15 ? Math.max(1, Math.ceil(len / 8)) : 1;
+
+    return labels.map((lbl, i) => {
+      if (!lbl || (len > 15 && i !== 0 && i !== len - 1 && i % n !== 0)) return "";
+      let s = lbl.trim();
+      if (s.includes("(") && s.endsWith(")")) {
+        const openIdx = s.indexOf("(");
+        if (openIdx !== -1) {
+          const inside = s.slice(openIdx + 1, -1).trim();
+          if (/^Minggu\s+\d+/i.test(s) || /^Mgg\s+\d+/i.test(s)) {
+            const mggNum = s.slice(0, openIdx).replace("Minggu", "M").replace("Mgg", "M").trim();
+            const monthParts = inside.split(" ");
+            const monthShort = monthParts[0] ? monthParts[0].substring(0, 3) : "";
+            return `${mggNum} ${monthShort}`;
+          }
+          return inside;
+        }
+      }
+      return s;
+    });
   };
 
   // Render Admin Dashboard
@@ -367,31 +560,25 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             })}
           </View>
 
-          <DateRangeFilter
-            startDate={rangeStart}
-            endDate={rangeEnd}
-            onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
-            colors={colors}
-          />
 
           {/* Stats Summary Info Panel */}
           {chartDataState.length > 0 && (
             <View style={[styles.chartStatsRow, { backgroundColor: theme === "Dark Mode" ? "#0f172a" : "#f8fafc" }]}>
               <View style={styles.chartStatBox}>
-                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Rata-rata</Text>
+                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{t("rata_rata")}</Text>
                 <Text style={[styles.chartStatValue, { color: colors.text }]}>{getChartStats().avg}</Text>
               </View>
               <View style={styles.chartStatBox}>
-                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Tertinggi</Text>
+                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{t("tertinggi")}</Text>
                 <Text style={[styles.chartStatValue, { color: colors.text }]}>{getChartStats().max}</Text>
               </View>
               <View style={styles.chartStatBox}>
-                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Terendah</Text>
+                <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{t("terendah")}</Text>
                 <Text style={[styles.chartStatValue, { color: colors.text }]}>{getChartStats().min}</Text>
               </View>
               {activeChartTab === "Listrik" && (
                 <View style={styles.chartStatBox}>
-                  <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>Est. Konsumsi</Text>
+                  <Text style={[styles.chartStatLabel, { color: colors.textMuted }]}>{t("est_konsumsi")}</Text>
                   <Text style={[styles.chartStatValue, { color: "#10b981" }]}>{getChartStats().energy}</Text>
                 </View>
               )}
@@ -402,23 +589,26 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
           {chartDataState.length === 0 ? (
             <View style={[styles.chartVisual, { justifyContent: "center", alignItems: "center", height: 180, backgroundColor: colors.background, borderRadius: 12 }]}>
               <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                {"Belum ada data telemetri"}
+                {t("belum_ada_telemetri")}
               </Text>
             </View>
           ) : (
             <>
-              <ChartXLabel xLabel="Waktu" colors={colors} />
+              <ChartXLabel xLabel={t("waktu")} colors={colors} />
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <ChartYLabel yLabel={getYAxisLabel()} colors={colors} chartHeight={180} />
+                <ChartYLabel yLabel={getYAxisLabel()} colors={colors} chartHeight={190} />
                 <LineChart
                   data={{
                     labels: thinLabels(chartLabelsState),
                     datasets: [{ data: chartDataState }],
                   }}
-                  width={chartWidth - 20 - 32}
-                  height={180}
+                  width={chartWidth - 24 - 20}
+                  height={190}
                   chartConfig={chartConfig}
-                  bezier
+                  formatYLabel={(yValue) => language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue)}
+                  bezier={chartDataState.length > 1 && Math.max(...chartDataState) !== Math.min(...chartDataState)}
+                  verticalLabelRotation={0}
+                  xLabelsOffset={2}
                   style={styles.chartVisual}
                   withHorizontalLabels={true}
                   fromZero={false}
@@ -434,20 +624,20 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         </Card>
 
         {/* Stack Lists for Mobile: Recent Devices and System Timeline */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Status Perangkat Terbaru</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("status_perangkat_terbaru")}</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
           {devices.slice(0, 5).map((dev, idx) => {
             const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");
             return (
               <View key={dev.id} style={[styles.listItemRow, idx === 4 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
                 <View>
-                  <Text style={[styles.listItemName, { color: colors.text }]}>{dev.name}</Text>
-                  <Text style={[styles.listItemSub, { color: colors.textMuted }]}>{dev.ruangan || "Lab AI-Lantai 1"}</Text>
+                  <Text style={[styles.listItemName, { color: colors.text }]}>{formatLocationHistoryText(dev.name, language)}</Text>
+                  <Text style={[styles.listItemSub, { color: colors.textMuted }]}>{formatLocationHistoryText(dev.ruangan || "Lab AI-Lantai 1", language)}</Text>
                 </View>
                 <View style={styles.statusRowBadge}>
                   <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
                   <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                    {isOnline ? t("device_online") : t("device_offline")}
+                    {t(isOnline ? "device_online" : "device_offline")}
                   </Text>
                 </View>
               </View>
@@ -465,7 +655,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             <View style={styles.emptyActivityBox}>
               <CheckCircle size={32} color="#10b981" />
               <Text style={[styles.emptyActivityText, { color: colors.textMuted }]}>
-                {t("bahasa") === "Indonesia" ? "Sistem berjalan normal. Tidak ada alarm." : "System running normally. No alarms."}
+                {t("sistem_normal")}
               </Text>
             </View>
           ) : (
@@ -544,31 +734,25 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             {t("grafik")} {t(activeChartTab === "Kelembaban" ? "kelembapan" : activeChartTab.toLowerCase())}
           </Text>
 
-          <DateRangeFilter
-            startDate={rangeStart}
-            endDate={rangeEnd}
-            onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
-            colors={colors}
-          />
 
           {/* Stats Summary Info Panel */}
           {chartDataState.length > 0 && (
             <View style={styles.chartStatsRow}>
               <View style={styles.chartStatBox}>
-                <Text style={styles.chartStatLabel}>Rata-rata</Text>
+                <Text style={styles.chartStatLabel}>{t("rata_rata")}</Text>
                 <Text style={styles.chartStatValue}>{getChartStats().avg}</Text>
               </View>
               <View style={styles.chartStatBox}>
-                <Text style={styles.chartStatLabel}>Tertinggi</Text>
+                <Text style={styles.chartStatLabel}>{t("tertinggi")}</Text>
                 <Text style={styles.chartStatValue}>{getChartStats().max}</Text>
               </View>
               <View style={styles.chartStatBox}>
-                <Text style={styles.chartStatLabel}>Terendah</Text>
+                <Text style={styles.chartStatLabel}>{t("terendah")}</Text>
                 <Text style={styles.chartStatValue}>{getChartStats().min}</Text>
               </View>
               {activeChartTab === "Listrik" && (
                 <View style={styles.chartStatBox}>
-                  <Text style={styles.chartStatLabel}>Est. Konsumsi</Text>
+                  <Text style={styles.chartStatLabel}>{t("est_konsumsi")}</Text>
                   <Text style={[styles.chartStatValue, { color: "#10b981" }]}>{getChartStats().energy}</Text>
                 </View>
               )}
@@ -578,23 +762,26 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
           {chartDataState.length === 0 ? (
             <View style={[styles.chartVisual, { justifyContent: "center", alignItems: "center", height: 180, backgroundColor: colors.background, borderRadius: 12 }]}>
               <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                {"Belum ada data telemetri"}
+                {t("belum_ada_telemetri")}
               </Text>
             </View>
           ) : (
             <>
-              <ChartXLabel xLabel="Waktu" colors={colors} />
+              <ChartXLabel xLabel={t("waktu")} colors={colors} />
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <ChartYLabel yLabel={getYAxisLabel()} colors={colors} chartHeight={180} />
+                <ChartYLabel yLabel={getYAxisLabel()} colors={colors} chartHeight={190} />
                 <LineChart
                   data={{
                     labels: thinLabels(chartLabelsState),
                     datasets: [{ data: chartDataState }],
                   }}
-                  width={chartWidth - 20 - 32}
-                  height={180}
+                  width={chartWidth - 24 - 20}
+                  height={190}
                   chartConfig={chartConfig}
-                  bezier
+                  formatYLabel={(yValue) => language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue)}
+                  bezier={chartDataState.length > 1 && Math.max(...chartDataState) !== Math.min(...chartDataState)}
+                  verticalLabelRotation={0}
+                  xLabelsOffset={2}
                   style={styles.chartVisual}
                   withHorizontalLabels={true}
                   fromZero={false}
@@ -608,38 +795,24 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
           </TouchableOpacity>
         </Card>
 
-        {/* Perangkat Aktif */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("perangkat_aktif")}</Text>
+        {/* Status Perangkat Terbaru */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("status_perangkat_terbaru")}</Text>
         <Card style={[styles.listCard, { backgroundColor: colors.cardBackground }]}>
-          {devices.filter((d) => d.category === "AC" || d.category === "Lampu").slice(0, 3).map((dev) => {
+          {devices.slice(0, 5).map((dev, idx) => {
             const isOnline = dev.status === "ON" || (dev.status && dev.status !== "OFF" && dev.status !== "0");
             return (
-              <TouchableOpacity
-                key={dev.id}
-                style={[styles.listItemRow, { paddingVertical: 14 }, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  if (dev.category === "AC") {
-                    navigation.navigate("AcControl", {
-                      deviceId: dev.id,
-                      deviceName: dev.name,
-                      deviceLocation: [dev.ruangan, dev.gedung].filter(Boolean).join(" — "),
-                    });
-                  } else {
-                    navigation.navigate("LampControl");
-                  }
-                }}
-              >
+              <View key={dev.id} style={[styles.listItemRow, idx === 4 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
                 <View>
-                  <Text style={[styles.listItemName, { color: colors.text }]}>{dev.name}</Text>
-                  <Text style={[styles.listItemSub, { color: colors.textMuted }]}>{dev.ruangan || "Ruang Meeting"}</Text>
+                  <Text style={[styles.listItemName, { color: colors.text }]}>{formatLocationHistoryText(dev.name, language)}</Text>
+                  <Text style={[styles.listItemSub, { color: colors.textMuted }]}>{formatLocationHistoryText(dev.ruangan || "Lab AI-Lantai 1", language)}</Text>
                 </View>
                 <View style={styles.statusRowBadge}>
                   <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
                   <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                    {isOnline ? t("online") : t("offline")}
+                    {t(isOnline ? "device_online" : "device_offline")}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })}
           <TouchableOpacity style={styles.chartLink} onPress={() => setActiveTab(1)}>
@@ -700,7 +873,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         <View style={[styles.welcomeCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
           <View style={styles.welcomeTextSection}>
             <Text style={[styles.welcomeGreeting, { color: colors.text }]}>{t("selamat_datang")}</Text>
-            <Text style={[styles.welcomeUser, { color: colors.text }]}>{user?.nickname || user?.username || (t("bahasa") === "Indonesia" ? "Pengguna" : "User")}</Text>
+            <Text style={[styles.welcomeUser, { color: colors.text }]}>{user?.nickname || user?.username || (language === "Indonesia" ? "Pengguna" : "User")}</Text>
             <View style={styles.roleBadgeBox}>
               <Text style={styles.roleBadgeText}>{selectedRoleName}</Text>
             </View>
@@ -717,7 +890,9 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
         {isLoading ? (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#0059AB" />
-            <Text style={styles.loaderText}>Menghubungkan ke sensor...</Text>
+            <Text style={styles.loaderText}>
+              {language === "Indonesia" ? "Menghubungkan ke sensor..." : "Connecting to sensor..."}
+            </Text>
           </View>
         ) : (
           (() => {
@@ -870,7 +1045,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             <TouchableOpacity style={styles.backBtn} onPress={() => setAboutModalVisible(false)}>
               <ChevronLeft size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.navTitle, { color: colors.text }]}>Tentang</Text>
+            <Text style={[styles.navTitle, { color: colors.text }]}>{t("tentang")}</Text>
             <View style={{ width: 40 }} />
           </View>
 
@@ -878,16 +1053,22 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
             <Card style={[styles.aboutBrandCard, { backgroundColor: colors.cardBackground }]}>
               <Text style={[styles.aboutLogoText, { color: colors.text }]}>ASTRAtech IoT</Text>
               <Text style={[styles.aboutDescText, { color: colors.textMuted }]}>
-                Aplikasi monitoring perangkat IoT untuk memantau sensor dan mengendalikan perangkat secara real-time.
+                {language === "Indonesia"
+                  ? "Aplikasi monitoring perangkat IoT untuk memantau sensor dan mengendalikan perangkat secara real-time."
+                  : "IoT device monitoring application to monitor sensors and control devices in real-time."}
               </Text>
             </Card>
 
-            <Text style={[styles.aboutSectionTitle, { color: colors.text }]}>Informasi Aplikasi</Text>
+            <Text style={[styles.aboutSectionTitle, { color: colors.text }]}>
+              {language === "Indonesia" ? "Informasi Aplikasi" : "App Information"}
+            </Text>
             <Card style={[styles.aboutInfoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.aboutInfoRow}>
                 <View style={styles.aboutRowLabelBox}>
                   <Info size={16} color="#0059AB" />
-                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Versi Aplikasi</Text>
+                  <Text style={[styles.aboutRowLabel, { color: colors.text }]}>
+                    {language === "Indonesia" ? "Versi Aplikasi" : "App Version"}
+                  </Text>
                 </View>
                 <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>1.0.0</Text>
               </View>
@@ -898,7 +1079,9 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
                   <User size={16} color="#0059AB" />
                   <Text style={[styles.aboutRowLabel, { color: colors.text }]}>Developer</Text>
                 </View>
-                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>Kelompok 6 & 7</Text>
+                <Text style={[styles.aboutRowValue, { color: colors.textMuted }]}>
+                  {language === "Indonesia" ? "Kelompok 6 & 7" : "Group 6 & 7"}
+                </Text>
               </View>
               <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
 
@@ -931,7 +1114,9 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
 
             <View style={styles.aboutFooterBox}>
               <Text style={[styles.aboutFooterText, { color: colors.textMuted }]}>© 2026 Astratech IoT</Text>
-              <Text style={[styles.aboutFooterSubText, { color: colors.textMuted }]}>Semua hak dilindungi.</Text>
+              <Text style={[styles.aboutFooterSubText, { color: colors.textMuted }]}>
+                {language === "Indonesia" ? "Semua hak dilindungi." : "All rights reserved."}
+              </Text>
             </View>
           </ScrollView>
         </SafeAreaView>

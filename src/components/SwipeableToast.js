@@ -12,7 +12,7 @@ import { AlertTriangle, CheckCircle, XCircle, Info } from "lucide-react-native";
 const width = Dimensions.get("window")?.width || 360;
 const SWIPE_THRESHOLD = width * 0.35;
 
-export default function SwipeableToast({ message, type, colors, onDismiss, onPress }) {
+export default function SwipeableToast({ message, type, colors, onDismiss, onPress, language = "Indonesia" }) {
   const pan = useRef(new Animated.ValueXY()).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -95,13 +95,14 @@ export default function SwipeableToast({ message, type, colors, onDismiss, onPre
     }
   };
 
-  let titleText = "Pemberitahuan";
+  const isIndo = language === "Indonesia";
+  let titleText = isIndo ? "Pemberitahuan" : "Notification";
   if (type === "warning") {
-    titleText = "Peringatan Sensor";
+    titleText = isIndo ? "Peringatan Sensor" : "Sensor Warning";
   } else if (type === "success") {
-    titleText = "Sukses";
+    titleText = isIndo ? "Sukses" : "Success";
   } else if (type === "error") {
-    titleText = "Gagal";
+    titleText = isIndo ? "Gagal" : "Failed";
   }
 
   return (

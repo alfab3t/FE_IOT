@@ -36,8 +36,74 @@ const formatDecimal = (value, digits = 2) => {
   });
 };
 
+const formatLocationHistoryText = (text, language) => {
+  if (!text || typeof text !== "string") return text || "-";
+  if (language === "Indonesia") return text;
+  return text
+    .replace(/\bSekarang\b/gi, "Present")
+    .replace(/\bLokasi Terbaru\b/gi, "Latest Location")
+    .replace(/\bTerbaru\b/gi, "Latest")
+    .replace(/\bHari Ini\b/gi, "Today")
+    .replace(/\bMinggu Ini\b/gi, "This Week")
+    .replace(/\bBulan Ini\b/gi, "This Month")
+    .replace(/\bDari\b/gi, "From")
+    .replace(/\bKe\b/gi, "To")
+    .replace(/\bs\/d\b/gi, "-")
+    .replace(/\bsd\b/gi, "-")
+    .replace(/\bsampai\b/gi, "to")
+    .replace(/\bLab AI\b/gi, "AI Lab")
+    .replace(/\bLab Mekatronika\b/gi, "Mechatronics Lab")
+    .replace(/\bLab Komputer\b/gi, "Computer Lab")
+    .replace(/\bLab Otomasi\b/gi, "Automation Lab")
+    .replace(/\bLab Robotika\b/gi, "Robotics Lab")
+    .replace(/\bLab Elektronika\b/gi, "Electronics Lab")
+    .replace(/\bLab Jaringan\b/gi, "Network Lab")
+    .replace(/\bLaboratorium\b/gi, "Laboratory")
+    .replace(/\bRuang Dosen\b/gi, "Lecturer Room")
+    .replace(/\bRuang Dekan\b/gi, "Dean Room")
+    .replace(/\bRuang Kaprodi\b/gi, "Department Head Room")
+    .replace(/\bRuang Rapat Utama\b/gi, "Main Meeting Room")
+    .replace(/\bRuang Rapat\b/gi, "Meeting Room")
+    .replace(/\bRuang Server\b/gi, "Server Room")
+    .replace(/\bRuang Kontrol\b/gi, "Control Room")
+    .replace(/\bRuang Direktur\b/gi, "Director Room")
+    .replace(/\bRuang Staf\b/gi, "Staff Room")
+    .replace(/\bRuang Kuliah\b/gi, "Lecture Room")
+    .replace(/\bRuang Kelas\b/gi, "Classroom")
+    .replace(/\bRuangan\b/gi, "Room")
+    .replace(/\bRuang\b/gi, "Room")
+    .replace(/\bGedung Utama\b/gi, "Main Building")
+    .replace(/\bGedung\b/gi, "Building")
+    .replace(/\bLantai\b/gi, "Floor")
+    .replace(/\bSenin\b/gi, "Monday")
+    .replace(/\bSelasa\b/gi, "Tuesday")
+    .replace(/\bRabu\b/gi, "Wednesday")
+    .replace(/\bKamis\b/gi, "Thursday")
+    .replace(/\bJum'at\b/gi, "Friday")
+    .replace(/\bJumat\b/gi, "Friday")
+    .replace(/\bSabtu\b/gi, "Saturday")
+    .replace(/\bMinggu\b/gi, "Sunday")
+    .replace(/\bJanuari\b/gi, "January")
+    .replace(/\bFebruari\b/gi, "February")
+    .replace(/\bMaret\b/gi, "March")
+    .replace(/\bMei\b/gi, "May")
+    .replace(/\bJuni\b/gi, "June")
+    .replace(/\bJuli\b/gi, "July")
+    .replace(/\bAgustus\b/gi, "August")
+    .replace(/\bAgt\b/gi, "Aug")
+    .replace(/\bAgu\b/gi, "Aug")
+    .replace(/\bSeptember\b/gi, "September")
+    .replace(/\bSept?\b/gi, "Sep")
+    .replace(/\bOktober\b/gi, "October")
+    .replace(/\bOkt\b/gi, "Oct")
+    .replace(/\bNovember\b/gi, "November")
+    .replace(/\bNov\b/gi, "Nov")
+    .replace(/\bDesember\b/gi, "December")
+    .replace(/\bDes\b/gi, "Dec");
+};
+
 export default function PowerMeterScreen({ navigation, route }) {
-  const { colors } = useUser();
+  const { colors, language } = useUser();
   const { deviceId, deviceName, deviceLocation } = route.params || {};
 
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +114,14 @@ export default function PowerMeterScreen({ navigation, route }) {
   const [selectedPeriod, setSelectedPeriod] = useState("Hourly");
   const [rangeStart, setRangeStart] = useState(null);
   const [rangeEnd, setRangeEnd] = useState(null);
+
+  const handlePeriodChange = (newPeriod) => {
+    if (newPeriod === "Hourly") {
+      setRangeStart(null);
+      setRangeEnd(null);
+    }
+    setSelectedPeriod(newPeriod);
+  };
 
   const updateDeviceState = (dev) => {
     if (!dev) {
@@ -149,7 +223,9 @@ export default function PowerMeterScreen({ navigation, route }) {
       return (
         <View style={styles.chartLoaderBox}>
           <ActivityIndicator size="small" color="#0059AB" />
-          <Text style={[styles.chartLoaderText, { color: colors.textMuted }]}>Memuat grafik...</Text>
+          <Text style={[styles.chartLoaderText, { color: colors.textMuted }]}>
+            {language === "Indonesia" ? "Memuat grafik..." : "Loading chart..."}
+          </Text>
         </View>
       );
     }
@@ -215,7 +291,9 @@ export default function PowerMeterScreen({ navigation, route }) {
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Memuat data...</Text>
+          <Text style={[styles.loaderText, { color: colors.textMuted }]}>
+            {language === "Indonesia" ? "Memuat data..." : "Loading data..."}
+          </Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -231,7 +309,7 @@ export default function PowerMeterScreen({ navigation, route }) {
                 {deviceLocation ? (
                   <View style={styles.locationRow}>
                     <MapPin size={12} color={colors.textMuted} />
-                    <Text style={[styles.infoLocation, { color: colors.textMuted }]}>{deviceLocation}</Text>
+                    <Text style={[styles.infoLocation, { color: colors.textMuted }]}>{formatLocationHistoryText(deviceLocation, language)}</Text>
                   </View>
                 ) : null}
                 <View style={styles.statusRow}>
@@ -246,7 +324,9 @@ export default function PowerMeterScreen({ navigation, route }) {
 
           {/* Current Reading Card */}
           <Card style={[styles.readingCard, { backgroundColor: "#0059AB" }]}>
-            <Text style={styles.readingLabel}>Konsumsi Daya Saat Ini</Text>
+            <Text style={styles.readingLabel}>
+              {language === "Indonesia" ? "Konsumsi Daya Saat Ini" : "Current Power Consumption"}
+            </Text>
             {hasConsumption ? (
               <View style={styles.readingValueRow}>
                 <Text style={styles.readingValue}>
@@ -257,7 +337,9 @@ export default function PowerMeterScreen({ navigation, route }) {
             ) : (
               <View style={styles.emptyReadingBox}>
                 <Text style={styles.emptyReadingText}>
-                  Saat ini tidak ada perangkat yang menggunakan power meter/plug ini
+                  {language === "Indonesia"
+                    ? "Saat ini tidak ada perangkat yang menggunakan power meter/plug ini"
+                    : "No device is currently using this power meter/plug"}
                 </Text>
               </View>
             )}
@@ -266,9 +348,9 @@ export default function PowerMeterScreen({ navigation, route }) {
           {/* Stats Row */}
           <View style={styles.statsRow}>
             {[
-              { label: "Rata-rata", value: avgValue, unit: "kWh", color: "#0059AB" },
-              { label: "Tertinggi", value: maxValue, unit: "kWh", color: "#ef4444" },
-              { label: "Terendah", value: minValue, unit: "kWh", color: "#10b981" },
+              { label: language === "Indonesia" ? "Rata-rata" : "Average", value: avgValue, unit: "kWh", color: "#0059AB" },
+              { label: language === "Indonesia" ? "Tertinggi" : "Highest", value: maxValue, unit: "kWh", color: "#ef4444" },
+              { label: language === "Indonesia" ? "Terendah" : "Lowest", value: minValue, unit: "kWh", color: "#10b981" },
             ].map((s) => (
               <Card key={s.label} style={[styles.statCard, { backgroundColor: colors.cardBackground }]}>
                 <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.label}</Text>
@@ -281,33 +363,43 @@ export default function PowerMeterScreen({ navigation, route }) {
           {/* Chart Section */}
           <Card style={[styles.chartCard, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.chartHeader}>
-              <Text style={[styles.chartTitle, { color: colors.text }]}>Grafik Konsumsi</Text>
+              <Text style={[styles.chartTitle, { color: colors.text }]}>
+                {language === "Indonesia" ? "Grafik Konsumsi" : "Consumption Chart"}
+              </Text>
             </View>
 
             {/* Period selector */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
               {PERIOD_OPTIONS.map((p) => {
                 const isActive = selectedPeriod === p.value;
+                let pLabel = p.label;
+                if (language === "English") {
+                  if (p.value === "Hourly") pLabel = "Hourly";
+                  else if (p.value === "Daily") pLabel = "Daily";
+                  else if (p.value === "Weekly") pLabel = "Weekly";
+                }
                 return (
                   <TouchableOpacity
                     key={p.value}
                     style={[styles.periodBtn, isActive && styles.periodBtnActive]}
-                    onPress={() => setSelectedPeriod(p.value)}
+                    onPress={() => handlePeriodChange(p.value)}
                   >
                     <Text style={[styles.periodBtnText, { color: isActive ? "#fff" : colors.textMuted }]}>
-                      {p.label}
+                      {pLabel}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
 
-            <DateRangeFilter
-              startDate={rangeStart}
-              endDate={rangeEnd}
-              onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
-              colors={colors}
-            />
+            {selectedPeriod !== "Hourly" && (
+              <DateRangeFilter
+                startDate={rangeStart}
+                endDate={rangeEnd}
+                onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); }}
+                colors={colors}
+              />
+            )}
             
             {/* Chart */}
             <View style={styles.chartWrapper}>

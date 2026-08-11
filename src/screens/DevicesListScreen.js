@@ -38,8 +38,126 @@ import {
   AlertCircle,
 } from "lucide-react-native";
 
+const formatLocationHistoryText = (text, language) => {
+  if (!text || typeof text !== "string") return text || "-";
+  if (language === "Indonesia") return text;
+  return text
+    .replace(/\bSekarang\b/gi, "Present")
+    .replace(/\bLokasi Terbaru\b/gi, "Latest Location")
+    .replace(/\bTerbaru\b/gi, "Latest")
+    .replace(/\bHari Ini\b/gi, "Today")
+    .replace(/\bMinggu Ini\b/gi, "This Week")
+    .replace(/\bBulan Ini\b/gi, "This Month")
+    .replace(/\bDari\b/gi, "From")
+    .replace(/\bKe\b/gi, "To")
+    .replace(/\bs\/d\b/gi, "-")
+    .replace(/\bsd\b/gi, "-")
+    .replace(/\bsampai\b/gi, "to")
+
+    // Specific Dashboard Device Titles & Rooms
+    .replace(/\bAC Ruang Lab\b/gi, "Lab Room AC")
+    .replace(/\bLampu Ruang Lab\b/gi, "Lab Room Lamp")
+    .replace(/\bPower Meter Gedung B\b/gi, "Building B Power Meter")
+    .replace(/\bPower Meter Gedung C\b/gi, "Building C Power Meter")
+    .replace(/\bPower Meter Gedung D\b/gi, "Building D Power Meter")
+    .replace(/\bPower Meter Gedung\b/gi, "Building Power Meter")
+    .replace(/\bWater Meter Gedung C\b/gi, "Building C Water Meter")
+    .replace(/\bWater Meter Gedung\b/gi, "Building Water Meter")
+    .replace(/\bRuang Dosen PSI\b/gi, "PSI Lecturer Room")
+    .replace(/\bRuang Lab\b/gi, "Lab Room")
+
+    // General Category Filters & Devices
+    .replace(/\bTemperatur & Kelembaban\b/gi, "Temperature & Humidity")
+    .replace(/\bTemperatur & Kelembapan\b/gi, "Temperature & Humidity")
+    .replace(/\bSensor Suhu & Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu dan Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu & Kelembapan\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu\b/gi, "Temperature Sensor")
+    .replace(/\bSensor Kelembaban\b/gi, "Humidity Sensor")
+    .replace(/\bSensor Kelembapan\b/gi, "Humidity Sensor")
+    .replace(/\bPower Meter\b/gi, "Power Meter")
+    .replace(/\bWater Meter\b/gi, "Water Meter")
+    .replace(/\bMeteran Air\b/gi, "Water Meter")
+    .replace(/\bMeteran Listrik\b/gi, "Power Meter")
+    .replace(/\bKontrol AC\b/gi, "AC Control")
+    .replace(/\bKontrol Lampu\b/gi, "Lamp Control")
+    .replace(/\bLampu Utama\b/gi, "Main Lamp")
+    .replace(/\bLampu\b/gi, "Lamp")
+    .replace(/\bListrik\b/gi, "Power / Electricity")
+    .replace(/\bSemua Perangkat\b/gi, "All Devices")
+    .replace(/\bSemua Kategori\b/gi, "All Categories")
+    .replace(/\bSemua\b/gi, "All")
+    .replace(/\bPerangkat Aktif\b/gi, "Active Devices")
+    .replace(/\bPerangkat Tidak Aktif\b/gi, "Inactive Devices")
+
+    // Labs & Rooms
+    .replace(/\bLab IoT\b/gi, "IoT Lab")
+    .replace(/\bLab Kontrol\b/gi, "Control Lab")
+    .replace(/\bLab Otomotif\b/gi, "Automotive Lab")
+    .replace(/\bLab Pemrograman\b/gi, "Programming Lab")
+    .replace(/\bLab AI\b/gi, "AI Lab")
+    .replace(/\bLab Mekatronika\b/gi, "Mechatronics Lab")
+    .replace(/\bLab Komputer\b/gi, "Computer Lab")
+    .replace(/\bLab Otomasi\b/gi, "Automation Lab")
+    .replace(/\bLab Robotika\b/gi, "Robotics Lab")
+    .replace(/\bLab Elektronika\b/gi, "Electronics Lab")
+    .replace(/\bLab Jaringan\b/gi, "Network Lab")
+    .replace(/\bLab Telekomunikasi\b/gi, "Telecommunication Lab")
+    .replace(/\bLab Manufaktur\b/gi, "Manufacturing Lab")
+    .replace(/\bLab Multimedia\b/gi, "Multimedia Lab")
+    .replace(/\bLab Basis Data\b/gi, "Database Lab")
+    .replace(/\bLab Bahasa\b/gi, "Language Lab")
+    .replace(/\bLaboratorium\b/gi, "Laboratory")
+    .replace(/\bRuang Dosen\b/gi, "Lecturer Room")
+    .replace(/\bRuang Dekan\b/gi, "Dean Room")
+    .replace(/\bRuang Kaprodi\b/gi, "Department Head Room")
+    .replace(/\bRuang Rapat Utama\b/gi, "Main Meeting Room")
+    .replace(/\bRuang Rapat\b/gi, "Meeting Room")
+    .replace(/\bRuang Server\b/gi, "Server Room")
+    .replace(/\bRuang Kontrol\b/gi, "Control Room")
+    .replace(/\bRuang Direktur\b/gi, "Director Room")
+    .replace(/\bRuang Staf\b/gi, "Staff Room")
+    .replace(/\bRuang Kuliah\b/gi, "Lecture Room")
+    .replace(/\bRuang Kelas\b/gi, "Classroom")
+    .replace(/\bRuangan\b/gi, "Room")
+    .replace(/\bRuang\b/gi, "Room")
+    .replace(/\bGedung A\b/gi, "Building A")
+    .replace(/\bGedung B\b/gi, "Building B")
+    .replace(/\bGedung C\b/gi, "Building C")
+    .replace(/\bGedung D\b/gi, "Building D")
+    .replace(/\bGedung E\b/gi, "Building E")
+    .replace(/\bGedung Utama\b/gi, "Main Building")
+    .replace(/\bGedung\b/gi, "Building")
+    .replace(/\bLantai\b/gi, "Floor")
+    .replace(/\bSenin\b/gi, "Monday")
+    .replace(/\bSelasa\b/gi, "Tuesday")
+    .replace(/\bRabu\b/gi, "Wednesday")
+    .replace(/\bKamis\b/gi, "Thursday")
+    .replace(/\bJum'at\b/gi, "Friday")
+    .replace(/\bJumat\b/gi, "Friday")
+    .replace(/\bSabtu\b/gi, "Saturday")
+    .replace(/\bMinggu\b/gi, "Sunday")
+    .replace(/\bJanuari\b/gi, "January")
+    .replace(/\bFebruari\b/gi, "February")
+    .replace(/\bMaret\b/gi, "March")
+    .replace(/\bMei\b/gi, "May")
+    .replace(/\bJuni\b/gi, "June")
+    .replace(/\bJuli\b/gi, "July")
+    .replace(/\bAgustus\b/gi, "August")
+    .replace(/\bAgt\b/gi, "Aug")
+    .replace(/\bAgu\b/gi, "Aug")
+    .replace(/\bSeptember\b/gi, "September")
+    .replace(/\bSept?\b/gi, "Sep")
+    .replace(/\bOktober\b/gi, "October")
+    .replace(/\bOkt\b/gi, "Oct")
+    .replace(/\bNovember\b/gi, "November")
+    .replace(/\bNov\b/gi, "Nov")
+    .replace(/\bDesember\b/gi, "December")
+    .replace(/\bDes\b/gi, "Dec");
+};
+
 export default function DevicesListScreen({ route, navigation, isTab = false }) {
-  const { user, colors, theme, showToast, t } = useUser();
+  const { user, colors, theme, showToast, t, language } = useUser();
   const [devices, setDevices] = useState([]);
   const [locations, setLocations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -194,7 +312,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
         setModalVisible(false);
         resetAddForm();
         await loadDevicesAndLocations();
-        setSuccessModalMessage("Perangkat baru berhasil ditambahkan!");
+        setSuccessModalMessage(language === "Indonesia" ? "Perangkat baru berhasil ditambahkan!" : "New device added successfully!");
         setSuccessModalVisible(true);
       }
     } catch (err) {
@@ -279,7 +397,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       } else {
         setEditModalVisible(false);
         await loadDevicesAndLocations();
-        setSuccessModalMessage("Informasi perangkat berhasil diperbarui.");
+        setSuccessModalMessage(language === "Indonesia" ? "Informasi perangkat berhasil diperbarui." : "Device information updated successfully.");
         setSuccessModalVisible(true);
       }
     } catch (err) {
@@ -313,7 +431,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       } else {
         setDevices((prev) => prev.filter((d) => (d.id || d.Id || d.dev_id) !== targetId));
         setDeviceToDelete(null);
-        setSuccessModalMessage("Perangkat berhasil dihapus.");
+        setSuccessModalMessage(language === "Indonesia" ? "Perangkat berhasil dihapus." : "Device deleted successfully.");
         setSuccessModalVisible(true);
       }
     } catch (err) {
@@ -325,19 +443,22 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   };
 
   const handleToggleActive = async (id, currentIsActive) => {
+    const safeId = id || "";
     const newIsActive = !currentIsActive;
     setDevices((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, isActive: newIsActive } : d))
+      prev.map((d) => ((d.id || d.Id || d.dev_id) === safeId ? { ...d, isActive: newIsActive } : d))
     );
-    const response = await iotService.toggleDeviceActive(id, newIsActive);
-    if (response.error) {
+    const response = await iotService.toggleDeviceActive(safeId, newIsActive);
+    if (response?.error) {
       setDevices((prev) =>
-        prev.map((d) => (d.id === id ? { ...d, isActive: currentIsActive } : d))
+        prev.map((d) => ((d.id || d.Id || d.dev_id) === safeId ? { ...d, isActive: currentIsActive } : d))
       );
-      showToast(response.message || "Gagal mengubah status perangkat.", "error");
+      showToast(response.message || (language === "Indonesia" ? "Gagal mengubah status perangkat." : "Failed to change device status."), "error");
     } else {
       showToast(
-        newIsActive ? "Perangkat berhasil diaktifkan." : "Perangkat dinonaktifkan.",
+        newIsActive
+          ? (language === "Indonesia" ? "Perangkat berhasil diaktifkan." : "Device activated successfully.")
+          : (language === "Indonesia" ? "Perangkat dinonaktifkan." : "Device deactivated."),
         newIsActive ? "success" : "info"
       );
     }
@@ -464,9 +585,14 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           </View>
 
           <View style={styles.deviceDetails}>
-            <Text style={[styles.deviceNameText, { color: colors.text }]}>{item.name}</Text>
+            <Text style={[styles.deviceNameText, { color: colors.text }]}>
+              {formatLocationHistoryText(item.name || item.Name || item.dev_name, language)}
+            </Text>
             <Text style={[styles.deviceLocText, { color: colors.textMuted }]}>
-              {[item.ruangan || item.loc_ruangan || "Lobby Utama", item.gedung || item.loc_gedung].filter(Boolean).join(" — ")}
+              {formatLocationHistoryText(
+                [item.ruangan || item.loc_ruangan || item.Ruangan || "Lobby Utama", item.gedung || item.loc_gedung || item.Gedung].filter(Boolean).join(" — "),
+                language
+              )}
             </Text>
             <View style={styles.statusDotRow}>
               <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
@@ -497,7 +623,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           {canCrud ? (
             <Switch
               value={isActive}
-              onValueChange={() => handleToggleActive(item.id, isActive)}
+              onValueChange={() => handleToggleActive(item.id || item.Id || item.dev_id, isActive)}
               trackColor={{ false: "#ef4444", true: "#10b981" }}
               thumbColor="#ffffff"
               style={styles.toggleSwitch}
@@ -525,9 +651,9 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   const renderStepProgressTracker = () => (
     <View style={[styles.trackerContainer, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
       {[
-        { num: 1, label: "Pilih Jenis" },
-        { num: 2, label: "Nama Perangkat" },
-        { num: 3, label: "Tempat Lokasi" },
+        { num: 1, label: language === "Indonesia" ? "Pilih Jenis" : "Select Type" },
+        { num: 2, label: language === "Indonesia" ? "Nama Perangkat" : "Device Name" },
+        { num: 3, label: language === "Indonesia" ? "Tempat Lokasi" : "Installation Location" },
       ].map((item, idx) => {
         const isCurrent = step === item.num;
         const isCompleted = step > item.num;
@@ -582,17 +708,19 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   // ── Render Wizard Step 1: Kategori Perangkat ─────────────────────────────
   const renderStep1 = () => (
     <View>
-      <Text style={[styles.wizardTitle, { color: colors.text }]}>Pilih Jenis Perangkat</Text>
+      <Text style={[styles.wizardTitle, { color: colors.text }]}>{language === "Indonesia" ? "Pilih Jenis Perangkat" : "Select Device Type"}</Text>
       <Text style={[styles.wizardSubtitle, { color: colors.textMuted }]}>
-        Pilih jenis perangkat IoT yang ingin Anda tambahkan ke sistem
+        {language === "Indonesia"
+          ? "Pilih jenis perangkat IoT yang ingin Anda tambahkan ke sistem"
+          : "Select the type of IoT device you want to add to the system"}
       </Text>
 
       <View style={styles.categoryGrid}>
         {[
           {
             id: "Lampu",
-            title: "Lampu",
-            desc: "Kontrol saklar & penerangan",
+            title: language === "Indonesia" ? "Lampu" : "Lamp",
+            desc: language === "Indonesia" ? "Kontrol saklar & penerangan" : "Switch control & lighting",
             icon: Lightbulb,
             color: "#eab308",
             bgColor: "#fef9c3",
@@ -600,7 +728,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           {
             id: "AC",
             title: "AC (Air Conditioner)",
-            desc: "Pengatur suhu & AC ruangan",
+            desc: language === "Indonesia" ? "Pengatur suhu & AC ruangan" : "Room temperature & AC control",
             icon: Cpu,
             color: "#0059AB",
             bgColor: "#e0f2fe",
@@ -608,7 +736,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           {
             id: "Listrik",
             title: "Smartplug / Power Meter",
-            desc: "Monitoring daya & konsumsi listrik",
+            desc: language === "Indonesia" ? "Monitoring daya & konsumsi listrik" : "Power monitoring & electricity consumption",
             icon: Zap,
             color: "#0284c7",
             bgColor: "#e0f2fe",
@@ -646,7 +774,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           style={styles.wizardNextBtnFull}
           onPress={() => animateNextStep(2)}
         >
-          <Text style={styles.wizardNextBtnText}>Lanjut</Text>
+          <Text style={styles.wizardNextBtnText}>{language === "Indonesia" ? "Lanjut" : "Next"}</Text>
           <ChevronRight size={18} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -662,14 +790,16 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           {getCategoryIcon(formCategory)}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.selectedCategoryLabel, { color: colors.textMuted }]}>Jenis Perangkat Dipilih</Text>
+          <Text style={[styles.selectedCategoryLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Jenis Perangkat Dipilih" : "Selected Device Type"}</Text>
           <Text style={[styles.selectedCategoryTitle, { color: colors.text }]}>{formCategory}</Text>
         </View>
       </View>
 
-      <Text style={[styles.wizardTitle, { color: colors.text }]}>Nama Perangkat</Text>
+      <Text style={[styles.wizardTitle, { color: colors.text }]}>{language === "Indonesia" ? "Nama Perangkat" : "Device Name"}</Text>
       <Text style={[styles.wizardSubtitle, { color: colors.textMuted }]}>
-        Beri nama untuk perangkat {formCategory} baru ini
+        {language === "Indonesia"
+          ? `Beri nama untuk perangkat ${formCategory} baru ini`
+          : `Enter a name for this new ${formCategory} device`}
       </Text>
 
       {formNameError ? (
@@ -680,8 +810,8 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       ) : null}
 
       <Input
-        label="Nama Perangkat *"
-        placeholder={`Contoh: ${formCategory} Ruang Lab Utama`}
+        label={language === "Indonesia" ? "Nama Perangkat *" : "Device Name *"}
+        placeholder={language === "Indonesia" ? `Contoh: ${formCategory} Ruang Lab Utama` : `Example: Main Lab Room ${formCategory}`}
         value={formName}
         onChangeText={(text) => {
           setFormName(text);
@@ -700,7 +830,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             animateNextStep(1);
           }}
         >
-          <Text style={[styles.wizardBackBtnText, { color: colors.text }]}>Kembali</Text>
+          <Text style={[styles.wizardBackBtnText, { color: colors.text }]}>{language === "Indonesia" ? "Kembali" : "Back"}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.wizardNextBtn}
@@ -714,7 +844,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             animateNextStep(3);
           }}
         >
-          <Text style={styles.wizardNextBtnText}>Lanjut</Text>
+          <Text style={styles.wizardNextBtnText}>{language === "Indonesia" ? "Lanjut" : "Next"}</Text>
           <ChevronRight size={18} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -730,14 +860,14 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           {getCategoryIcon(formCategory)}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.selectedCategoryLabel, { color: colors.textMuted }]}>Perangkat Didaftarkan</Text>
+          <Text style={[styles.selectedCategoryLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Perangkat Didaftarkan" : "Registering Device"}</Text>
           <Text style={[styles.selectedCategoryTitle, { color: colors.text }]}>{formName}</Text>
         </View>
       </View>
 
-      <Text style={[styles.wizardTitle, { color: colors.text }]}>Pilih Tempat Lokasi</Text>
+      <Text style={[styles.wizardTitle, { color: colors.text }]}>{language === "Indonesia" ? "Pilih Tempat Lokasi" : "Select Installation Location"}</Text>
       <Text style={[styles.wizardSubtitle, { color: colors.textMuted }]}>
-        Pilih tempat lokasi
+        {language === "Indonesia" ? "Pilih tempat lokasi" : "Select room / installation location"}
       </Text>
 
       <View style={styles.locationDropdownList}>
@@ -759,9 +889,11 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                   <MapPin size={18} color={isSelected ? "#fff" : colors.textMuted} />
                 </View>
                 <View>
-                  <Text style={[styles.locationRuanganText, { color: colors.text }]}>{loc.ruangan}</Text>
+                  <Text style={[styles.locationRuanganText, { color: colors.text }]}>
+                    {formatLocationHistoryText(loc.ruangan, language)}
+                  </Text>
                   <Text style={[styles.locationGedungText, { color: colors.textMuted }]}>
-                    {loc.lantai} — {loc.gedung}
+                    {formatLocationHistoryText(`${language === "Indonesia" ? "Lantai" : "Floor"} ${loc.lantai} — ${loc.gedung}`, language)}
                   </Text>
                 </View>
               </View>
@@ -781,7 +913,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           onPress={() => animateNextStep(2)}
           disabled={isSubmitting}
         >
-          <Text style={[styles.wizardBackBtnText, { color: colors.text }]}>Kembali</Text>
+          <Text style={[styles.wizardBackBtnText, { color: colors.text }]}>{language === "Indonesia" ? "Kembali" : "Back"}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.wizardSubmitBtn}
@@ -791,7 +923,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.wizardSubmitBtnText}>Simpan Perangkat</Text>
+            <Text style={styles.wizardSubmitBtnText}>{language === "Indonesia" ? "Simpan Perangkat" : "Save Device"}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -921,7 +1053,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             <TouchableOpacity style={styles.backBtn} onPress={() => setEditModalVisible(false)}>
               <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.navTitle, { color: colors.text }]}>Edit Perangkat</Text>
+            <Text style={[styles.navTitle, { color: colors.text }]}>{language === "Indonesia" ? "Edit Perangkat" : "Edit Device"}</Text>
             <View style={{ width: 40 }} />
           </View>
 
@@ -933,15 +1065,17 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                   {getCategoryIcon(editDevice.category)}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.selectedCategoryLabel, { color: colors.textMuted }]}>Perangkat Dipilih</Text>
+                  <Text style={[styles.selectedCategoryLabel, { color: colors.textMuted }]}>{language === "Indonesia" ? "Perangkat Dipilih" : "Selected Device"}</Text>
                   <Text style={[styles.selectedCategoryTitle, { color: colors.text }]}>{editDevice.name || editDevice.id}</Text>
                 </View>
               </View>
             )}
 
-            <Text style={[styles.wizardTitle, { color: colors.text }]}>Ubah Perangkat</Text>
+            <Text style={[styles.wizardTitle, { color: colors.text }]}>{language === "Indonesia" ? "Ubah Perangkat" : "Edit Device"}</Text>
             <Text style={[styles.wizardSubtitle, { color: colors.textMuted }]}>
-              Ubah nama dan tempat lokasi perangkat dipasang
+              {language === "Indonesia"
+                ? "Ubah nama dan tempat lokasi perangkat dipasang"
+                : "Change device name and installation location"}
             </Text>
 
             {editFormNameError ? (
@@ -952,8 +1086,8 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             ) : null}
 
             <Input
-              label="Nama Perangkat *"
-              placeholder="Masukkan nama perangkat"
+              label={language === "Indonesia" ? "Nama Perangkat *" : "Device Name *"}
+              placeholder={language === "Indonesia" ? "Masukkan nama perangkat" : "Enter device name"}
               value={editFormName}
               onChangeText={(text) => {
                 setEditFormName(text);
@@ -965,7 +1099,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             />
 
             <Text style={[styles.formLabel, { color: colors.text, marginTop: 16 }]}>
-              Pilih Tempat Lokasi <Text style={{ color: "#ef4444", fontWeight: "800" }}>*</Text>
+              {language === "Indonesia" ? "Pilih Tempat Lokasi" : "Select Installation Location"} <Text style={{ color: "#ef4444", fontWeight: "800" }}>*</Text>
             </Text>
             <View style={styles.locationDropdownList}>
               {locations.map((loc) => {
@@ -986,9 +1120,11 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                         <MapPin size={18} color={isSelected ? "#fff" : colors.textMuted} />
                       </View>
                       <View>
-                        <Text style={[styles.locationRuanganText, { color: colors.text }]}>{loc.ruangan}</Text>
+                        <Text style={[styles.locationRuanganText, { color: colors.text }]}>
+                          {formatLocationHistoryText(loc.ruangan, language)}
+                        </Text>
                         <Text style={[styles.locationGedungText, { color: colors.textMuted }]}>
-                          Lantai {loc.lantai} — {loc.gedung}
+                          {formatLocationHistoryText(`${language === "Indonesia" ? "Lantai" : "Floor"} ${loc.lantai} — ${loc.gedung}`, language)}
                         </Text>
                       </View>
                     </View>
@@ -1008,7 +1144,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                 onPress={() => setEditModalVisible(false)}
                 disabled={isSubmitting}
               >
-                <Text style={[styles.wizardBackBtnText, { color: colors.text }]}>Batal</Text>
+                <Text style={[styles.wizardBackBtnText, { color: colors.text }]}>{language === "Indonesia" ? "Batal" : "Cancel"}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.wizardSubmitBtn}
@@ -1018,7 +1154,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.wizardSubmitBtnText}>Simpan Perubahan</Text>
+                  <Text style={styles.wizardSubmitBtnText}>{language === "Indonesia" ? "Simpan Perubahan" : "Save Changes"}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1042,16 +1178,16 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
             {/* Title */}
             <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
-              Hapus Perangkat
+              {language === "Indonesia" ? "Hapus Perangkat" : "Delete Device"}
             </Text>
 
             {/* Message Body */}
             <Text style={[styles.deleteModalMessage, { color: colors.textMuted }]}>
-              Apakah Anda yakin ingin menghapus perangkat{" "}
+              {language === "Indonesia" ? "Apakah Anda yakin ingin menghapus perangkat " : "Are you sure you want to delete device "}
               <Text style={{ fontWeight: "800", color: colors.text }}>
                 {deviceToDelete?.name || deviceToDelete?.id}?
               </Text>{" "}
-              Semua data telemetri dan notifikasi terkait akan ikut terhapus.
+              {language === "Indonesia" ? "Semua data telemetri dan notifikasi terkait akan ikut terhapus." : "All related telemetry data and notifications will also be deleted."}
             </Text>
 
             {/* Action Buttons Row */}
@@ -1061,7 +1197,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                 onPress={() => setDeleteModalVisible(false)}
                 disabled={isSubmitting}
               >
-                <Text style={[styles.deleteModalCancelText, { color: colors.textMuted }]}>BATAL</Text>
+                <Text style={[styles.deleteModalCancelText, { color: colors.textMuted }]}>{language === "Indonesia" ? "BATAL" : "CANCEL"}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1072,7 +1208,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.deleteModalConfirmText}>HAPUS</Text>
+                  <Text style={styles.deleteModalConfirmText}>{language === "Indonesia" ? "HAPUS" : "DELETE"}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1096,7 +1232,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
             {/* Title */}
             <Text style={[styles.deleteModalTitle, { color: colors.text }]}>
-              Sukses
+              {language === "Indonesia" ? "Sukses" : "Success"}
             </Text>
 
             {/* Subtitle Message */}
@@ -1135,7 +1271,17 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             </Text>
             {["Semua", "Lampu", "AC", "Listrik", "Temperatur & Kelembaban"].map((catOption) => {
               const isSelected = selectedCategoryFilter === catOption;
-              const transCatLabel = catOption === "Semua" ? t("semua") : catOption;
+              let transCatLabel = catOption;
+              if (language !== "Indonesia") {
+                if (catOption === "Semua") transCatLabel = "All";
+                else if (catOption === "Lampu") transCatLabel = "Lamp";
+                else if (catOption === "AC") transCatLabel = "AC";
+                else if (catOption === "Listrik") transCatLabel = "Power / Electricity";
+                else if (catOption === "Temperatur & Kelembaban" || catOption === "Temperatur & Kelembapan") transCatLabel = "Temperature & Humidity";
+                else transCatLabel = formatLocationHistoryText(catOption, language);
+              } else {
+                if (catOption === "Semua") transCatLabel = t("semua");
+              }
               return (
                 <TouchableOpacity
                   key={catOption}

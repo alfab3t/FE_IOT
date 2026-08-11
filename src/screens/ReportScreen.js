@@ -22,14 +22,14 @@ import {
   User,
 } from "lucide-react-native";
 
-const formatDecimal = (value, digits = 1, language = "Indonesia") =>
-  Number(value).toLocaleString(
-    language === "Indonesia" ? "id-ID" : "en-US",
-    {
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    }
-  );
+const formatDecimal = (value, digits = 1, language = "Indonesia") => {
+  const num = Number(value);
+  if (Number.isNaN(num)) return "0";
+  return num.toLocaleString(language === "Indonesia" ? "id-ID" : "en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+};
 
 export default function ReportScreen({ navigation }) {
   const { colors, theme, t, language } = useUser();
@@ -124,7 +124,9 @@ function ReportStatsCard({ summary, colors, theme, t , language }) {
  
   const avgTemp = formatDecimal(summary.avgTemperature || 0, 1, language);
   const avgHum = formatDecimal(summary.avgHumidity || 0, 1, language);
-  const totalPower = formatDecimal(summary.totalPowerKwh || 0, 0, language);
+  const rawPower = Number(summary.totalPowerKwh || 0);
+  const powerInKwh = rawPower > 100 ? rawPower / 1000.0 : rawPower;
+  const totalPower = formatDecimal(powerInKwh, 2, language);
 
   const monitoringTitle =
     language === "Indonesia"
@@ -132,12 +134,12 @@ function ReportStatsCard({ summary, colors, theme, t , language }) {
       : "Monitoring Summary";
   const deviceOnlineTitle =
     language === "Indonesia"
-      ? "Perangkat Online"
-      : "Devices Online";
+      ? "Perangkat Aktif"
+      : "Active Devices";
   const deviceOfflineTitle =
     language === "Indonesia"
-      ? "Perangkat Offline"
-      : "Devices Offline";
+      ? "Perangkat Tidak Aktif"
+      : "Inactive Devices";
   const totalUserTitle =
     language === "Indonesia"
       ? "Total Pengguna"

@@ -16,8 +16,126 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import { ArrowLeft, Wind, Snowflake, Compass } from "lucide-react-native";
 
+const formatLocationHistoryText = (text, language) => {
+  if (!text || typeof text !== "string") return text || "-";
+  if (language === "Indonesia") return text;
+  return text
+    .replace(/\bSekarang\b/gi, "Present")
+    .replace(/\bLokasi Terbaru\b/gi, "Latest Location")
+    .replace(/\bTerbaru\b/gi, "Latest")
+    .replace(/\bHari Ini\b/gi, "Today")
+    .replace(/\bMinggu Ini\b/gi, "This Week")
+    .replace(/\bBulan Ini\b/gi, "This Month")
+    .replace(/\bDari\b/gi, "From")
+    .replace(/\bKe\b/gi, "To")
+    .replace(/\bs\/d\b/gi, "-")
+    .replace(/\bsd\b/gi, "-")
+    .replace(/\bsampai\b/gi, "to")
+
+    // Specific Dashboard Device Titles & Rooms
+    .replace(/\bAC Ruang Lab\b/gi, "Lab Room AC")
+    .replace(/\bLampu Ruang Lab\b/gi, "Lab Room Lamp")
+    .replace(/\bPower Meter Gedung B\b/gi, "Building B Power Meter")
+    .replace(/\bPower Meter Gedung C\b/gi, "Building C Power Meter")
+    .replace(/\bPower Meter Gedung D\b/gi, "Building D Power Meter")
+    .replace(/\bPower Meter Gedung\b/gi, "Building Power Meter")
+    .replace(/\bWater Meter Gedung C\b/gi, "Building C Water Meter")
+    .replace(/\bWater Meter Gedung\b/gi, "Building Water Meter")
+    .replace(/\bRuang Dosen PSI\b/gi, "PSI Lecturer Room")
+    .replace(/\bRuang Lab\b/gi, "Lab Room")
+
+    // General Category Filters & Devices
+    .replace(/\bTemperatur & Kelembaban\b/gi, "Temperature & Humidity")
+    .replace(/\bTemperatur & Kelembapan\b/gi, "Temperature & Humidity")
+    .replace(/\bSensor Suhu & Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu dan Kelembaban\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu & Kelembapan\b/gi, "Temperature & Humidity Sensor")
+    .replace(/\bSensor Suhu\b/gi, "Temperature Sensor")
+    .replace(/\bSensor Kelembaban\b/gi, "Humidity Sensor")
+    .replace(/\bSensor Kelembapan\b/gi, "Humidity Sensor")
+    .replace(/\bPower Meter\b/gi, "Power Meter")
+    .replace(/\bWater Meter\b/gi, "Water Meter")
+    .replace(/\bMeteran Air\b/gi, "Water Meter")
+    .replace(/\bMeteran Listrik\b/gi, "Power Meter")
+    .replace(/\bKontrol AC\b/gi, "AC Control")
+    .replace(/\bKontrol Lampu\b/gi, "Lamp Control")
+    .replace(/\bLampu Utama\b/gi, "Main Lamp")
+    .replace(/\bLampu\b/gi, "Lamp")
+    .replace(/\bListrik\b/gi, "Power / Electricity")
+    .replace(/\bSemua Perangkat\b/gi, "All Devices")
+    .replace(/\bSemua Kategori\b/gi, "All Categories")
+    .replace(/\bSemua\b/gi, "All")
+    .replace(/\bPerangkat Aktif\b/gi, "Active Devices")
+    .replace(/\bPerangkat Tidak Aktif\b/gi, "Inactive Devices")
+
+    // Labs & Rooms
+    .replace(/\bLab IoT\b/gi, "IoT Lab")
+    .replace(/\bLab Kontrol\b/gi, "Control Lab")
+    .replace(/\bLab Otomotif\b/gi, "Automotive Lab")
+    .replace(/\bLab Pemrograman\b/gi, "Programming Lab")
+    .replace(/\bLab AI\b/gi, "AI Lab")
+    .replace(/\bLab Mekatronika\b/gi, "Mechatronics Lab")
+    .replace(/\bLab Komputer\b/gi, "Computer Lab")
+    .replace(/\bLab Otomasi\b/gi, "Automation Lab")
+    .replace(/\bLab Robotika\b/gi, "Robotics Lab")
+    .replace(/\bLab Elektronika\b/gi, "Electronics Lab")
+    .replace(/\bLab Jaringan\b/gi, "Network Lab")
+    .replace(/\bLab Telekomunikasi\b/gi, "Telecommunication Lab")
+    .replace(/\bLab Manufaktur\b/gi, "Manufacturing Lab")
+    .replace(/\bLab Multimedia\b/gi, "Multimedia Lab")
+    .replace(/\bLab Basis Data\b/gi, "Database Lab")
+    .replace(/\bLab Bahasa\b/gi, "Language Lab")
+    .replace(/\bLaboratorium\b/gi, "Laboratory")
+    .replace(/\bRuang Dosen\b/gi, "Lecturer Room")
+    .replace(/\bRuang Dekan\b/gi, "Dean Room")
+    .replace(/\bRuang Kaprodi\b/gi, "Department Head Room")
+    .replace(/\bRuang Rapat Utama\b/gi, "Main Meeting Room")
+    .replace(/\bRuang Rapat\b/gi, "Meeting Room")
+    .replace(/\bRuang Server\b/gi, "Server Room")
+    .replace(/\bRuang Kontrol\b/gi, "Control Room")
+    .replace(/\bRuang Direktur\b/gi, "Director Room")
+    .replace(/\bRuang Staf\b/gi, "Staff Room")
+    .replace(/\bRuang Kuliah\b/gi, "Lecture Room")
+    .replace(/\bRuang Kelas\b/gi, "Classroom")
+    .replace(/\bRuangan\b/gi, "Room")
+    .replace(/\bRuang\b/gi, "Room")
+    .replace(/\bGedung A\b/gi, "Building A")
+    .replace(/\bGedung B\b/gi, "Building B")
+    .replace(/\bGedung C\b/gi, "Building C")
+    .replace(/\bGedung D\b/gi, "Building D")
+    .replace(/\bGedung E\b/gi, "Building E")
+    .replace(/\bGedung Utama\b/gi, "Main Building")
+    .replace(/\bGedung\b/gi, "Building")
+    .replace(/\bLantai\b/gi, "Floor")
+    .replace(/\bSenin\b/gi, "Monday")
+    .replace(/\bSelasa\b/gi, "Tuesday")
+    .replace(/\bRabu\b/gi, "Wednesday")
+    .replace(/\bKamis\b/gi, "Thursday")
+    .replace(/\bJum'at\b/gi, "Friday")
+    .replace(/\bJumat\b/gi, "Friday")
+    .replace(/\bSabtu\b/gi, "Saturday")
+    .replace(/\bMinggu\b/gi, "Sunday")
+    .replace(/\bJanuari\b/gi, "January")
+    .replace(/\bFebruari\b/gi, "February")
+    .replace(/\bMaret\b/gi, "March")
+    .replace(/\bMei\b/gi, "May")
+    .replace(/\bJuni\b/gi, "June")
+    .replace(/\bJuli\b/gi, "July")
+    .replace(/\bAgustus\b/gi, "August")
+    .replace(/\bAgt\b/gi, "Aug")
+    .replace(/\bAgu\b/gi, "Aug")
+    .replace(/\bSeptember\b/gi, "September")
+    .replace(/\bSept?\b/gi, "Sep")
+    .replace(/\bOktober\b/gi, "October")
+    .replace(/\bOkt\b/gi, "Oct")
+    .replace(/\bNovember\b/gi, "November")
+    .replace(/\bNov\b/gi, "Nov")
+    .replace(/\bDesember\b/gi, "December")
+    .replace(/\bDes\b/gi, "Dec");
+};
+
 export default function AcControlScreen({ route, navigation }) {
-  const { user, colors } = useUser();
+  const { user, colors, t, language } = useUser();
   const [activeBuilding, setActiveBuilding] = useState("");
   const [acDeviceId, setAcDeviceId] = useState("DEV_AC01");
   const [tempDeviceId, setTempDeviceId] = useState("DEV_TEMP01");
@@ -33,21 +151,14 @@ export default function AcControlScreen({ route, navigation }) {
   const selectedRoleName = user?.selectedRole?.roleName || "Viewer";
   const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
-  const processAcDeviceDetail = async (currentDevice, response) => {
+  const processAcDeviceDetail = async (currentDevice, allDevices) => {
+    const buildingName = currentDevice.gedung || "Gedung Utama";
     const locText = [currentDevice.ruangan, currentDevice.gedung].filter(Boolean).join(" — ");
-    setActiveBuilding(locText || "Gedung Utama");
+    setActiveBuilding(locText || buildingName);
     setAcDeviceId(currentDevice.id);
-    setIsPowerOn(currentDevice.status === "ON");
 
-    const devDetail = await iotService.getDeviceById(currentDevice.id);
-    const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
-    if (Array.isArray(historyList)) {
-      setLocationHistory(historyList);
-    }
-
-    const buildingName = currentDevice.gedung || "";
-    const tempDevInBuilding = Array.isArray(response)
-      ? response.find(
+    const tempDevInBuilding = Array.isArray(allDevices)
+      ? allDevices.find(
           (dev) => dev?.gedung?.toLowerCase() === buildingName.toLowerCase() && dev?.category?.includes("Temp")
         )
       : null;
@@ -58,6 +169,12 @@ export default function AcControlScreen({ route, navigation }) {
       targetTempId = "DEV_TEMP02";
     }
     setTempDeviceId(targetTempId);
+
+    const devDetail = await iotService.getDeviceById(currentDevice.id);
+    const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
+    if (Array.isArray(historyList)) {
+      setLocationHistory(historyList);
+    }
 
     const savedSettings = await iotService.getAcSettings(currentDevice.id);
     if (!savedSettings?.error && savedSettings) {
@@ -104,7 +221,10 @@ export default function AcControlScreen({ route, navigation }) {
   }, [loadAcStatus]);
 
   const handleViewerBlock = () => {
-    Alert.alert("Akses Ditolak", "Anda tidak memiliki akses untuk mengendalikan perangkat (Viewer).");
+    Alert.alert(
+      language === "Indonesia" ? "Akses Ditolak" : "Access Denied",
+      language === "Indonesia" ? "Anda tidak memiliki akses untuk mengendalikan perangkat (Viewer)." : "You do not have access to control devices (Viewer)."
+    );
   };
 
   const handlePowerToggle = async (value) => {
@@ -116,17 +236,15 @@ export default function AcControlScreen({ route, navigation }) {
     setIsPowerOn(value);
     const cmd = value ? "1" : "0";
     
-    // Send valid AC power topic (setPowerS3 for S3, setPower00121 for standard AC)
     const topic = tempDeviceId === "DEV_TEMP02" ? "setPowerS3" : "setPower00121";
     const response = await iotService.controlAc(topic, cmd);
     
     if (response.error) {
       setIsPowerOn(!value);
-      Alert.alert("Gagal", response.message || "Gagal mengontrol daya AC.");
+      Alert.alert(language === "Indonesia" ? "Gagal" : "Failed", response.message || (language === "Indonesia" ? "Gagal mengontrol daya AC." : "Failed to control AC power."));
     }
   };
 
-  // Helper: simpan semua setting AC ke database
   const persistSettings = async (temp, mode, fan, swing) => {
     await iotService.saveAcSettings(acDeviceId, temp, mode, fan, swing);
   };
@@ -138,84 +256,105 @@ export default function AcControlScreen({ route, navigation }) {
     }
 
     const prevTemp = temperature;
-    const nextTemp = prevTemp + delta;
-    if (nextTemp < 16 || nextTemp > 30) return;
-
-    setTemperature(nextTemp);
-    const topic = tempDeviceId === "DEV_TEMP02" ? "setTempS3" : "setTemp00122";
+    const newTemp = Math.min(Math.max(temperature + delta, 16), 30);
+    setTemperature(newTemp);
     
-    const response = await iotService.controlAc(topic, String(nextTemp));
+    const topic = tempDeviceId === "DEV_TEMP02" ? "setTempS3" : "setTemp00122";
+    const response = await iotService.controlAc(topic, String(newTemp));
     if (response.error) {
       setTemperature(prevTemp);
-      Alert.alert("Gagal", response.message || "Gagal mengubah suhu AC.");
+      Alert.alert(language === "Indonesia" ? "Gagal" : "Failed", response.message || (language === "Indonesia" ? "Gagal mengubah temperatur." : "Failed to change temperature."));
     } else {
-      await persistSettings(nextTemp, acMode, fanSpeed, swingMode);
+      await persistSettings(newTemp, acMode, fanSpeed, swingMode);
     }
   };
 
-  const changeMode = async (mode, value) => {
+  const changeMode = async (modeName, modeVal) => {
     if (isViewer) {
       handleViewerBlock();
       return;
     }
-    setAcMode(mode);
+
+    const prevMode = acMode;
+    setAcMode(modeName);
+    
     const topic = tempDeviceId === "DEV_TEMP02" ? "setModeS3" : "setMode00124";
-    await iotService.controlAc(topic, String(value));
-    await persistSettings(temperature, mode, fanSpeed, swingMode);
+    const response = await iotService.controlAc(topic, String(modeVal));
+    if (response.error) {
+      setAcMode(prevMode);
+      Alert.alert(language === "Indonesia" ? "Gagal" : "Failed", response.message || (language === "Indonesia" ? "Gagal mengubah mode." : "Failed to change mode."));
+    } else {
+      await persistSettings(temperature, modeName, fanSpeed, swingMode);
+    }
   };
 
-  const changeFanSpeed = async (speed, value) => {
+  const changeFanSpeed = async (speedName, speedVal) => {
     if (isViewer) {
       handleViewerBlock();
       return;
     }
-    setFanSpeed(speed);
+
+    const prevSpeed = fanSpeed;
+    setFanSpeed(speedName);
+
     const topic = tempDeviceId === "DEV_TEMP02" ? "setFanS3" : "setFan00123";
-    await iotService.controlAc(topic, String(value));
-    await persistSettings(temperature, acMode, speed, swingMode);
+    const response = await iotService.controlAc(topic, String(speedVal));
+    if (response.error) {
+      setFanSpeed(prevSpeed);
+      Alert.alert(language === "Indonesia" ? "Gagal" : "Failed", response.message || (language === "Indonesia" ? "Gagal mengubah fan speed." : "Failed to change fan speed."));
+    } else {
+      await persistSettings(temperature, acMode, speedName, swingMode);
+    }
   };
 
-  const changeSwingMode = async (swing, value) => {
+  const changeSwingMode = async (swingName, swingVal) => {
     if (isViewer) {
       handleViewerBlock();
       return;
     }
-    setSwingMode(swing);
+
+    const prevSwing = swingMode;
+    setSwingMode(swingName);
+
     const topic = tempDeviceId === "DEV_TEMP02" ? "setSwingS3" : "setSwing00125";
-    await iotService.controlAc(topic, String(value));
-    await persistSettings(temperature, acMode, fanSpeed, swing);
+    const response = await iotService.controlAc(topic, String(swingVal));
+    if (response.error) {
+      setSwingMode(prevSwing);
+      Alert.alert(language === "Indonesia" ? "Gagal" : "Failed", response.message || (language === "Indonesia" ? "Gagal mengubah swing." : "Failed to change swing mode."));
+    } else {
+      await persistSettings(temperature, acMode, fanSpeed, swingName);
+    }
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Navbar */}
       <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.navTitle, { color: colors.text }]}>Kontrol AC</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{t("kontrol_ac")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {isLoading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#0059AB" />
-          <Text style={[styles.loaderText, { color: colors.textMuted }]}>Menghubungkan kontrol AC...</Text>
+          <Text style={[styles.loaderText, { color: colors.textMuted }]}>{language === "Indonesia" ? "Menghubungkan kontrol AC..." : "Connecting AC control..."}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Active Info */}
-          <Text style={[styles.activeBuildingText, { color: colors.textMuted }]}>Lokasi: {activeBuilding}</Text>
+          <Text style={[styles.activeBuildingText, { color: colors.textMuted }]}>
+            {language === "Indonesia" ? "Lokasi:" : "Location:"} {formatLocationHistoryText(activeBuilding, language)}
+          </Text>
 
-          {/* Power Switch Card */}
           <Card style={[styles.powerCard, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.powerHeader}>
-              <Text style={[styles.powerTitle, { color: colors.text }]}>Daya AC</Text>
+              <Text style={[styles.powerTitle, { color: colors.text }]}>{t("daya_ac")}</Text>
               <Text style={styles.powerStatusText}>{isPowerOn ? "ON" : "OFF"}</Text>
             </View>
             {isViewer ? (
               <View style={[styles.readOnlyBadge, { backgroundColor: colors.border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }]}>
-                <Text style={{ color: colors.textMuted, fontWeight: "600", fontSize: 12 }}>Read Only</Text>
+                <Text style={{ color: colors.textMuted, fontWeight: "600", fontSize: 12 }}>{language === "Indonesia" ? "Hanya Lihat" : "Read Only"}</Text>
               </View>
             ) : (
               <Switch
@@ -227,9 +366,8 @@ export default function AcControlScreen({ route, navigation }) {
             )}
           </Card>
 
-          {/* Temperature Controls */}
           <Card style={[styles.tempCard, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.tempHeaderTitle, { color: colors.text }]}>Target Temperatur</Text>
+            <Text style={[styles.tempHeaderTitle, { color: colors.text }]}>{t("target_temperatur")}</Text>
             <View style={[styles.tempSelectorRow, { justifyContent: "center" }]}>
               {!isViewer && (
                 <TouchableOpacity
@@ -256,7 +394,7 @@ export default function AcControlScreen({ route, navigation }) {
           </Card>
 
           {/* AC Modes */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Mode Pengoperasian</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("mode_pengoperasian")}</Text>
           <Card style={[styles.modeCard, { backgroundColor: colors.cardBackground }]}>
             {[
               { label: "Auto", val: 1 },
@@ -281,7 +419,7 @@ export default function AcControlScreen({ route, navigation }) {
           </Card>
 
           {/* Fan Speeds */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Kecepatan Kipas (Fan Speed)</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("kecepatan_kipas")}</Text>
           <Card style={[styles.modeCard, { backgroundColor: colors.cardBackground }]}>
             {[
               { label: "Auto", val: 1 },
@@ -308,7 +446,7 @@ export default function AcControlScreen({ route, navigation }) {
           </Card>
 
           {/* Swing Modes */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Arah Swing (Hembusan)</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("arah_swing")}</Text>
           <Card style={[styles.modeCard, { backgroundColor: colors.cardBackground }]}>
             {[
               { label: "Auto", val: 1 },
@@ -335,12 +473,16 @@ export default function AcControlScreen({ route, navigation }) {
           </Card>
 
           {/* Riwayat Perpindahan Lokasi Timeline */}
-          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Riwayat Perpindahan Lokasi</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 16 }]}>
+            {language === "Indonesia" ? "Riwayat Perpindahan Lokasi" : "Location Transfer History"}
+          </Text>
           <Card style={{ backgroundColor: colors.cardBackground, padding: 16, borderRadius: 16, marginVertical: 8 }}>
             {Array.isArray(locationHistory) && locationHistory.length > 0 ? (
               locationHistory.map((h, idx) => {
-                const period = h.periodText || h.PeriodText || h.timestampText || h.TimestampText || "-";
-                const room = h.ruangan || h.Ruangan || h.locationName || h.roomName || h.Gedung || "-";
+                const rawPeriod = h.periodText || h.PeriodText || h.timestampText || h.TimestampText || "-";
+                const rawRoom = h.ruangan || h.Ruangan || h.locationName || h.roomName || h.Gedung || "-";
+                const period = formatLocationHistoryText(rawPeriod, language);
+                const room = formatLocationHistoryText(rawRoom, language);
                 return (
                   <View key={h.id || h.historyId || `loc-${idx}`} style={{ flexDirection: "row", marginBottom: idx === locationHistory.length - 1 ? 0 : 14 }}>
                     <View style={{ alignItems: "center", width: 16, marginRight: 12 }}>
@@ -360,7 +502,9 @@ export default function AcControlScreen({ route, navigation }) {
               })
             ) : (
               <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: "italic" }}>
-                Belum ada riwayat perpindahan lokasi untuk perangkat ini.
+                {language === "Indonesia"
+                  ? "Belum ada riwayat perpindahan lokasi untuk perangkat ini."
+                  : "No location transfer history recorded for this device."}
               </Text>
             )}
           </Card>

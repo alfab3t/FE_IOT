@@ -40,6 +40,7 @@ function SwipeableNotifItem({
   colors,
   theme,
 }) {
+  const { language } = useUser();
   const pan = useRef(new Animated.ValueXY()).current;
   const [isOpen, setIsOpen] = useState(false);
 
@@ -104,7 +105,9 @@ function SwipeableNotifItem({
           }}
         >
           <Trash2 size={22} color="#ffffff" />
-          <Text style={styles.deleteActionText}>Hapus</Text>
+          <Text style={styles.deleteActionText}>
+            {language === "Indonesia" ? "Hapus" : "Delete"}
+          </Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -170,7 +173,7 @@ function SwipeableNotifItem({
 }
 
 export default function NotificationsScreen({ navigation }) {
-  const { colors, theme, language, translateNotification } = useUser();
+  const { colors, theme, language, translateNotification, t } = useUser();
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -195,7 +198,10 @@ export default function NotificationsScreen({ navigation }) {
     setIsRefreshing(false);
 
     if (response.error) {
-      Alert.alert("Gagal", response.message || "Gagal memuat notifikasi.");
+      Alert.alert(
+        language === "Indonesia" ? "Gagal" : "Failed",
+        response.message || (language === "Indonesia" ? "Gagal memuat notifikasi." : "Failed to load notifications.")
+      );
       return;
     }
 
@@ -260,7 +266,10 @@ export default function NotificationsScreen({ navigation }) {
 
     const response = await iotService.markNotificationsReadBulk(ids);
     if (response.error) {
-      Alert.alert("Gagal", "Gagal sinkronisasi baca ke server.");
+      Alert.alert(
+        language === "Indonesia" ? "Gagal" : "Failed",
+        language === "Indonesia" ? "Gagal sinkronisasi baca ke server." : "Failed to sync read status to server."
+      );
       loadNotifications(false);
     }
   };
@@ -282,8 +291,8 @@ export default function NotificationsScreen({ navigation }) {
 
     const response = await iotService.deleteNotificationsBulk(ids);
     if (response.error) {
-      setPopupTitle("Gagal");
-      setPopupMessage("Gagal menghapus dari server.");
+      setPopupTitle(language === "Indonesia" ? "Gagal" : "Failed");
+      setPopupMessage(language === "Indonesia" ? "Gagal menghapus dari server." : "Failed to delete from server.");
       setPopupType("error");
       setShowCancel(false);
       setPopupConfirmText("OK");
@@ -404,21 +413,21 @@ export default function NotificationsScreen({ navigation }) {
       <View style={[styles.navbar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         {isEditMode ? (
           <TouchableOpacity style={styles.navActionTextBtn} onPress={handleSelectAll}>
-            <Text style={styles.navActionText}>{allSelected ? "Batal Semua" : "Pilih Semua"}</Text>
+            <Text style={styles.navActionText}>{allSelected ? (language === "Indonesia" ? "Batal Semua" : "Deselect All") : (language === "Indonesia" ? "Pilih Semua" : "Select All")}</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 60 }} />
         )}
 
-        <Text style={[styles.navTitle, { color: colors.text }]}>{isEditMode ? `${selectedIds.size} Terpilih` : "Notifikasi"}</Text>
+        <Text style={[styles.navTitle, { color: colors.text }]}>{isEditMode ? `${selectedIds.size} ${language === "Indonesia" ? "Terpilih" : "Selected"}` : t("notifikasi")}</Text>
 
         {isEditMode ? (
           <TouchableOpacity style={styles.navActionTextBtn} onPress={() => setIsEditMode(false)}>
-            <Text style={[styles.navActionText, { color: colors.text }]}>Selesai</Text>
+            <Text style={[styles.navActionText, { color: colors.text }]}>{language === "Indonesia" ? "Selesai" : "Done"}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditMode(true)}>
-            <Edit2 size={20} color="#0059AB" />
+            <CheckSquare size={20} color="#0059AB" />
           </TouchableOpacity>
         )}
       </View>
@@ -427,6 +436,7 @@ export default function NotificationsScreen({ navigation }) {
       <View style={[styles.filterBar, { backgroundColor: colors.navbarBg, borderBottomColor: colors.border }]}>
         {["Semua", "Telah Dibaca", "Belum Dibaca"].map((cat) => {
           const isActive = filterCategory === cat;
+          const labelText = cat === "Semua" ? (language === "Indonesia" ? "Semua" : "All") : cat === "Telah Dibaca" ? (language === "Indonesia" ? "Telah Dibaca" : "Read") : (language === "Indonesia" ? "Belum Dibaca" : "Unread");
           return (
             <TouchableOpacity
               key={cat}
@@ -440,7 +450,7 @@ export default function NotificationsScreen({ navigation }) {
               onPress={() => setFilterCategory(cat)}
             >
               <Text style={[styles.filterPillText, { color: isActive ? "#ffffff" : colors.textMuted }]}>
-                {cat}
+                {labelText}
               </Text>
             </TouchableOpacity>
           );
@@ -461,7 +471,7 @@ export default function NotificationsScreen({ navigation }) {
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={["#0059AB"]} />
           }
           ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tidak ada notifikasi dalam kategori ini</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{language === "Indonesia" ? "Tidak ada notifikasi dalam kategori ini" : "No notifications in this category"}</Text>
           }
         />
       )}
@@ -476,7 +486,7 @@ export default function NotificationsScreen({ navigation }) {
           >
             <CheckCircle size={18} color={selectedIds.size === 0 ? "#adb5bd" : "#10b981"} />
             <Text style={[styles.panelBtnText, selectedIds.size === 0 && styles.panelBtnTextDisabled, { color: "#10b981" }]}>
-              Sudah Dibaca
+              {language === "Indonesia" ? "Sudah Dibaca" : "Mark as Read"}
             </Text>
           </TouchableOpacity>
 
@@ -487,7 +497,7 @@ export default function NotificationsScreen({ navigation }) {
           >
             <Trash2 size={18} color={selectedIds.size === 0 ? "#adb5bd" : "#ef4444"} />
             <Text style={[styles.panelBtnText, selectedIds.size === 0 && styles.panelBtnTextDisabled, { color: "#ef4444" }]}>
-              Hapus
+              {language === "Indonesia" ? "Hapus" : "Delete"}
             </Text>
           </TouchableOpacity>
         </View>

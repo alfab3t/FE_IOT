@@ -80,9 +80,10 @@ export const iotService = {
     });
   },
 
-  getGraphAverage: async (category, period = "Daily", startDate = null, endDate = null) => {
+  getGraphAverage: async (category, period = "Hourly", startDate = null, endDate = null) => {
     const normCategory = category === "Kelembapan" ? "Kelembaban" : category;
-    const params = { category: normCategory, period };
+    const normPeriod = (period === "per_jam" || period === "hourly" || !period || period === "Hourly") ? "Hourly" : period;
+    const params = { category: normCategory, period: normPeriod };
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     return apiClient("/api/Iot/dashboard/graph-average", { method: "GET" }, params);
