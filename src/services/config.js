@@ -2,7 +2,7 @@
 // export const BASE_URL = "http://192.168.1.12:5234/";
 
 // 🏠 IP Jaringan RUMAH
-export const BASE_URL = "http://192.168.1.19:5234/"; // NOSONAR
+export const BASE_URL = "http://10.92.71.116:5234/"; // NOSONAR
 
 //🏢 IP Jaringan KAMPUS ASTRA (Aktif Wi-Fi: 10.1.12.214)
 //export const BASE_URL = "http://10.1.12.214:5234/"; // NOSONAR

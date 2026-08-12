@@ -21,7 +21,6 @@ import {
   Sun,
   Info,
   ChevronDown,
-  Database,
 } from "lucide-react-native";
 
 export default function SystemSettingsScreen({ navigation }) {
@@ -48,8 +47,6 @@ export default function SystemSettingsScreen({ navigation }) {
     t,
     colors,
   } = useUser();
-
-  const [isBackingUp, setIsBackingUp] = useState(false);
 
   // Dropdown Picker Modals
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -113,21 +110,6 @@ export default function SystemSettingsScreen({ navigation }) {
       handleThemeSelect(option);
     }
     setPickerVisible(false);
-  };
-
-  const handleBackup = () => {
-    setIsBackingUp(true);
-    // Simulate database backup process
-    setTimeout(() => {
-      setIsBackingUp(false);
-      triggerPopup(
-        language === "English" ? "Backup Successful" : "Backup Sukses",
-        language === "English"
-          ? "System database backup successfully created and saved locally (Backup_ASTRATech_IoT.bak)."
-          : "Backup database sistem berhasil dibuat dan disimpan secara lokal (Backup_ASTRATech_IoT.bak).",
-        "success"
-      );
-    }, 2000);
   };
 
   let pickerTitleSuffix = "";
@@ -229,7 +211,9 @@ export default function SystemSettingsScreen({ navigation }) {
             style={[styles.dropdownSelector, { backgroundColor: colors.background, borderColor: colors.border }]}
             onPress={() => openPicker("theme", ["Light Mode", "Dark Mode"], theme)}
           >
-            <Text style={[styles.dropdownText, { color: colors.text }]}>{theme}</Text>
+            <Text style={[styles.dropdownText, { color: colors.text }]}>
+              {language === "Indonesia" ? (theme === "Dark Mode" ? "Mode Gelap" : "Mode Terang") : theme}
+            </Text>
             <ChevronDown size={14} color={colors.textMuted} />
           </TouchableOpacity>
         </Card>
@@ -246,26 +230,6 @@ export default function SystemSettingsScreen({ navigation }) {
             </View>
           </View>
           <Text style={[styles.versionValueText, { color: colors.text }]}>1.0.0</Text>
-        </Card>
-
-        {/* 6. Backup Database */}
-        <Card style={[styles.settingsRowCard, { backgroundColor: colors.cardBackground }]}>
-          <View style={styles.leftInfoBlock}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.background }]}>
-              <Database size={20} color="#0059AB" />
-            </View>
-            <View style={styles.textBlock}>
-              <Text style={[styles.rowTitleText, { color: colors.text }]}>{t("backup_db")}</Text>
-              <Text style={[styles.rowDescText, { color: colors.textMuted }]}>{t("backup_desc")}</Text>
-            </View>
-          </View>
-          {isBackingUp ? (
-            <ActivityIndicator size="small" color="#0059AB" style={{ paddingRight: 20 }} />
-          ) : (
-            <TouchableOpacity style={[styles.backupBtnOutline, { borderColor: "#0059AB", backgroundColor: colors.background }]} onPress={handleBackup}>
-              <Text style={styles.backupBtnText}>{t("backup_btn")}</Text>
-            </TouchableOpacity>
-          )}
         </Card>
       </ScrollView>
 
@@ -284,7 +248,10 @@ export default function SystemSettingsScreen({ navigation }) {
 
             {pickerOptions.map((opt) => {
               let displayLabel = opt;
-              if (language === "English") {
+              if (language === "Indonesia") {
+                if (opt === "Light Mode") displayLabel = "Mode Terang";
+                else if (opt === "Dark Mode") displayLabel = "Mode Gelap";
+              } else if (language === "English") {
                 if (opt === "5 detik") displayLabel = "5 seconds";
                 else if (opt === "10 detik") displayLabel = "10 seconds";
                 else if (opt === "30 detik") displayLabel = "30 seconds";

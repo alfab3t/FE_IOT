@@ -17,16 +17,19 @@ import { iotService } from "../services/iotService";
 import Card from "../components/Card";
 import Input from "../components/Input";
 import NotificationPopup from "../components/NotificationPopup";
+import SwipeableToast from "../components/SwipeableToast";
 import {
   User,
   Camera,
   Edit2,
   LogOut,
+  AlertCircle,
 } from "lucide-react-native";
 
 export default function ProfileScreen({ navigation }) {
   const { user, setUser, logout, colors, showToast, t, language } = useUser();
   const [avatarBase64, setAvatarBase64] = useState(user?.foto || null);
+  const [editUsernameError, setEditUsernameError] = useState("");
 
   // Modals and Previews
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
@@ -121,12 +124,8 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSaveUsername = async () => {
     if (!editUsernameValue.trim()) {
-      showToast(
-        language === "Indonesia"
-          ? "Username tidak boleh kosong."
-          : "Username cannot be empty.",
-        "error"
-      );
+      const emptyMsg = language === "Indonesia" ? "Username wajib diisi." : "Username is required.";
+      setEditUsernameError(emptyMsg);
       return;
     }
 
@@ -135,8 +134,31 @@ export default function ProfileScreen({ navigation }) {
 
     // Kalau username tidak berubah
     if (nextVal.toLowerCase() === oldVal.toLowerCase()) {
+      setEditUsernameError("");
       setUsernameModalVisible(false);
       return;
+    }
+
+    // Validasi duplikasi username terhadap pengguna lain (case-insensitive)
+    try {
+      const usersRes = await iotService.getUsers("", "", "");
+      if (usersRes && !usersRes.error) {
+        const rawUsers = usersRes.users || usersRes.Users || (Array.isArray(usersRes) ? usersRes : usersRes.data || []);
+        const exists = Array.isArray(rawUsers) && rawUsers.some((u) => {
+          const uName = (u.username || u.Username || u.use_id || "").toString().trim().toLowerCase();
+          return uName === nextVal.toLowerCase() && uName !== oldVal.toLowerCase();
+        });
+
+        if (exists) {
+          const dupMsg = language === "Indonesia"
+            ? "Username sudah terdaftar, silakan gunakan username lain."
+            : "Username is already registered, please use another username.";
+          setEditUsernameError(dupMsg);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("User duplicate pre-check failed:", err);
     }
 
     try {
@@ -145,14 +167,14 @@ export default function ProfileScreen({ navigation }) {
 
       // Kalau backend mengembalikan error
       if (response?.error) {
-        showToast(
-          language === "Indonesia"
-            ? response.message || "Username sudah terdaftar di sistem."
-            : response.message || "Username is already registered.",
-          "error"
-        );
+        const errBackend = language === "Indonesia"
+          ? response.message || "Username sudah terdaftar, silakan gunakan username lain."
+          : response.message || "Username is already registered, please use another username.";
+        setEditUsernameError(errBackend);
         return;
       }
+
+      setEditUsernameError("");
 
       // Backend berhasil → baru update data lokal
       const currentPhoto =
@@ -315,12 +337,13 @@ export default function ProfileScreen({ navigation }) {
             style={styles.settingRow}
             onPress={() => {
               setEditUsernameValue(user?.username || "");
+              setEditUsernameError("");
               setUsernameModalVisible(true);
             }}
           >
             <View style={styles.rowInfo}>
               <Text style={[styles.rowLabel, { color: colors.text }]}>
-                {language === "Indonesia" ? "Ubah Username" : "Change Username"}
+                {language === "Indonesia" ? "Ubah Username" : "Change Username"} <Text style={{ color: "#ef4444" }}>*</Text>
               </Text>
               <Text style={[styles.rowValue, { color: colors.textMuted }]}>{user?.username || "admin"}</Text>
             </View>
@@ -337,9 +360,14 @@ export default function ProfileScreen({ navigation }) {
 
       <UsernameModal
         visible={usernameModalVisible}
-        onClose={() => setUsernameModalVisible(false)}
+        onClose={() => {
+          setEditUsernameError("");
+          setUsernameModalVisible(false);
+        }}
         editUsernameValue={editUsernameValue}
         setEditUsernameValue={setEditUsernameValue}
+        editUsernameError={editUsernameError}
+        setEditUsernameError={setEditUsernameError}
         handleSaveUsername={handleSaveUsername}
         colors={colors}
         t={t}
@@ -388,6 +416,8 @@ function UsernameModal({
   onClose,
   editUsernameValue,
   setEditUsernameValue,
+  editUsernameError,
+  setEditUsernameError,
   handleSaveUsername,
   colors,
   t,
@@ -403,12 +433,25 @@ function UsernameModal({
       <View style={styles.modalOverlay}>
         <View style={[styles.dialogBox, { backgroundColor: colors.cardBackground }]}>
           <Text style={[styles.dialogTitle, { color: colors.text }]}>
-            {language === "Indonesia" ? "Ubah Username" : "Change Username"}
+            {language === "Indonesia" ? "Ubah Username" : "Change Username"} <Text style={{ color: "#ef4444" }}>*</Text>
           </Text>
+
+          {editUsernameError ? (
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#fef2f2", padding: 10, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: "#fca5a5" }}>
+              <AlertCircle size={16} color="#ef4444" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 12, color: "#ef4444", flex: 1, fontWeight: "600" }}>{editUsernameError}</Text>
+            </View>
+          ) : null}
+
           <Input
             placeholder={language === "Indonesia" ? "Masukkan username baru" : "Enter new username"}
             value={editUsernameValue}
-            onChangeText={setEditUsernameValue}
+            onChangeText={(text) => {
+              setEditUsernameValue(text);
+              if (text.trim()) setEditUsernameError("");
+            }}
+            error={editUsernameError}
+            hideErrorText={true}
           />
           <View style={styles.dialogButtonRow}>
             <TouchableOpacity

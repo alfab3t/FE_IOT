@@ -176,10 +176,11 @@ export default function LampControlScreen({ navigation }) {
   const isViewer = user?.selectedRole?.roleId === "ROL003" || user?.selectedRole?.roleId === "ROL03" || selectedRoleName.toLowerCase().includes("viewer");
 
   const processLampDevice = async (firstLamp) => {
-    setIsLampOn(firstLamp.status === "ON" || firstLamp.status === "1");
-    setLampDeviceId(firstLamp.id);
-    setActiveBuilding(`${firstLamp.ruangan} (${firstLamp.gedung})`);
-    const devDetail = await iotService.getDeviceById(firstLamp.id);
+    const isCurrentlyOn = firstLamp.status === "ON" || firstLamp.status === "1" || firstLamp.status === true;
+    setIsLampOn(isCurrentlyOn);
+    setLampDeviceId(firstLamp.id || "DEV_LAMP01");
+    setActiveBuilding(`${firstLamp.ruangan || "Lab IoT"} (${firstLamp.gedung || "Gedung Utama"})`);
+    const devDetail = await iotService.getDeviceById(firstLamp.id || "DEV_LAMP01");
     const historyList = devDetail?.locationHistory || devDetail?.LocationHistory || devDetail?.data?.locationHistory || devDetail?.data?.LocationHistory;
     if (Array.isArray(historyList)) {
       setLocationHistory(historyList);
@@ -195,7 +196,7 @@ export default function LampControlScreen({ navigation }) {
       return;
     }
 
-    const firstLamp = response.find((d) => d.category === "Lampu" || d.name?.toLowerCase().includes("lamp"));
+    const firstLamp = Array.isArray(response) ? response.find((d) => d.category === "Lampu" || d.name?.toLowerCase().includes("lamp")) : null;
     if (firstLamp) {
       await processLampDevice(firstLamp);
     } else {
@@ -228,10 +229,11 @@ export default function LampControlScreen({ navigation }) {
     }
 
     setIsLampOn(value);
-    const cmd = value ? "1" : "0";
-    const response = await iotService.controlLamp(activeTopic, cmd);
+    const targetId = lampDeviceId || "DEV_LAMP01";
+    const statusStr = value ? "ON" : "OFF";
+    const response = await iotService.setDeviceStatus(targetId, statusStr);
 
-    if (response.error) {
+    if (response?.error) {
       setIsLampOn(!value);
       Alert.alert(language === "Indonesia" ? "Gagal" : "Failed", response.message || (language === "Indonesia" ? "Gagal mengubah status lampu." : "Failed to change lamp status."));
     }
@@ -283,7 +285,9 @@ export default function LampControlScreen({ navigation }) {
               />
             </View>
             <Text style={[styles.lampStatusLabel, { color: colors.text }]}>
-              {isLampOn ? (language === "Indonesia" ? "Lampu Menyala (ON)" : "Lamp ON") : (language === "Indonesia" ? "Lampu Mati (OFF)" : "Lamp OFF")}
+              {isLampOn
+                ? (language === "Indonesia" ? "Lampu Menyala (Nyala)" : "Lamp ON")
+                : (language === "Indonesia" ? "Lampu Mati (Mati)" : "Lamp OFF")}
             </Text>
           </View>
 

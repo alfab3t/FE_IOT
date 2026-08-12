@@ -35,6 +35,7 @@ export default function ReportScreen({ navigation }) {
   const { colors, theme, t, language } = useUser();
   const [selectedPeriod, setSelectedPeriod] = useState("Hari Ini");
   const [summary, setSummary]   = useState(null);
+  const [deviceStats, setDeviceStats] = useState({ total: 0, active: 0, inactive: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
   const periodMap = {
@@ -43,12 +44,57 @@ export default function ReportScreen({ navigation }) {
     "Bulan ini"  : "month",
   };
 
+  const isDeviceActive = (dev) => {
+    if (!dev) return false;
+    if (dev.isActive !== undefined) return dev.isActive !== false;
+    if (dev.use_status !== undefined) return String(dev.use_status) !== "0" && String(dev.use_status) !== "false";
+    if (dev.is_active !== undefined) return String(dev.is_active) !== "0" && String(dev.is_active) !== "false";
+    if (dev.status === 0 || dev.status === "0") return false;
+    return true;
+  };
+
+  const extractDeviceArray = (res) => {
+    if (!res || res.error) return [];
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res.data)) return res.data;
+    if (Array.isArray(res.Data)) return res.Data;
+    if (Array.isArray(res.devices)) return res.devices;
+    if (Array.isArray(res.Devices)) return res.Devices;
+    if (Array.isArray(res.items)) return res.items;
+    if (Array.isArray(res.Items)) return res.Items;
+    return [];
+  };
+
   const loadReportData = async (period) => {
     setIsLoading(true);
-    const response = await iotService.getReportSummary(periodMap[period] ?? "today");
+    const [response, devListRes, dashDevRes] = await Promise.all([
+      iotService.getReportSummary(periodMap[period] ?? "today"),
+      iotService.getDevices("", ""),
+      iotService.getDashboardLatest(),
+    ]);
     setIsLoading(false);
     if (!response.error) {
       setSummary(response);
+    }
+
+    const devList = extractDeviceArray(devListRes);
+    const dashList = extractDeviceArray(dashDevRes);
+    const combinedMap = new Map();
+    [...devList, ...dashList].forEach((d) => {
+      const dId = d.id || d.Id || d.dev_id;
+      if (dId && !combinedMap.has(dId)) {
+        combinedMap.set(dId, d);
+      }
+    });
+
+    const finalDevArray = Array.from(combinedMap.values());
+    if (finalDevArray.length > 0) {
+      const activeCount = finalDevArray.filter(isDeviceActive).length;
+      setDeviceStats({
+        total: finalDevArray.length,
+        active: activeCount,
+        inactive: finalDevArray.length - activeCount,
+      });
     }
   };
 
@@ -102,7 +148,7 @@ export default function ReportScreen({ navigation }) {
             <ActivityIndicator size="large" color="#0059AB" />
           </View>
         ) : (
-          <ReportStatsCard summary={summary} colors={colors} theme={theme} t={t} language={language} />
+          <ReportStatsCard summary={summary} deviceStats={deviceStats} colors={colors} theme={theme} t={t} language={language} />
         )}
 
       </ScrollView>
@@ -111,15 +157,19 @@ export default function ReportScreen({ navigation }) {
 }
 
 // ── Helpers & Subcomponents ───────────────────────────────────────────────
-function ReportStatsCard({ summary, colors, theme, t , language }) {
+function ReportStatsCard({ summary, deviceStats, colors, theme, t , language }) {
   if (!summary) return null;
 
   const unitText = language === "Indonesia" ? "unit" : "units";
   const userText = language === "Indonesia" ? "pengguna" : "users";
 
-  const totalDevStr = `${summary.totalDevice ?? "-"} ${unitText}`;
-  const onlineDevStr = `${summary.deviceOnline ?? "-"} ${unitText}`;
-  const offlineDevStr = `${summary.deviceOffline ?? "-"} ${unitText}`;
+  const totalDevCount = deviceStats && deviceStats.total > 0 ? deviceStats.total : (summary.totalDevice ?? 0);
+  const activeDevCount = deviceStats && deviceStats.total > 0 ? deviceStats.active : (summary.deviceOnline ?? 0);
+  const inactiveDevCount = deviceStats && deviceStats.total > 0 ? deviceStats.inactive : (summary.deviceOffline ?? 0);
+
+  const totalDevStr = `${totalDevCount} ${unitText}`;
+  const onlineDevStr = `${activeDevCount} ${unitText}`;
+  const offlineDevStr = `${inactiveDevCount} ${unitText}`;
   const totalUsersStr = `${summary.totalUsers ?? "-"} ${userText}`;  
  
   const avgTemp = formatDecimal(summary.avgTemperature || 0, 1, language);

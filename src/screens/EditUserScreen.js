@@ -54,6 +54,12 @@ export default function EditUserScreen({ route, navigation }) {
   const [photoBase64, setPhotoBase64] = useState(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
 
+  // Inline Validation Errors (Matching AddUserScreen.js)
+  const [photoError, setPhotoError] = useState("");
+  const [emailError, setEmailError] = useState("");
+
+  const isValidEmail = (email) => /\S+@\S+\.\S+/.test(email);
+
   // Custom Popup States
   const [popupVisible, setPopupVisible] = useState(false);
   const [popupTitle, setPopupTitle] = useState("");
@@ -91,7 +97,7 @@ export default function EditUserScreen({ route, navigation }) {
     fetchUserDetail();
   }, [editUsername]);
 
-  // ── Photo picking (sama seperti AddUserScreen) ──────────────────────────
+  // ── Photo picking ──────────────────────────
   const processPickedAsset = (asset) => {
     if (asset.fileSize && asset.fileSize > MAX_PHOTO_SIZE_BYTES) {
       showPopup(
@@ -100,29 +106,18 @@ export default function EditUserScreen({ route, navigation }) {
       );
       return;
     }
-    if (!asset.base64) {
-      showPopup(
-        isIndo ? "Gagal Memuat Foto" : "Failed to Load Photo",
-        isIndo ? "Tidak bisa membaca file foto ini." : "Could not read this photo file."
-      );
-      return;
-    }
-    const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
-    const mime = ext === "png" ? "image/png" : "image/jpeg";
-
     setPhotoUri(asset.uri);
-    setPhotoBase64(`data:${mime};base64,${asset.base64}`);
+    setPhotoBase64(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
     setPhotoRemoved(false);
+    setPhotoError("");
   };
 
   const handlePickFromGallery = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
       showPopup(
-        isIndo ? "Izin Dibutuhkan" : "Permission Needed",
-        isIndo
-          ? "Aplikasi memerlukan akses galeri untuk mengunggah foto profil."
-          : "The app needs gallery access to upload a profile photo."
+        isIndo ? "Izin Ditolak" : "Permission Denied",
+        isIndo ? "Akses ke galeri foto diperlukan." : "Photo library access is required."
       );
       return;
     }
@@ -130,32 +125,32 @@ export default function EditUserScreen({ route, navigation }) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.7,
       base64: true,
     });
-    if (result.canceled) return;
-    processPickedAsset(result.assets[0]);
+    if (!result.canceled && result.assets && result.assets[0]) {
+      processPickedAsset(result.assets[0]);
+    }
   };
 
   const handleTakePhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
       showPopup(
-        isIndo ? "Izin Dibutuhkan" : "Permission Needed",
-        isIndo
-          ? "Aplikasi memerlukan akses kamera untuk mengambil foto profil."
-          : "The app needs camera access to take a profile photo."
+        isIndo ? "Izin Ditolak" : "Permission Denied",
+        isIndo ? "Akses ke kamera diperlukan." : "Camera access is required."
       );
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.7,
       base64: true,
     });
-    if (result.canceled) return;
-    processPickedAsset(result.assets[0]);
+    if (!result.canceled && result.assets && result.assets[0]) {
+      processPickedAsset(result.assets[0]);
+    }
   };
 
   const handlePickPhoto = () => {
@@ -174,14 +169,42 @@ export default function EditUserScreen({ route, navigation }) {
     setPhotoUri(null);
     setPhotoBase64(null);
     setPhotoRemoved(true);
+    setPhotoError(isIndo ? "Foto profil wajib diunggah." : "Profile photo is required.");
   };
-  // ──────────────────────────────────────────────────────────────────────
+
+  const validateForm = () => {
+    let hasError = false;
+
+    const photoToSend = photoBase64
+      ? photoBase64
+      : photoRemoved
+        ? null
+        : originalPhoto;
+
+    if (!photoToSend) {
+      setPhotoError(isIndo ? "Foto profil wajib diunggah." : "Profile photo is required.");
+      hasError = true;
+    } else {
+      setPhotoError("");
+    }
+
+    const trimmedEmail = emailInput.trim();
+    if (!trimmedEmail) {
+      setEmailError(isIndo ? "Email wajib diisi." : "Email is required.");
+      hasError = true;
+    } else if (!isValidEmail(trimmedEmail)) {
+      setEmailError(isIndo ? "Format email tidak valid." : "Invalid email format.");
+      hasError = true;
+    } else {
+      setEmailError("");
+    }
+
+    return !hasError;
+  };
 
   const handleSave = async () => {
-    // Tentukan foto yang dikirim:
-    // - user pilih foto baru -> photoBase64
-    // - user hapus foto -> null
-    // - user gak sentuh sama sekali -> kirim balik originalPhoto (biar gak ke-null-in)
+    if (!validateForm()) return;
+
     const photoToSend = photoBase64
       ? photoBase64
       : photoRemoved
@@ -219,7 +242,7 @@ export default function EditUserScreen({ route, navigation }) {
       setPopupVisible(true);
     } else {
       const succTitle = isIndo ? "Sukses" : "Success";
-      const succMsg = isIndo ? "Informasi pengguna berhasil diperbarui." : "User information successfully updated.";
+      const succMsg = isIndo ? "Data pengguna berhasil diperbarui." : "User details successfully updated.";
 
       const onOkPress = () => {
         setPopupVisible(false);
@@ -262,8 +285,10 @@ export default function EditUserScreen({ route, navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile photo — sekarang bisa diubah */}
-        <Text style={[styles.formLabel, { color: colors.text }]}>{t("foto_profil")}</Text>
+        {/* Profile photo */}
+        <Text style={[styles.formLabel, { color: colors.text }]}>
+          {t("foto_profil")}<Text style={styles.redAsterisk}>*</Text>
+        </Text>
         <View style={styles.avatarSection}>
           <TouchableOpacity
             style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder, overflow: "hidden" }]}
@@ -296,6 +321,18 @@ export default function EditUserScreen({ route, navigation }) {
               </TouchableOpacity>
             )}
           </View>
+
+          <Text style={[styles.photoHintText, { color: colors.textMuted }]}>
+            {isIndo
+              ? "Format: JPG, PNG. Ukuran maks. 2MB."
+              : "Format: JPG, PNG. Max size 2MB."}
+          </Text>
+
+          {photoError ? (
+            <Text style={{ fontSize: 12, color: "#ef4444", fontWeight: "600", marginTop: 6 }}>
+              {photoError}
+            </Text>
+          ) : null}
         </View>
 
         {/* Inputs */}
@@ -307,13 +344,25 @@ export default function EditUserScreen({ route, navigation }) {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={[styles.inputLabelText, { color: colors.text }]}>{isIndo ? "Email Pengguna" : "User Email"}</Text>
+          <Text style={[styles.inputLabelText, { color: colors.text }]}>
+            {isIndo ? "Email Pengguna" : "User Email"}<Text style={styles.redAsterisk}>*</Text>
+          </Text>
           <Input
             placeholder={isIndo ? "Masukkan Email (Contoh: user@gmail.com)" : "Enter Email (e.g. user@gmail.com)"}
             value={emailInput}
-            onChangeText={(val) => setEmailInput(val)}
+            onChangeText={(val) => {
+              setEmailInput(val);
+              if (!val.trim()) {
+                setEmailError(isIndo ? "Email wajib diisi." : "Email is required.");
+              } else if (!isValidEmail(val.trim())) {
+                setEmailError(isIndo ? "Format email tidak valid." : "Invalid email format.");
+              } else {
+                setEmailError("");
+              }
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
+            error={emailError}
           />
         </View>
 
@@ -471,6 +520,7 @@ const styles = StyleSheet.create({
   },
   uploadBtnText: { fontSize: 12, fontWeight: "800", color: "#0059AB" },
   removePhotoText: { fontSize: 12, fontWeight: "700", color: "#ef4444" },
+  photoHintText: { fontSize: 10, fontWeight: "600", marginTop: 6 },
   inputContainer: { marginBottom: 16, width: "100%" },
   inputLabelText: { fontSize: 12, fontWeight: "700", marginBottom: 8 },
   redAsterisk: { color: "#ef4444" },

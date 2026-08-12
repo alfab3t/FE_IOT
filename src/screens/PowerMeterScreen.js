@@ -251,6 +251,7 @@ export default function PowerMeterScreen({ navigation, route }) {
         bezier
         verticalLabelRotation={0}
         xLabelsOffset={2}
+        formatYLabel={(yValue) => (language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue))}
         style={{ borderRadius: 10, marginLeft: -16 }}
         withHorizontalLabels={true}
         fromZero={false}
@@ -315,7 +316,7 @@ export default function PowerMeterScreen({ navigation, route }) {
                 <View style={styles.statusRow}>
                   <Wifi size={12} color={deviceStatus === "Online" ? "#10b981" : "#ef4444"} />
                   <Text style={[styles.statusText, { color: deviceStatus === "Online" ? "#10b981" : "#ef4444" }]}>
-                    {deviceStatus}
+                    {language === "Indonesia" ? (deviceStatus === "Online" ? "Nyala" : "Mati") : (deviceStatus === "Online" ? "Online" : "Offline")}
                   </Text>
                 </View>
               </View>

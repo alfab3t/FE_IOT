@@ -174,6 +174,34 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
   return extractLabelsFromRes(pwrRes) || extractLabelsFromRes(suhuRes) || extractLabelsFromRes(humiRes) || [];
 };
 
+const ensureOngoingHourPoint = (labels, values, period = "Hourly") => {
+  if (!labels || !values || labels.length === 0 || values.length === 0) {
+    return { labels, values };
+  }
+  if (period !== "Hourly" && period !== "per_jam") {
+    return { labels, values };
+  }
+
+  const currentHourStr = `${String(new Date().getHours()).padStart(2, "0")}:00`;
+  const lastLabel = labels[labels.length - 1] || "";
+
+  if (lastLabel && lastLabel.includes(":") && !labels.includes(currentHourStr)) {
+    const newLabels = [...labels, currentHourStr];
+    const lastRealVal = values[values.length - 1];
+    const newValues = [...values, lastRealVal];
+
+    if (newLabels.length > 7) {
+      return {
+        labels: newLabels.slice(-7),
+        values: newValues.slice(-7),
+      };
+    }
+    return { labels: newLabels, values: newValues };
+  }
+
+  return { labels, values };
+};
+
   const fetchCategoryAverageGraph = async (period) => {
     const startISO = rangeStart ? rangeStart.toISOString() : null;
     const endISO = rangeEnd ? rangeEnd.toISOString() : null;
@@ -189,10 +217,25 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
     const humiRes = !hasCustomRange && Array.isArray(humiRaw) && humiRaw.length > 7 ? humiRaw.slice(-7) : humiRaw;
     const pwrRes = !hasCustomRange && Array.isArray(pwrRaw) && pwrRaw.length > 7 ? pwrRaw.slice(-7) : pwrRaw;
 
-    setTempPoints(extractPoints(suhuRes));
-    setHumiPoints(extractPoints(humiRes));
-    setPowerPoints(extractPoints(pwrRes, 1000.0));
-    setGraphLabels(resolveCategoryLabels(activeTab, suhuRes, humiRes, pwrRes));
+    let labels = resolveCategoryLabels(activeTab, suhuRes, humiRes, pwrRes);
+    let tPts = extractPoints(suhuRes);
+    let hPts = extractPoints(humiRes);
+    let pPts = extractPoints(pwrRes, 1000.0);
+
+    if (!hasCustomRange && (period === "Hourly" || period === "per_jam")) {
+      const ensuredT = ensureOngoingHourPoint(labels, tPts, period);
+      const ensuredH = ensureOngoingHourPoint(labels, hPts, period);
+      const ensuredP = ensureOngoingHourPoint(labels, pPts, period);
+      labels = ensuredT.labels;
+      tPts = ensuredT.values;
+      hPts = ensuredH.values;
+      pPts = ensuredP.values;
+    }
+
+    setTempPoints(tPts);
+    setHumiPoints(hPts);
+    setPowerPoints(pPts);
+    setGraphLabels(labels);
   };
 
   const loadGraphs = async (showSpinner = false) => {
@@ -322,41 +365,42 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
   })();
 
   const renderTableHeadCells = () => {
+    const thColor = theme === "Dark Mode" ? "#cbd5e1" : "#64748b";
     if (activeTab !== "Semua") {
-      return <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("nilai")}</Text>;
+      return <Text style={[styles.thText, { flex: 3, textAlign: "center", color: thColor }]}>{t("nilai")}</Text>;
     }
     if (isAcOrLampOrPower) {
-      return <Text style={[styles.thText, { flex: 3, textAlign: "center", color: colors.textMuted }]}>{t("listrik")} (kWh)</Text>;
+      return <Text style={[styles.thText, { flex: 3, textAlign: "center", color: thColor }]}>{t("listrik")} (kWh)</Text>;
     }
     if (activeDevice) {
       return (
         <>
-          <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
-          <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
+          <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: thColor }]}>{t("suhu")}</Text>
+          <Text style={[styles.thText, { flex: 1.5, textAlign: "center", color: thColor }]}>{t("kelembapan")}</Text>
         </>
       );
     }
     return (
       <>
-        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("suhu")}</Text>
-        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("kelembapan")}</Text>
-        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: colors.textMuted }]}>{t("listrik")}</Text>
+        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: thColor }]}>{t("suhu")}</Text>
+        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: thColor }]}>{t("kelembapan")}</Text>
+        <Text style={[styles.thText, { flex: 1, textAlign: "center", color: thColor }]}>{t("listrik")}</Text>
       </>
     );
   };
 
   const renderTableRowCells = (log) => {
     if (activeTab === "Suhu") {
-      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.temp}</Text>;
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.temp}°C</Text>;
     }
     if (activeTab === "Kelembapan") {
-      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.hum}</Text>;
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.hum}%</Text>;
     }
     if (activeTab === "Listrik") {
-      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power}</Text>;
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power !== "-" ? `${log.power} kWh` : "-"}</Text>;
     }
     if (isAcOrLampOrPower) {
-      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power} kWh</Text>;
+      return <Text style={[styles.tdText, { flex: 3, textAlign: "center", fontWeight: "800", color: "#0059AB" }]}>{log.power !== "-" ? `${log.power} kWh` : "-"}</Text>;
     }
     if (activeDevice) {
       return (
@@ -370,7 +414,7 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
       <>
         <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.temp}°C</Text>
         <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.hum}%</Text>
-        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.power}</Text>
+        <Text style={[styles.tdText, { flex: 1, textAlign: "center", color: colors.text, fontWeight: "600" }]}>{log.power !== "-" ? `${log.power} kWh` : "-"}</Text>
       </>
     );
   };
@@ -418,11 +462,96 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
       );
     }
 
+    const renderStatusCell = (log) => {
+      const parseNum = (str) => {
+        if (str === null || str === undefined || str === "-") return null;
+        const num = Number(String(str).replace(",", "."));
+        return Number.isNaN(num) ? null : num;
+      };
+
+      let statusText = language === "Indonesia" ? "Normal" : "Normal";
+      let statusColor = "#10b981";
+
+      if (activeTab === "Suhu") {
+        const val = parseNum(log.temp);
+        if (val !== null) {
+          if (val > 30) {
+            statusText = language === "Indonesia" ? "Suhu Tinggi" : "High Temp";
+            statusColor = "#ef4444";
+          } else if (val < 18) {
+            statusText = language === "Indonesia" ? "Suhu Rendah" : "Low Temp";
+            statusColor = "#3b82f6";
+          }
+        }
+      } else if (activeTab === "Kelembapan") {
+        const val = parseNum(log.hum);
+        if (val !== null) {
+          if (val > 80) {
+            statusText = language === "Indonesia" ? "Kelembapan Tinggi" : "High Humidity";
+            statusColor = "#ef4444";
+          } else if (val < 40) {
+            statusText = language === "Indonesia" ? "Kelembapan Rendah" : "Low Humidity";
+            statusColor = "#f59e0b";
+          }
+        }
+      } else if (activeTab === "Semua") {
+        const tempVal = parseNum(log.temp);
+        const humVal = parseNum(log.hum);
+
+        const isTempAbnormal = tempVal !== null && (tempVal > 30 || tempVal < 18);
+        const isHumAbnormal = humVal !== null && (humVal > 80 || humVal < 40);
+
+        if (isTempAbnormal && isHumAbnormal) {
+          statusText = language === "Indonesia" ? "Suhu & Humi Abnormal" : "Temp & Humi Abnormal";
+          statusColor = "#ef4444";
+        } else if (isTempAbnormal) {
+          if (tempVal > 30) {
+            statusText = language === "Indonesia" ? "Suhu Tinggi" : "High Temp";
+            statusColor = "#ef4444";
+          } else {
+            statusText = language === "Indonesia" ? "Suhu Rendah" : "Low Temp";
+            statusColor = "#3b82f6";
+          }
+        } else if (isHumAbnormal) {
+          if (humVal > 80) {
+            statusText = language === "Indonesia" ? "Kelembapan Tinggi" : "High Humidity";
+            statusColor = "#ef4444";
+          } else {
+            statusText = language === "Indonesia" ? "Kelembapan Rendah" : "Low Humidity";
+            statusColor = "#f59e0b";
+          }
+        }
+      }
+
+      return (
+        <View style={{ flex: 1.2, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+          <View style={[styles.normalDot, { backgroundColor: statusColor }]} />
+          <Text style={[styles.tdText, { flex: 0, color: statusColor, fontWeight: "700" }]}>{statusText}</Text>
+        </View>
+      );
+    };
+
     return (
       <View>
         <View style={styles.tableHeaderRow}>
-          <Text style={[styles.tableTitle, { color: colors.text }]}>{tableTitleText}</Text>
-          <Text style={[styles.unitSubtitle, { color: colors.textMuted }]}>{`${t("satuan")}: ${unit}`}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.tableTitle, { color: colors.text }]}>{tableTitleText}</Text>
+            {activeTab === "Suhu" && (
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted, marginTop: 2 }}>
+                {language === "Indonesia" ? "Suhu Normal: 18°C – 30°C" : "Normal Temp: 18°C – 30°C"}
+              </Text>
+            )}
+            {activeTab === "Kelembapan" && (
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted, marginTop: 2 }}>
+                {language === "Indonesia" ? "Kelembapan Normal: 40% – 80%" : "Normal Humidity: 40% – 80%"}
+              </Text>
+            )}
+            {activeTab === "Semua" && (
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted, marginTop: 2 }}>
+                {language === "Indonesia" ? "Rentang Normal: Suhu 18°C – 30°C | Kelembapan 40% – 80%" : "Normal Range: Temp 18°C – 30°C | Humidity 40% – 80%"}
+              </Text>
+            )}
+          </View>
         </View>
 
         <View style={[styles.timeFilterRow, { marginTop: 0, marginBottom: 16 }]}>
@@ -451,10 +580,10 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
         </View>
 
         <Card style={[styles.tableCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
-          <View style={[styles.tableHead, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.thText, { flex: 1.2, color: colors.textMuted }]}>{t("waktu")}</Text>
+          <View style={[styles.tableHead, { backgroundColor: theme === "Dark Mode" ? "#1e293b" : "#f8fafc", borderBottomColor: colors.border }]}>
+            <Text style={[styles.thText, { flex: 1.2, color: theme === "Dark Mode" ? "#cbd5e1" : "#64748b" }]}>{t("waktu")}</Text>
             {renderTableHeadCells()}
-            <Text style={[styles.thText, { flex: 1, textAlign: "right", color: colors.textMuted }]}>{t("status")}</Text>
+            <Text style={[styles.thText, { flex: 1.2, textAlign: "right", color: theme === "Dark Mode" ? "#cbd5e1" : "#64748b" }]}>{t("status")}</Text>
           </View>
 
           {tableLogs.map((log, idx) => {
@@ -463,10 +592,7 @@ const resolveCategoryLabels = (tab, suhuRes, humiRes, pwrRes) => {
               <View key={log.time + idx} style={[styles.tableRow, idx === tableLogs.length - 1 && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
                 <Text style={[styles.tdText, { flex: 1.2, color: colors.textMuted }]}>{formattedTime}</Text>
                 {renderTableRowCells(log)}
-                <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
-                  <View style={styles.normalDot} />
-                  <Text style={[styles.tdText, { flex: 0, color: "#10b981", fontWeight: "700" }]}>{log.status || t("normal")}</Text>
-                </View>
+                {renderStatusCell(log)}
               </View>
             );
           })}
@@ -679,7 +805,12 @@ function SuhuChart({ showSuhu, tempPoints, latestTemp, colors, theme, language, 
   return (
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
-        <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("suhu")} (°C)</Text>
+        <View>
+          <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("suhu")} (°C)</Text>
+          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted, marginTop: 2 }}>
+            {language === "Indonesia" ? "Suhu Normal: 18°C – 30°C" : "Normal Temp: 18°C – 30°C"}
+          </Text>
+        </View>
         <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestTemp, 1, language)}°C</Text>
       </View>
 
@@ -733,7 +864,12 @@ function HumiChart({ showHumi, humiPoints, latestHumi, colors, theme, language, 
   return (
     <Card style={[styles.chartMetricCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.chartMetricHeader}>
-        <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("kelembapan")} (%)</Text>
+        <View>
+          <Text style={[styles.chartMetricLabel, { color: colors.text }]}>{t("kelembapan")} (%)</Text>
+          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted, marginTop: 2 }}>
+            {language === "Indonesia" ? "Kelembapan Normal: 40% – 80%" : "Normal Humidity: 40% – 80%"}
+          </Text>
+        </View>
         <Text style={[styles.chartMetricValue, { color: colors.text }]}>{formatDecimal(latestHumi, 1, language)}%</Text>
       </View>
 

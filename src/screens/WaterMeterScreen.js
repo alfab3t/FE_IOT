@@ -153,6 +153,7 @@ export default function WaterMeterScreen({ navigation, route }) {
         height={CHART_HEIGHT + 40}
         chartConfig={chartConfig}
         bezier
+        formatYLabel={(yValue) => (language === "Indonesia" ? String(yValue).replace(".", ",") : String(yValue))}
         style={{ borderRadius: 10, marginLeft: -16 }}
         withHorizontalLabels={true}
         fromZero={false}
@@ -211,7 +212,7 @@ export default function WaterMeterScreen({ navigation, route }) {
                 <View style={styles.metaRow}>
                   <Wifi size={11} color={deviceStatus === "Online" ? "#10b981" : "#ef4444"} />
                   <Text style={[styles.metaText, { color: deviceStatus === "Online" ? "#10b981" : "#ef4444" }]}>
-                    {deviceStatus}
+                    {language === "Indonesia" ? (deviceStatus === "Online" ? "Nyala" : "Mati") : (deviceStatus === "Online" ? "Online" : "Offline")}
                   </Text>
                 </View>
               </View>

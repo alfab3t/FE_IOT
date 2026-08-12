@@ -91,7 +91,7 @@ export default function SensorDetailScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <SensorNavBar navigation={navigation} deviceName={deviceName} colors={colors} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <SensorInfoCard deviceName={deviceName} deviceLocation={deviceLocation} deviceStatus={deviceStatus} colors={colors} />
+        <SensorInfoCard deviceName={deviceName} deviceLocation={deviceLocation} deviceStatus={deviceStatus} colors={colors} language={language} />
         <SensorReadingsCard temperature={temperature} humidity={humidity} language={language} />
         <SensorStatusCard temperature={temperature} humidity={humidity} colors={colors} language={language} />
         <LocationHistoryCard locationHistory={locationHistory} colors={colors} language={language} />
@@ -115,7 +115,7 @@ function SensorNavBar({ navigation, deviceName, colors }) {
   );
 }
 
-function SensorInfoCard({ deviceName, deviceLocation, deviceStatus, colors }) {
+function SensorInfoCard({ deviceName, deviceLocation, deviceStatus, colors, language }) {
   return (
     <Card style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.infoRow}>
@@ -133,7 +133,7 @@ function SensorInfoCard({ deviceName, deviceLocation, deviceStatus, colors }) {
           <View style={styles.metaRow}>
             <Wifi size={11} color={deviceStatus === "Online" ? "#10b981" : "#ef4444"} />
             <Text style={[styles.metaText, { color: deviceStatus === "Online" ? "#10b981" : "#ef4444" }]}>
-              {deviceStatus}
+              {language === "Indonesia" ? (deviceStatus === "Online" ? "Aktif" : "Tidak Aktif") : deviceStatus}
             </Text>
           </View>
         </View>
@@ -156,6 +156,9 @@ function SensorReadingsCard({ temperature, humidity, language }) {
           {temperature !== null ? formatDecimal(temperature, 1) : "—"}
         </Text>
         <Text style={styles.readingCardUnit}>°C</Text>
+        <Text style={{ fontSize: 10, fontWeight: "600", color: "#ef4444", marginTop: 2, textAlign: "center" }}>
+          {language === "Indonesia" ? "Normal: 18°C – 30°C" : "Normal: 18°C – 30°C"}
+        </Text>
       </View>
 
       <View style={[styles.readingCard, { backgroundColor: "#eff6ff" }]}>
@@ -169,6 +172,9 @@ function SensorReadingsCard({ temperature, humidity, language }) {
           {humidity !== null ? formatDecimal(humidity, 1) : "—"}
         </Text>
         <Text style={styles.readingCardUnit}>%</Text>
+        <Text style={{ fontSize: 10, fontWeight: "600", color: "#0284c7", marginTop: 2, textAlign: "center" }}>
+          {language === "Indonesia" ? "Normal: 40% – 80%" : "Normal: 40% – 80%"}
+        </Text>
       </View>
     </View>
   );
@@ -199,7 +205,7 @@ function SensorStatusCard({ temperature, humidity, colors, language }) {
     <Card style={[styles.statusCard, { backgroundColor: colors.cardBackground }]}>
       <View style={styles.statusRow}>
         <View style={[styles.statusDot, {
-          backgroundColor: temperature !== null && temperature > 30 ? "#ef4444" : "#10b981"
+          backgroundColor: temperature !== null && (temperature > 30 || temperature < 18) ? "#ef4444" : "#10b981"
         }]} />
         <Text style={[styles.statusCardText, { color: colors.text }]}>
           {getTempStatus()}
@@ -208,7 +214,7 @@ function SensorStatusCard({ temperature, humidity, colors, language }) {
       {humidity !== null && (
         <View style={[styles.statusRow, { marginTop: 6 }]}>
           <View style={[styles.statusDot, {
-            backgroundColor: humidity > 80 ? "#f59e0b" : "#10b981"
+            backgroundColor: humidity > 80 || humidity < 40 ? "#f59e0b" : "#10b981"
           }]} />
           <Text style={[styles.statusCardText, { color: colors.text }]}>
             {getHumiStatus()}

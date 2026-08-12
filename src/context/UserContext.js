@@ -359,11 +359,41 @@ export function UserProvider({ children }) {
 
   const translateNotification = (msg) => {
     if (!msg) return msg;
-    if (language === "Indonesia") return msg;
 
-    let translated = msg;
+    let text = String(msg)
+      .replace(/Â°C/g, "°C")
+      .replace(/Ã‚Â°C/g, "°C")
+      .replace(/\u00C2\u00B0/g, "°")
+      .replace(/Â°/g, "°");
+
+    text = text.replace(/(\b(?:penggunaan daya|daya|temperatur|suhu|kelembaban|kelembapan)\b)\s+([0-9.,]+\s*[A-Z°%a-z]+)\)/gi, (match, p1, p2) => {
+      return `${p1} (${p2})`;
+    });
+
+    const isIndo = language === "Indonesia";
+    text = text.replace(/([0-9]+(?:\.[0-9]+)?)\s*(°C|W|kW|%)/gi, (match, numStr, unit) => {
+      const val = Number.parseFloat(numStr);
+      if (Number.isNaN(val)) return match;
+
+      let formattedNum = "";
+      if (isIndo) {
+        const parts = val.toString().split(".");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        formattedNum = parts.join(",");
+      } else {
+        const parts = val.toString().split(".");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        formattedNum = parts.join(".");
+      }
+      return `${formattedNum} ${unit.replace(/Â°/g, "°")}`;
+    });
+
+    if (isIndo) return text;
+
+    let translated = text;
     translated = translated.replaceAll("Peringatan: Perangkat", "Warning: Device");
     translated = translated.replaceAll("penggunaan daya", "power consumption");
+    translated = translated.replaceAll("temperatur", "temperature");
     translated = translated.replaceAll("melebihi", "exceeded");
     translated = translated.replaceAll("melampaui batas normal maksimum", "exceeded maximum normal limit");
     translated = translated.replaceAll("melampaui batas normal minimum", "exceeded minimum normal limit");

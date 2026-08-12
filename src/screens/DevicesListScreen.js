@@ -12,6 +12,7 @@ import {
   TextInput,
   Switch,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../context/UserContext";
@@ -37,6 +38,12 @@ import {
   ChevronRight,
   AlertCircle,
 } from "lucide-react-native";
+
+const getNormalizedDeviceName = (d) => {
+  if (!d) return "";
+  const raw = typeof d === "string" ? d : (d.name || d.Name || d.dev_name || d.nama || d.Nama || d.dev_nama || d.title || d.Title || "");
+  return String(raw).trim().toLowerCase().replace(/\s+/g, " ");
+};
 
 const formatLocationHistoryText = (text, language) => {
   if (!text || typeof text !== "string") return text || "-";
@@ -222,12 +229,30 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       const devResponse = await iotService.getDevices();
       const locResponse = await iotService.getLocations();
 
+      let list = [];
       if (!devResponse?.error) {
-        const list = Array.isArray(devResponse)
-          ? devResponse
-          : (devResponse.data || devResponse.Data || []);
-        setDevices(list);
+        if (Array.isArray(devResponse)) {
+          list = devResponse;
+        } else if (devResponse) {
+          list = devResponse.devices || devResponse.Devices || devResponse.data || devResponse.Data || devResponse.items || devResponse.Items || (Array.isArray(devResponse.data) ? devResponse.data : []);
+        }
       }
+
+      const dashDev = await iotService.getDashboardLatest();
+      if (!dashDev?.error && Array.isArray(dashDev) && dashDev.length > 0) {
+        if (list.length === 0) {
+          list = dashDev;
+        } else {
+          dashDev.forEach((dd) => {
+            const ddId = dd.id || dd.Id || dd.dev_id;
+            if (!list.some((existing) => (existing.id || existing.Id || existing.dev_id) === ddId)) {
+              list.push(dd);
+            }
+          });
+        }
+      }
+
+      setDevices(list);
       if (!locResponse?.error) {
         const locList = Array.isArray(locResponse)
           ? locResponse
@@ -268,18 +293,32 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
     }
   };
 
-  const handleOpenAdd = () => {
+  const handleOpenAdd = async () => {
     if (!canCrud) {
       showToast("Anda tidak memiliki hak akses untuk menambahkan perangkat.", "error");
       return;
     }
+    await loadDevicesAndLocations();
     resetAddForm();
     setModalVisible(true);
   };
 
   const handleAddDevice = async () => {
     if (!formName.trim() || !formLocationId) {
-      showToast("Nama Perangkat dan Lokasi Pemasangan wajib diisi.", "error");
+      const reqMsg = language === "Indonesia"
+        ? "Nama Perangkat dan Lokasi Pemasangan wajib diisi."
+        : "Device name and installation location are required.";
+      showToast(reqMsg, "error");
+      return;
+    }
+
+    const newNameNormalized = String(formName).trim().toLowerCase().replace(/\s+/g, " ");
+    const isDuplicate = devices.some((d) => getNormalizedDeviceName(d) === newNameNormalized);
+    if (isDuplicate) {
+      const dupMsg = language === "Indonesia"
+        ? "Nama perangkat sudah terdaftar, silakan gunakan nama lain."
+        : "Device name already registered, please use another name.";
+      setFormNameError(dupMsg);
       return;
     }
 
@@ -288,10 +327,11 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
 
       let generatedId = formId.trim();
       if (!generatedId) {
-        if (formCategory === "AC") generatedId = "DEV_AC01";
-        else if (formCategory === "Listrik") generatedId = "DEV_PWR01";
-        else if (formCategory === "Debit Air" || formCategory.includes("Air")) generatedId = "DEV_WAT01";
-        else generatedId = "DEV_LAMP01";
+        const suffix = Date.now().toString().slice(-4);
+        if (formCategory === "AC") generatedId = `DEV_AC${suffix}`;
+        else if (formCategory === "Listrik") generatedId = `DEV_PWR${suffix}`;
+        else if (formCategory === "Debit Air" || formCategory.includes("Air")) generatedId = `DEV_WAT${suffix}`;
+        else generatedId = `DEV_LAMP${suffix}`;
       }
 
       const macAddress = formMac.trim() || Array.from({ length: 6 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, "0")).join(":").toUpperCase(); // NOSONAR
@@ -360,18 +400,31 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   };
 
   const handleUpdateDevice = async () => {
-    if (!editFormName.trim()) {
-      setEditFormNameError("Nama Perangkat wajib diisi.");
-      showToast("Nama Perangkat wajib diisi.", "error");
-      return;
-    }
-    setEditFormNameError("");
-
     const targetId = editDevice?.id || editDevice?.Id || editDevice?.dev_id;
     if (!targetId) {
       showToast("ID Perangkat tidak ditemukan.", "error");
       return;
     }
+
+    if (!editFormName.trim()) {
+      const reqMsg = language === "Indonesia" ? "Nama Perangkat wajib diisi." : "Device name is required.";
+      setEditFormNameError(reqMsg);
+      showToast(reqMsg, "error");
+      return;
+    }
+
+    const newNameNormalized = String(editFormName).trim().toLowerCase().replace(/\s+/g, " ");
+    const isDuplicate = devices.some(
+      (d) => String(d.id || d.Id || d.dev_id || "") !== String(targetId) && getNormalizedDeviceName(d) === newNameNormalized
+    );
+    if (isDuplicate) {
+      const dupMsg = language === "Indonesia"
+        ? "Nama perangkat sudah terdaftar, silakan gunakan nama lain."
+        : "Device name already registered, please use another name.";
+      setEditFormNameError(dupMsg);
+      return;
+    }
+    setEditFormNameError("");
 
     try {
       setIsSubmitting(true);
@@ -613,7 +666,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
             <View style={styles.statusDotRow}>
               <View style={[styles.statusDot, { backgroundColor: isOnline ? "#10b981" : "#ef4444" }]} />
               <Text style={[styles.statusText, { color: isOnline ? "#10b981" : "#ef4444" }]}>
-                {isOnline ? "ON" : "OFF"}
+                {language === "Indonesia" ? (isOnline ? "Aktif" : "Tidak Aktif") : (isOnline ? "Active" : "Inactive")}
               </Text>
             </View>
           </View>
@@ -765,16 +818,34 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               key={item.id}
               style={[
                 styles.categoryCard,
-                { backgroundColor: colors.cardBackground, borderColor: isSelected ? item.color : colors.border },
-                isSelected && styles.categoryCardSelected,
+                {
+                  backgroundColor: isSelected
+                    ? (theme === "Dark Mode" ? "#1e3a5f" : "#f0f9ff")
+                    : colors.cardBackground,
+                  borderColor: isSelected ? item.color : colors.border,
+                },
               ]}
               onPress={() => setFormCategory(item.id)}
             >
               <View style={[styles.categoryIconCircle, { backgroundColor: item.bgColor }]}>
                 <IconComp size={28} color={item.color} />
               </View>
-              <Text style={[styles.categoryCardTitle, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[styles.categoryCardDesc, { color: colors.textMuted }]}>{item.desc}</Text>
+              <Text
+                style={[
+                  styles.categoryCardTitle,
+                  { color: isSelected ? (theme === "Dark Mode" ? "#ffffff" : "#0f172a") : colors.text },
+                ]}
+              >
+                {item.title}
+              </Text>
+              <Text
+                style={[
+                  styles.categoryCardDesc,
+                  { color: isSelected ? (theme === "Dark Mode" ? "#cbd5e1" : "#475569") : colors.textMuted },
+                ]}
+              >
+                {item.desc}
+              </Text>
               {isSelected && (
                 <View style={[styles.checkBadge, { backgroundColor: item.color }]}>
                   <Check size={12} color="#fff" />
@@ -852,8 +923,18 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
           style={styles.wizardNextBtn}
           onPress={() => {
             if (!formName.trim()) {
-              setFormNameError("Nama Perangkat wajib diisi.");
-              showToast("Nama Perangkat wajib diisi.", "error");
+              const reqMsg = language === "Indonesia" ? "Nama Perangkat wajib diisi." : "Device name is required.";
+              setFormNameError(reqMsg);
+              showToast(reqMsg, "error");
+              return;
+            }
+            const newNameNormalized = String(formName).trim().toLowerCase().replace(/\s+/g, " ");
+            const isDuplicate = devices.some((d) => getNormalizedDeviceName(d) === newNameNormalized);
+            if (isDuplicate) {
+              const dupMsg = language === "Indonesia"
+                ? "Nama perangkat sudah terdaftar, silakan gunakan nama lain."
+                : "Device name already registered, please use another name.";
+              setFormNameError(dupMsg);
               return;
             }
             setFormNameError("");
@@ -894,8 +975,12 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               key={loc.id}
               style={[
                 styles.locationRowCard,
-                { backgroundColor: colors.cardBackground, borderColor: isSelected ? "#0059AB" : colors.border },
-                isSelected && styles.locationRowCardSelected,
+                {
+                  backgroundColor: isSelected
+                    ? (theme === "Dark Mode" ? "#1e3a5f" : "#f0f9ff")
+                    : colors.cardBackground,
+                  borderColor: isSelected ? "#0059AB" : colors.border,
+                },
               ]}
               onPress={() => setFormLocationId(String(loc.id))}
               disabled={isSubmitting}
@@ -905,10 +990,20 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                   <MapPin size={18} color={isSelected ? "#fff" : colors.textMuted} />
                 </View>
                 <View>
-                  <Text style={[styles.locationRuanganText, { color: colors.text }]}>
+                  <Text
+                    style={[
+                      styles.locationRuanganText,
+                      { color: isSelected ? (theme === "Dark Mode" ? "#ffffff" : "#0f172a") : colors.text },
+                    ]}
+                  >
                     {formatLocationHistoryText(loc.ruangan, language)}
                   </Text>
-                  <Text style={[styles.locationGedungText, { color: colors.textMuted }]}>
+                  <Text
+                    style={[
+                      styles.locationGedungText,
+                      { color: isSelected ? (theme === "Dark Mode" ? "#cbd5e1" : "#475569") : colors.textMuted },
+                    ]}
+                  >
                     {formatLocationHistoryText(`${language === "Indonesia" ? "Lantai" : "Floor"} ${loc.lantai} — ${loc.gedung}`, language)}
                   </Text>
                 </View>
@@ -965,8 +1060,8 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
       <View style={[styles.segmentTabBar, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
         {[
           { label: t("semua"), count: countAll, val: "Semua" },
-          { label: "Online", count: countOnline, val: "Online" },
-          { label: "Offline", count: countOffline, val: "Offline" },
+          { label: language === "Indonesia" ? "Aktif" : "Active", count: countOnline, val: "Online" },
+          { label: language === "Indonesia" ? "Tidak Aktif" : "Inactive", count: countOffline, val: "Offline" },
         ].map((tab) => {
           const active = statusTab === tab.val;
           return (
@@ -1125,8 +1220,12 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                     key={loc.id}
                     style={[
                       styles.locationRowCard,
-                      { backgroundColor: colors.cardBackground, borderColor: isSelected ? "#0059AB" : colors.border },
-                      isSelected && styles.locationRowCardSelected,
+                      {
+                        backgroundColor: isSelected
+                          ? (theme === "Dark Mode" ? "#1e3a5f" : "#f0f9ff")
+                          : colors.cardBackground,
+                        borderColor: isSelected ? "#0059AB" : colors.border,
+                      },
                     ]}
                     onPress={() => setEditFormLocationId(String(loc.id))}
                     disabled={isSubmitting}
@@ -1136,10 +1235,20 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
                         <MapPin size={18} color={isSelected ? "#fff" : colors.textMuted} />
                       </View>
                       <View>
-                        <Text style={[styles.locationRuanganText, { color: colors.text }]}>
+                        <Text
+                          style={[
+                            styles.locationRuanganText,
+                            { color: isSelected ? (theme === "Dark Mode" ? "#ffffff" : "#0f172a") : colors.text },
+                          ]}
+                        >
                           {formatLocationHistoryText(loc.ruangan, language)}
                         </Text>
-                        <Text style={[styles.locationGedungText, { color: colors.textMuted }]}>
+                        <Text
+                          style={[
+                            styles.locationGedungText,
+                            { color: isSelected ? (theme === "Dark Mode" ? "#cbd5e1" : "#475569") : colors.textMuted },
+                          ]}
+                        >
                           {formatLocationHistoryText(`${language === "Indonesia" ? "Lantai" : "Floor"} ${loc.lantai} — ${loc.gedung}`, language)}
                         </Text>
                       </View>
@@ -1202,8 +1311,7 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
               {language === "Indonesia" ? "Apakah Anda yakin ingin menghapus perangkat " : "Are you sure you want to delete device "}
               <Text style={{ fontWeight: "800", color: colors.text }}>
                 {deviceToDelete?.name || deviceToDelete?.id}?
-              </Text>{" "}
-              {language === "Indonesia" ? "Semua data telemetri dan notifikasi terkait akan ikut terhapus." : "All related telemetry data and notifications will also be deleted."}
+              </Text>
             </Text>
 
             {/* Action Buttons Row */}
@@ -1953,9 +2061,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   inlineErrorText: {
+    flex: 1,
+    flexWrap: "wrap",
     color: "#b91c1c",
     fontSize: 13,
     fontWeight: "700",
+    lineHeight: 18,
   },
   deleteModalOverlay: {
     flex: 1,

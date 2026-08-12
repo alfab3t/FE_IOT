@@ -57,6 +57,7 @@ export default function UsersListScreen({ navigation }) {
       const mappedUsers = await Promise.all(
         (Array.isArray(rawUsers) ? rawUsers : []).map(async (u) => {
           const uName = u.username || u.Username || u.use_id || "";
+          const realName = u.nama || u.Nama || u.fullName || u.FullName || u.use_nama || "";
           let uPhoto = u.photo || u.Photo || "";
           if (!uPhoto) {
             if (user?.username && uName.toLowerCase() === user.username.toLowerCase() && user.foto) {
@@ -70,10 +71,19 @@ export default function UsersListScreen({ navigation }) {
               }
             }
           }
+
+          let displayTitle = uName;
+          if (realName && realName.trim() && realName.trim().toLowerCase() !== uName.trim().toLowerCase()) {
+            displayTitle = `${uName} - ${realName.trim()}`;
+          } else if (!uName && realName) {
+            displayTitle = realName.trim();
+          }
+
           return {
             ...u,
             username: uName,
-            fullName: u.fullName || u.FullName || uName,
+            realName: realName,
+            fullName: displayTitle,
             email: u.email || u.Email || "",
             status: u.status || u.Status || u.use_status || "Aktif",
             roleName: u.roleName || u.RoleName || u.rol_deskripsi || "User",

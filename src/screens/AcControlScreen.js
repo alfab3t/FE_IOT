@@ -350,7 +350,9 @@ export default function AcControlScreen({ route, navigation }) {
           <Card style={[styles.powerCard, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.powerHeader}>
               <Text style={[styles.powerTitle, { color: colors.text }]}>{t("daya_ac")}</Text>
-              <Text style={styles.powerStatusText}>{isPowerOn ? "ON" : "OFF"}</Text>
+              <Text style={styles.powerStatusText}>
+                {language === "Indonesia" ? (isPowerOn ? "Nyala" : "Mati") : (isPowerOn ? "ON" : "OFF")}
+              </Text>
             </View>
             {isViewer ? (
               <View style={[styles.readOnlyBadge, { backgroundColor: colors.border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }]}>
