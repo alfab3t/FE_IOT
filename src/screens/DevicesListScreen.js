@@ -492,9 +492,25 @@ export default function DevicesListScreen({ route, navigation, isTab = false }) 
   };
 
   const filteredDevices = getFilteredDevices();
-  const countAll = devices.length;
-  const countOnline = devices.filter((d) => d.isActive !== false).length;
-  const countOffline = countAll - countOnline;
+
+  const countAll = devices.filter((dev) => {
+    const nameMatch = dev.name?.toLowerCase().includes(search.toLowerCase());
+    return matchesCategory(dev) && nameMatch;
+  }).length;
+
+  const countOnline = devices.filter((dev) => {
+    const nameMatch = dev.name?.toLowerCase().includes(search.toLowerCase());
+    const isOnline = dev.isActive !== false;
+
+    return isOnline && matchesCategory(dev) && nameMatch;
+  }).length;
+
+  const countOffline = devices.filter((dev) => {
+    const nameMatch = dev.name?.toLowerCase().includes(search.toLowerCase());
+    const isOnline = dev.isActive !== false;
+
+    return !isOnline && matchesCategory(dev) && nameMatch;
+  }).length;
 
   const renderCategoryIcon = (category, name) => {
     const catLower = category?.toLowerCase() || "";

@@ -264,14 +264,40 @@ export default function UsersListScreen({ navigation }) {
 
       {/* Segment Tabs */}
       <View style={[styles.segmentBar, { borderBottomColor: colors.border }]}>
-        {[
-          { label: "Semua", count: allUsers.length, roleId: "" },
-          ...dbRoles.map((role) => ({
-            label: role.roleName,
-            count: role.count,
-            roleId: role.roleId,
-          })),
-        ].map((tab) => {
+       {[
+            {
+              label: "Semua",
+              count: filteredUsers.length,
+              roleId: "",
+            },
+            ...dbRoles.map((role) => ({
+              label: role.roleName,
+              count: allUsers.filter((u) => {
+                const normUserRole = (u.roleId || "")
+                  .replace("ROL00", "ROL0")
+                  .replace("ROL0", "ROL");
+
+                const normRoleId = (role.roleId || "")
+                  .replace("ROL00", "ROL0")
+                  .replace("ROL0", "ROL");
+
+                const matchRole =
+                  u.roleId === role.roleId ||
+                  normUserRole === normRoleId;
+
+                const matchStatus =
+                  statusFilter === "Semua" || u.status === statusFilter;
+
+                const matchQuery =
+                  !searchQuery ||
+                  u.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  u.username?.toLowerCase().includes(searchQuery.toLowerCase());
+
+                return matchRole && matchStatus && matchQuery;
+              }).length,
+              roleId: role.roleId,
+            })),
+          ].map((tab) => {
           const active = activeRoleId === tab.roleId;
           const displayLabel = tab.label === "Semua" ? t("semua") : tab.label;
           return (

@@ -60,6 +60,7 @@ export default function AddUserScreen({ navigation }) {
   const [usernameError, setUsernameError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [photoError, setPhotoError] = useState("");
 
   const showPopup = (title, message, type = "error") => {
     setPopupTitle(title);
@@ -93,7 +94,8 @@ export default function AddUserScreen({ navigation }) {
     const mime = ext === "png" ? "image/png" : "image/jpeg";
 
     setPhotoUri(asset.uri); // for local preview only
-    setPhotoBase64(`data:${mime};base64,${asset.base64}`); // this is what actually gets sent
+    setPhotoBase64(`data:${mime};base64,${asset.base64}`);
+    setPhotoError("");
   };
 
   const handlePickFromGallery = async () => {
@@ -162,6 +164,17 @@ export default function AddUserScreen({ navigation }) {
 
   const validateForm = () => {
     let hasError = false;
+
+      if (!photoBase64) {
+      setPhotoError(
+        isIndo
+          ? "Foto profil wajib diunggah."
+          : "Profile photo is required."
+      );
+      hasError = true;
+    } else {
+      setPhotoError("");
+    }
 
     if (!usernameInput.trim()) {
       setUsernameError(isIndo ? "Username wajib diisi." : "Username is required.");
@@ -257,7 +270,10 @@ export default function AddUserScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile photo circle */}
-        <Text style={[styles.formLabel, { color: colors.text }]}>{t("foto_profil")}</Text>
+        <Text style={[styles.formLabel, { color: colors.text }]}>
+          {t("foto_profil")}
+          <Text style={styles.redAsterisk}>*</Text>
+        </Text>        
         <View style={styles.avatarSection}>
           <TouchableOpacity
             style={[styles.avatarCircle, { backgroundColor: colors.border, borderColor: colors.cardBorder }]}
@@ -293,6 +309,12 @@ export default function AddUserScreen({ navigation }) {
               ? `Format: ${ACCEPTED_PHOTO_LABEL}. Ukuran maks. 2MB.`
               : `Format: ${ACCEPTED_PHOTO_LABEL}. Max size 2MB.`}
           </Text>
+
+          {photoError ? (
+            <Text style={styles.photoErrorText}>
+              {photoError}
+            </Text>
+          ) : null}
         </View>
 
         {/* Inputs */}
@@ -438,6 +460,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  photoErrorText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#ef4444",
+    marginTop: 4,
   },
   navbar: {
     height: 60,

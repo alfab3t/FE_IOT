@@ -122,55 +122,109 @@ export default function ProfileScreen({ navigation }) {
   const handleSaveUsername = async () => {
     if (!editUsernameValue.trim()) {
       showToast(
-        language === "Indonesia" ? "Username tidak boleh kosong." : "Username cannot be empty.",
+        language === "Indonesia"
+          ? "Username tidak boleh kosong."
+          : "Username cannot be empty.",
         "error"
       );
       return;
     }
+
     const nextVal = editUsernameValue.trim();
     const oldVal = user?.username || "admin";
-    const currentPhoto = avatarBase64 || user?.foto || user?.photo;
-    const currentEmail = user?.email || (user?.username ? `${user.username.toLowerCase()}@astratech.ac.id` : "");
 
-    // 1. Update global user context & local storage immediately (keep email & photo intact!)
-    setUser((prev) => ({
-      ...prev,
-      username: nextVal,
-      nama: nextVal,
-      nickname: nextVal,
-      email: currentEmail,
-      foto: currentPhoto || prev?.foto || prev?.photo || null,
-      photo: currentPhoto || prev?.foto || prev?.photo || null,
-    }));
-
-    try {
-      await AsyncStorage.setItem("username", nextVal);
-      await AsyncStorage.setItem(`nickname_${nextVal.toLowerCase()}`, nextVal);
-      if (currentPhoto) {
-        await AsyncStorage.setItem(`avatar_${nextVal.toLowerCase()}`, currentPhoto);
-        await AsyncStorage.setItem(`avatar_${oldVal.toLowerCase()}`, currentPhoto);
-      }
-      if (currentEmail) {
-        await AsyncStorage.setItem(`email_${nextVal.toLowerCase()}`, currentEmail);
-        await AsyncStorage.setItem(`email_${oldVal.toLowerCase()}`, currentEmail);
-      }
-    } catch (e) {
-      console.warn("AsyncStorage write username failed:", e);
+    // Kalau username tidak berubah
+    if (nextVal.toLowerCase() === oldVal.toLowerCase()) {
+      setUsernameModalVisible(false);
+      return;
     }
 
-    setUsernameModalVisible(false);
-
-    // 2. Call backend API in background to sync SQL Server database
     try {
-      await authService.updateUsername(nextVal, oldVal);
+      // Update ke backend TERLEBIH DAHULU
+      const response = await authService.updateUsername(nextVal, oldVal);
+
+      // Kalau backend mengembalikan error
+      if (response?.error) {
+        showToast(
+          language === "Indonesia"
+            ? response.message || "Username sudah terdaftar di sistem."
+            : response.message || "Username is already registered.",
+          "error"
+        );
+        return;
+      }
+
+      // Backend berhasil → baru update data lokal
+      const currentPhoto =
+        avatarBase64 || user?.foto || user?.photo || null;
+
+      const currentEmail =
+        user?.email ||
+        (oldVal ? `${oldVal.toLowerCase()}@astratech.ac.id` : "");
+
+      setUser((prev) => ({
+        ...prev,
+        username: nextVal,
+        nama: nextVal,
+        nickname: nextVal,
+        email: currentEmail,
+        foto: currentPhoto || prev?.foto || prev?.photo || null,
+        photo: currentPhoto || prev?.foto || prev?.photo || null,
+      }));
+
+      try {
+        await AsyncStorage.setItem("username", nextVal);
+
+        await AsyncStorage.setItem(
+          `nickname_${nextVal.toLowerCase()}`,
+          nextVal
+        );
+
+        if (currentPhoto) {
+          await AsyncStorage.setItem(
+            `avatar_${nextVal.toLowerCase()}`,
+            currentPhoto
+          );
+
+          await AsyncStorage.setItem(
+            `avatar_${oldVal.toLowerCase()}`,
+            currentPhoto
+          );
+        }
+
+        if (currentEmail) {
+          await AsyncStorage.setItem(
+            `email_${nextVal.toLowerCase()}`,
+            currentEmail
+          );
+
+          await AsyncStorage.setItem(
+            `email_${oldVal.toLowerCase()}`,
+            currentEmail
+          );
+        }
+      } catch (e) {
+        console.warn("AsyncStorage write username failed:", e);
+      }
+
+      setUsernameModalVisible(false);
+
+      showToast(
+        language === "Indonesia"
+          ? "Username berhasil diperbarui!"
+          : "Username successfully updated!",
+        "success"
+      );
     } catch (e) {
       console.warn("Backend username sync failed:", e);
-    }
 
-    showToast(
-      language === "Indonesia" ? "Username berhasil diperbarui!" : "Username successfully updated!",
-      "success"
-    );
+      showToast(
+        language === "Indonesia"
+          ? "Username gagal diperbarui."
+          : "Failed to update username.",
+        "error"
+      );
+    }
   };
 
   const handleLogout = () => {
