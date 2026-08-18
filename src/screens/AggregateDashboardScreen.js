@@ -239,6 +239,11 @@ const ensureOngoingHourPoint = (labels, values, period = "Hourly") => {
   };
 
   const loadGraphs = async (showSpinner = false) => {
+    // Jika user baru memilih tanggal "Dari" saja, jangan lakukan loading dulu sampai tanggal "Sampai" juga dipilih
+    if (rangeStart && !rangeEnd) {
+      return;
+    }
+
     if (showSpinner) setIsGraphLoading(true);
     const period = getPeriodKey(timePeriod);
 

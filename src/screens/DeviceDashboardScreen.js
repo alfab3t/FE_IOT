@@ -432,7 +432,7 @@ export default function DeviceDashboardScreen({ navigation, setActiveTab }) {
   const getIndonesianDate = () => {
     const date = new Date();
     let offsetHours = 0;
-    let tzLabel = "WIB";
+    let tzLabel = "";
 
     if (timezone === "WITA" || timezone?.includes("WITA")) {
       offsetHours = 1;

@@ -9,6 +9,13 @@ const formatDate = (date, lang = "Indonesia") => {
   return date.toLocaleDateString(lang === "Indonesia" ? "id-ID" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const isBeforeStart = (start, end) => {
+  if (!start || !end) return false;
+  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const e = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  return e < s;
+};
+
 /**
  * Props:
  * - startDate, endDate: Date | null
@@ -16,23 +23,53 @@ const formatDate = (date, lang = "Indonesia") => {
  * - colors: theme colors from useUser()
  */
 export default function DateRangeFilter({ startDate, endDate, onChange, colors }) {
-  const { language } = useUser();
+  const { language, showToast } = useUser();
   const [activeTarget, setActiveTarget] = useState(null); // "start" | "end" | null
   const [tempDate, setTempDate] = useState(new Date());
 
   const openPicker = (target) => {
-    setTempDate((target === "start" ? startDate : endDate) || new Date());
+    let initialDate = target === "start" ? startDate : endDate;
+    if (!initialDate && target === "end" && startDate) {
+      initialDate = startDate;
+    }
+    setTempDate(initialDate || new Date());
     setActiveTarget(target);
   };
 
   const closePicker = () => setActiveTarget(null);
 
-  // Android: langsung apply begitu user pilih tanggal (native dialog udah punya tombol sendiri)
+  // Android: langsung apply begitu user pilih tanggal
   const handleAndroidChange = (event, selectedDate) => {
     setActiveTarget(null);
     if (event.type === "dismissed" || !selectedDate) return;
-    if (activeTarget === "start") onChange(selectedDate, endDate);
-    else if (activeTarget === "end") onChange(startDate, selectedDate);
+
+    if (activeTarget === "start") {
+      if (endDate && isBeforeStart(selectedDate, endDate)) {
+        if (showToast) {
+          showToast(
+            language === "Indonesia"
+              ? "Tanggal mulai tidak boleh lebih lambat dari tanggal sampai."
+              : "Start date cannot be later than end date.",
+            "error"
+          );
+        }
+        return;
+      }
+      onChange(selectedDate, endDate);
+    } else if (activeTarget === "end") {
+      if (startDate && isBeforeStart(startDate, selectedDate)) {
+        if (showToast) {
+          showToast(
+            language === "Indonesia"
+              ? "Tanggal sampai tidak boleh lebih awal dari tanggal mulai."
+              : "End date cannot be earlier than start date.",
+            "error"
+          );
+        }
+        return;
+      }
+      onChange(startDate, selectedDate);
+    }
   };
 
   // iOS: user geser-geser dulu di dalam modal, baru "Selesai" apply
@@ -41,8 +78,35 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
   };
 
   const confirmIos = () => {
-    if (activeTarget === "start") onChange(tempDate, endDate);
-    else if (activeTarget === "end") onChange(startDate, tempDate);
+    if (activeTarget === "start") {
+      if (endDate && isBeforeStart(tempDate, endDate)) {
+        if (showToast) {
+          showToast(
+            language === "Indonesia"
+              ? "Tanggal mulai tidak boleh lebih lambat dari tanggal sampai."
+              : "Start date cannot be later than end date.",
+            "error"
+          );
+        }
+        closePicker();
+        return;
+      }
+      onChange(tempDate, endDate);
+    } else if (activeTarget === "end") {
+      if (startDate && isBeforeStart(startDate, tempDate)) {
+        if (showToast) {
+          showToast(
+            language === "Indonesia"
+              ? "Tanggal sampai tidak boleh lebih awal dari tanggal mulai."
+              : "End date cannot be earlier than start date.",
+            "error"
+          );
+        }
+        closePicker();
+        return;
+      }
+      onChange(startDate, tempDate);
+    }
     closePicker();
   };
 
@@ -89,7 +153,8 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
           mode="date"
           display="default"
           onChange={handleAndroidChange}
-          maximumDate={new Date()}
+          minimumDate={activeTarget === "end" && startDate ? startDate : undefined}
+          maximumDate={activeTarget === "start" && endDate && endDate < new Date() ? endDate : new Date()}
         />
       )}
 
@@ -112,7 +177,8 @@ export default function DateRangeFilter({ startDate, endDate, onChange, colors }
                 mode="date"
                 display="inline"
                 onChange={handleIosChange}
-                maximumDate={new Date()}
+                minimumDate={activeTarget === "end" && startDate ? startDate : undefined}
+                maximumDate={activeTarget === "start" && endDate && endDate < new Date() ? endDate : new Date()}
                 style={{ alignSelf: "center" }}
               />
 

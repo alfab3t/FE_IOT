@@ -154,9 +154,9 @@ export default function PowerMeterScreen({ navigation, route }) {
 
   // Load chart data
   const loadChartData = useCallback(async (period) => {
+    if (rangeStart && !rangeEnd) return;
     setIsChartLoading(true);
-    const response = await iotService.getGraphData(deviceId, period,rangeStart ? rangeStart.toISOString() : null,
-    rangeEnd ? rangeEnd.toISOString() : null);
+    const response = await iotService.getGraphData(deviceId, period, rangeStart ? rangeStart.toISOString() : null, rangeEnd ? rangeEnd.toISOString() : null);
     setIsChartLoading(false);
     if (!response?.error && Array.isArray(response) && response.length > 0) {
       const sliced = response.length > 7 ? response.slice(-7) : response;
