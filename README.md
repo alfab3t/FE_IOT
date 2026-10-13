@@ -73,11 +73,11 @@ flowchart TD
         FCM[🔥 Firebase Cloud Messaging]
     end
 
-    subgraph Client Application [FE_IOT Client]
-        Nav[🚀 App Navigator]
-        Nav --> Dash[📊 Telemetry Dashboard]
-        Nav --> Ctrl[🎛️ Remote Controller Screen]
-        Nav --> Scan[📷 QR Scanner Pairing]
+    subgraph ClientApp["FE_IOT Client Application"]
+        Nav["🚀 App Navigator"]
+        Nav --> Dash["📊 Telemetry Dashboard"]
+        Nav --> Ctrl["🎛️ Remote Controller Screen"]
+        Nav --> Scan["📷 QR Scanner Pairing"]
     end
 
     Sensors -->|Live Telemetry Data| IoTBroker
@@ -85,7 +85,7 @@ flowchart TD
     Ctrl -->|Publish Switch / Temperature Command| IoTBroker
     IoTBroker --> Actuators
     IoTBroker -->|Anomaly Trigger| FCM
-    FCM -->|Push Notification Alerts| FE_IOT Client
+    FCM -->|Push Notification Alerts| Nav
 ```
 
 ---
